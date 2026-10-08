@@ -8,7 +8,12 @@ const DOMAINES_JS = [
 ];
 const DIRECTION_JS = /\b(dg|pdg|dga|directeur|directrice|direction|dirigeant|responsable|manager|chef|g[ée]rant|cadre|daf|dsi|drh|ceo|patron|propri[ée]taire)/i;
 const SUGG_CIBLE = ["DG", "Responsables", "Vendeurs", "Employés", "Managers", "DSI", "DRH", "Chefs de ménage"];
-const SUGG_ZONES = ["Dakar", "Thiès", "Saint-Louis", "Abidjan", "Bouaké", "Bamako", "Ouagadougou", "Lomé", "Cotonou", "Douala"];
+const ESPACES_JS = {
+  UEMOA: ["Bénin", "Burkina Faso", "Côte d'Ivoire", "Guinée-Bissau", "Mali", "Niger", "Sénégal", "Togo"],
+  CEMAC: ["Cameroun", "Centrafrique", "Congo", "Gabon", "Guinée équatoriale", "Tchad"],
+  "Guinée": ["Guinée"],
+  "RD Congo": ["RD Congo"],
+};
 const ETAPES_ETUDE = [["Le sujet", "Thème et objectif"], ["La cible", "Profils interrogés"], ["Le terrain", "Zones, taille, durée"], ["Le lancement", "Budget et récapitulatif"]];
 
 const E = { etape: 0, f: null };
@@ -38,13 +43,7 @@ function vueEtude(app, params) {
   if (m) appliquerModele(m, false);
   app.innerHTML = `
   <section class="etude">
-    <div class="soie" aria-hidden="true">
-      <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
-        <path class="ruban r1" d="M-100 620 C 250 420, 520 820, 860 560 S 1380 380, 1560 520 L1560 900 L-100 900Z"/>
-        <path class="ruban r2" d="M-100 700 C 300 560, 600 900, 980 660 S 1400 560, 1560 640 L1560 900 L-100 900Z"/>
-        <path class="ruban r3" d="M-100 300 C 220 160, 560 420, 900 240 S 1300 80, 1560 200 L1560 0 L-100 0Z"/>
-      </svg>
-    </div>
+    <div class="soie" aria-hidden="true"><i class="ruban r1"></i><i class="ruban r2"></i><i class="ruban r3"></i></div>
     <div class="etude-tete">
       <span class="sur" data-reveal="haut">Nouvelle étude</span>
       <h1 class="titre-section-l" data-reveal="haut" data-delai="80">Les éléments essentiels pour lancer le baromètre.</h1>
@@ -97,8 +96,10 @@ function panneauCible() {
 
 function panneauTerrain() {
   return `<h2 class="ass-titre">Où et combien&nbsp;?</h2>
-    ${champ("e-zones-in", 'Zones d\'enquête <span class="obl">*</span>', `<div class="puces-saisie" data-liste="zones"><input id="e-zones-in" placeholder="Saisir une zone puis Entrée"></div>`)}
-    <div class="suggestions" data-sugg="zones">${SUGG_ZONES.map((s) => `<button data-ajout="${esc(s)}">+ ${esc(s)}</button>`).join("")}</div>
+    <div class="lib">Champ d'étude : pays <span class="obl">*</span></div>
+    <div class="espaces">${Object.entries(ESPACES_JS).map(([e, l]) => `<button class="espace" data-espace="${esc(e)}"><b>${esc(e)}</b><small>${l.length} pays</small><i class="esp-jauge"><i></i></i></button>`).join("")}</div>
+    <div class="pays-grille">${Object.entries(ESPACES_JS).map(([e, l]) => `<div class="pays-groupe"><span>${esc(e)}</span>${l.map((p) => `<button class="pays" data-pays="${esc(p)}">${esc(p)}</button>`).join("")}</div>`).join("")}</div>
+    ${champ("e-zones-in", 'Pays retenus <span class="ex">ajoutez librement tout autre pays ou zone</span>', `<div class="puces-saisie" data-liste="zones"><input id="e-zones-in" placeholder="Autre pays ou zone, puis Entrée"></div>`)}
     <div class="grille-2" style="margin-top:14px">
       ${champ("e-secteur", "Secteur", `<input class="saisie" id="e-secteur" data-f="secteur" placeholder="Commerce formel">`, "Plusieurs secteurs séparés par des virgules ajoutent une question.")}
       ${champ("e-date", "Début de la collecte", `<input class="saisie" type="date" id="e-date" data-f="date_debut">`, "Par défaut : le lundi dans trois semaines.")}
@@ -167,6 +168,19 @@ function lierEtude(app) {
     rafraichirEtude();
   });
   app.querySelectorAll("[data-outil]").forEach((b) => (b.onclick = () => { f.outil = b.dataset.outil; rafraichirEtude(); }));
+  app.querySelectorAll("[data-espace]").forEach((b) => (b.onclick = () => {
+    const liste = ESPACES_JS[b.dataset.espace];
+    const tous = liste.every((p) => f.zones.includes(p));
+    f.zones = tous ? f.zones.filter((z) => !liste.includes(z)) : [...f.zones, ...liste.filter((p) => !f.zones.includes(p))];
+    $("[data-liste='zones']").classList.remove("erreur");
+    rafraichirEtude();
+  }));
+  app.querySelectorAll("[data-pays]").forEach((b) => (b.onclick = () => {
+    const p = b.dataset.pays;
+    f.zones = f.zones.includes(p) ? f.zones.filter((z) => z !== p) : [...f.zones, p];
+    $("[data-liste='zones']").classList.remove("erreur");
+    rafraichirEtude();
+  }));
   app.querySelectorAll("[data-aller]").forEach((b) => (b.onclick = () => allerEtape(+b.dataset.aller)));
   $("#ass-prec").onclick = () => allerEtape(E.etape - 1);
   $("#ass-suiv").onclick = () => allerEtape(E.etape + 1);
@@ -224,6 +238,7 @@ function rafraichirEtude(complet) {
 
   // assistant
   $("#ass-rail").style.transform = `translateX(-${E.etape * 100}%)`;
+  $(".ass-fenetre").scrollLeft = 0;
   document.querySelectorAll(".ass-panneau").forEach((p, k) => p.classList.toggle("actif", k === E.etape));
   document.querySelectorAll(".ass-etape").forEach((b, k) => { b.classList.toggle("actif", k === E.etape); b.classList.toggle("fait", k < E.etape); });
   $("#ass-liquide").style.width = `${((E.etape + 1) / 4) * 100}%`;
@@ -234,6 +249,14 @@ function rafraichirEtude(complet) {
   $("#v-duree").textContent = f.duree;
   ["e-taille", "e-duree"].forEach((id) => { const el = $("#" + id); el.value = f[el.dataset.f]; el.style.setProperty("--p", `${((el.value - el.min) / (el.max - el.min)) * 100}%`); });
   document.querySelectorAll("[data-outil]").forEach((b) => b.classList.toggle("actif", b.dataset.outil === f.outil));
+  document.querySelectorAll("[data-pays]").forEach((b) => b.classList.toggle("actif", f.zones.includes(b.dataset.pays)));
+  document.querySelectorAll("[data-espace]").forEach((b) => {
+    const l = ESPACES_JS[b.dataset.espace], n = l.filter((p) => f.zones.includes(p)).length;
+    b.classList.toggle("complet", n === l.length);
+    b.classList.toggle("partiel", n > 0 && n < l.length);
+    b.querySelector(".esp-jauge i").style.width = `${(100 * n) / l.length}%`;
+    b.querySelector("small").textContent = n && n < l.length ? `${n} / ${l.length} pays` : `${l.length} pays`;
+  });
   document.querySelectorAll(".puces-saisie").forEach((box) => {
     const cle = box.dataset.liste;
     box.querySelectorAll(".puce-e").forEach((x) => x.remove());
@@ -244,7 +267,7 @@ function rafraichirEtude(complet) {
     <div class="dom-inds">${dom.inds.map((x, k) => `<span style="animation-delay:${k * 70}ms">${esc(x)}</span>`).join("")}</div><small>Indicateurs proposés dans la note de cadrage, à ajuster ensuite.</small>` : "";
   $("#e-niveaux").innerHTML = f.cible.length ? `<div class="niv-col"><span class="niv dir">Direction</span>${f.cible.filter((c) => DIRECTION_JS.test(c)).map((c) => `<em>${esc(c)}</em>`).join("") || "<em class='vide-n'>—</em>"}</div>
     <div class="niv-col"><span class="niv ope">Opérationnel</span>${f.cible.filter((c) => !DIRECTION_JS.test(c)).map((c) => `<em>${esc(c)}</em>`).join("") || "<em class='vide-n'>—</em>"}</div>` : "";
-  $("#e-recap").innerHTML = [["Thème", f.theme], ["Objectif", f.objectif], ["Cible", f.cible.join(", ")], ["Zones", f.zones.join(", ")],
+  $("#e-recap").innerHTML = [["Thème", f.theme], ["Objectif", f.objectif], ["Cible", f.cible.join(", ")], ["Pays", f.zones.length ? `${f.zones.length} : ${f.zones.join(", ")}` : ""],
     ["Secteur", f.secteur || "Secteur formel"], ["Taille", `${n} répondants`], ["Durée", `${f.duree} jours`], ["Outil", f.outil === "kobo" ? "KoboToolbox" : "QuestionPro"],
     ["Budget", f.cout ? `${f.cout} FCFA` : "Non renseigné"]].map(([k, v]) => `<div><span>${k}</span><b class="${v ? "" : "manque"}">${esc(v || "à compléter")}</b></div>`).join("");
 
@@ -254,14 +277,15 @@ function rafraichirEtude(complet) {
     <div class="avp-titre ${f.theme ? "" : "fantome"}">${esc(f.theme || "Thème du baromètre")}</div>
     <div class="avp-obj ${f.objectif ? "" : "fantome"}">${esc(f.objectif || "Objectif de l'étude")}</div>
     <div class="avp-trait"></div>
-    <div class="avp-meta">${n} répondants · ${esc(f.zones.join(", ") || "zones")} · ${f.duree} jours</div>
+    <div class="avp-meta">${n} répondants · ${f.zones.length > 3 ? `${f.zones.length} pays` : esc(f.zones.join(", ") || "pays")} · ${f.duree} jours</div>
     <div class="avp-lignes"><i></i><i></i><i></i><i class="court"></i></div>`;
   $("#av-jauges").innerHTML = [
     [mg ? `±${mg.toFixed(1).replace(".", ",")}` : "–", "pts de marge globale"],
     [mgProfil ? `±${mgProfil.toFixed(1).replace(".", ",")}` : "–", "pts par profil"],
-    [nEnq, "enquêteurs estimés"],
+    [nEnq, `enquêteurs estimés${f.zones.length > 1 ? ` · ${f.zones.length} pays` : ""}`],
     [Math.ceil(n / jours), "questionnaires par jour"],
-  ].map(([v, l]) => `<div class="avj"><b>${v}</b><span>${l}</span></div>`).join("");
+  ].map(([v, l]) => `<div class="avj"><b>${v}</b><span>${l}</span></div>`).join("")
+    + (f.zones.length > 1 && n / f.zones.length < 30 ? `<div class="avj-alerte">${ico("alert")}<span>Environ ${Math.floor(n / f.zones.length)} répondants par pays : sous le seuil de 30, les résultats par pays ne seront pas publiables. Visez au moins ${30 * f.zones.length} répondants.</span></div>` : "");
   const livr = ["Note de cadrage", "Questionnaire et formulaires", "Échantillonnage et formation", "Note méthodologique", "Tableau de bord", "Note de suivi", "Rapport d'analyse"];
   const remplis = [f.theme && f.objectif, f.cible.length, f.zones.length, true].filter(Boolean).length;
   $("#av-chaine").innerHTML = `<div class="avc-titre">Ce qui sera produit</div>` + livr.map((l, k) => `<div class="avc ${k < remplis + 2 ? "pret" : ""}" style="transition-delay:${k * 60}ms"><i></i>${l}</div>`).join("");

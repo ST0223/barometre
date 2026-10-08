@@ -2,6 +2,7 @@
 from datetime import date
 
 from ..charte import chiffres, liste, p, section, tableau
+from ..banque import sont_des_pays
 from ..outils import aujourdhui, date_courte, date_fr, nombre, pct
 
 DOCS = {"note_suivi": ("NoteSuivi", "Note de suivi des enquêtes")}
@@ -29,6 +30,7 @@ def construire_docs(projet, data, stats):
                                "meta": [], "en_tete": "", "sections": [section("vide", "Données manquantes", [
                                    p("Aucune soumission n'a encore été importée à l'étape Collecte.")], source="auto")]}}
     s = stats
+    Z = "Pays" if sont_des_pays([z["zone"] for z in s["par_zone"]]) else "Zone"
     j0, j1 = s["par_jour"][0]["date"], s["par_jour"][-1]["date"]
     ecart = s["realise"] - s["objectif"]
     sections = [
@@ -44,12 +46,12 @@ def construire_docs(projet, data, stats):
               f"et {s['rapides']} à des entretiens trop rapides, écartés de l'analyse."),
         ], source="auto"),
         section("realise", "2. Réalisé contre prévu", [
-            tableau(["Zone", "Objectif", "Réalisé", "Taux"], [[z["zone"], z["objectif"], z["realise"], pct(z["taux"])] for z in s["par_zone"]], "Réalisation par zone"),
+            tableau([Z, "Objectif", "Réalisé", "Taux"], [[z["zone"], z["objectif"], z["realise"], pct(z["taux"])] for z in s["par_zone"]], f"Réalisation par {Z.lower()}"),
             tableau(["Profil", "Objectif", "Réalisé", "Taux"], [[x["profil"], x["objectif"], x["realise"], pct(x["taux"])] for x in s["par_profil"]], "Réalisation par profil"),
-            tableau(["Zone", "Profil", "Objectif", "Réalisé", "Taux"], [[q["zone"], q["profil"], q["objectif"], q["realise"], pct(q["taux"])] for q in s["quotas"]], "Atteinte des quotas zone × profil", taille=9),
+            tableau([Z, "Profil", "Objectif", "Réalisé", "Taux"], [[q["zone"], q["profil"], q["objectif"], q["realise"], pct(q["taux"])] for q in s["quotas"]], f"Atteinte des quotas {Z.lower()} × profil", taille=9),
         ], source="auto"),
         section("enqueteurs", "3. Performance des enquêteurs", [
-            tableau(["Enquêteur", "Zone", "Objectif", "Réalisé", "Taux", "Écart"],
+            tableau(["Enquêteur", Z, "Objectif", "Réalisé", "Taux", "Écart"],
                     [[e["nom"], e["zone"], e["objectif"], e["realise"], pct(e["taux"]), f"{e['realise'] - e['objectif']:+d}"] for e in s["par_enqueteur"]],
                     "Réalisation par enquêteur", taille=9),
         ], source="auto"),

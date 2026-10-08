@@ -22,6 +22,34 @@ def decouper(texte):
     return [m.strip() for m in morceaux if m and m.strip()]
 
 
+# Champ d'étude habituel de Datatym : pays de l'UEMOA, de la CEMAC, Guinée et RD Congo.
+ESPACES = {
+    "UEMOA": ["Bénin", "Burkina Faso", "Côte d'Ivoire", "Guinée-Bissau", "Mali", "Niger", "Sénégal", "Togo"],
+    "CEMAC": ["Cameroun", "Centrafrique", "Congo", "Gabon", "Guinée équatoriale", "Tchad"],
+    "Guinée": ["Guinée"],
+    "RD Congo": ["RD Congo"],
+}
+ESPACE_DU_PAYS = {slug(p): e for e, liste in ESPACES.items() for p in liste}
+
+
+def sont_des_pays(zones):
+    """Vrai si le champ d'étude contient des pays de la liste Datatym (le questionnaire parle alors de pays)."""
+    return any(slug(z) in ESPACE_DU_PAYS for z in decouper(zones))
+
+
+def resume_champ(zones):
+    """« UEMOA (8 pays), CEMAC (2 pays), autres : Maroc »"""
+    par_espace, autres = {}, []
+    for z in decouper(zones):
+        e = ESPACE_DU_PAYS.get(slug(z))
+        if e and e not in ("Guinée", "RD Congo"):
+            par_espace[e] = par_espace.get(e, 0) + 1
+        else:
+            autres.append(z)
+    morceaux = [f"{e} ({n} pays)" for e, n in par_espace.items()] + autres
+    return ", ".join(morceaux)
+
+
 DIRECTION_RE = re.compile(r"\b(dg|pdg|dga|directeur|directrice|direction|dirigeant|responsable|manager|chef|g[ée]rant|cadre|daf|dsi|drh|ceo|patron|propri[ée]taire)", re.I)
 
 

@@ -2,7 +2,7 @@
 import math
 from datetime import date, timedelta
 
-from ..banque import decouper, slug
+from ..banque import decouper, slug, sont_des_pays
 from ..charte import liste, p, section, tableau, chiffres
 from ..config import charger_parametres
 from ..outils import aujourdhui, date_courte, date_fr, debut_collecte, fcfa, fmt_marge, jours_collecte, nombre, repartir
@@ -170,12 +170,15 @@ def construire_docs(projet, data, quest):
     jours = [date.fromisoformat(j) for j in data["jours"]]
     n = fiche["taille"]
     q = {(z, c): v for z, c, v in data["quotas"]}
+    Z = "Pays" if sont_des_pays(data["zones"]) else "Zone"
 
     lignes_quotas = [[z] + [str(q[(z, c)]) for c in codes] + [str(data["tot_zone"][z])] for z in data["zones"]]
     lignes_quotas.append(["**Total**"] + [f"**{sum(q[(z, c)] for z in data['zones'])}**" for c in codes] + [f"**{n}**"])
     lignes_enq = [[m["nom"], m["zone"]] + [str(m["par_profil"][c]) for c in codes] + [str(m["objectif"]), nombre(m["objectif"] / len(jours), 1)]
                   for m in data["enqueteurs"]]
-    cal = [[date_courte(l["date"])] + [str(l["zones"].get(z, 0)) for z in data["zones"]] + [str(l["profils"].get(c, 0)) for c in codes]
+    # au-delà de 6 pays, les colonnes par pays ne tiennent plus sur la page : le détail reste dans l'Excel
+    zones_cal = data["zones"] if len(data["zones"]) <= 6 else []
+    cal = [[date_courte(l["date"])] + [str(l["zones"].get(z, 0)) for z in zones_cal] + [str(l["profils"].get(c, 0)) for c in codes]
            + [str(l["total"]), str(l["cumul"])] for l in data["calendrier"]]
 
     sections = [
@@ -189,19 +192,20 @@ def construire_docs(projet, data, quest):
               + (", hors dimanches" if data["params"].get("sans_dimanche", True) else "") + "."),
         ], source="auto"),
         section("quotas", "2. Quotas par zone et par profil", [
-            tableau(["Zone"] + [lib[c] for c in codes] + ["Total"], lignes_quotas, "Quotas zone × profil"),
+            tableau([Z] + [lib[c] for c in codes] + ["Total"], lignes_quotas, f"Quotas {Z.lower()} × profil"),
             tableau(["Niveau de lecture", "Effectif", "Marge d'erreur (IC 95 %)"],
-                    [["Global", str(n), fmt_marge(n)]] + [[f"Zone : {z}", str(t), fmt_marge(t)] for z, t in data["tot_zone"].items()]
+                    [["Global", str(n), fmt_marge(n)]] + [[f"{Z} : {z}", str(t), fmt_marge(t)] for z, t in data["tot_zone"].items()]
                     + [[f"Profil : {lib[c]}", str(sum(q[(z, c)] for z in data['zones'])), fmt_marge(sum(q[(z, c)] for z in data['zones']))] for c in codes],
                     "Précision attendue"),
         ], source="auto"),
         section("repartition", "3. Répartition par enquêteur", [
             p("Les enquêteurs sont désignés Enq1, Enq2… tant que la liste nominative n'est pas chargée. Chaque enquêteur reçoit un objectif par profil."),
-            tableau(["Enquêteur", "Zone"] + [lib[c] for c in codes] + ["Objectif", "Par jour"], lignes_enq, "Objectifs par enquêteur"),
+            tableau(["Enquêteur", Z] + [lib[c] for c in codes] + ["Objectif", "Par jour"], lignes_enq, "Objectifs par enquêteur"),
         ], source="auto"),
         section("calendrier", "4. Calendrier de collecte", [
-            p("Objectifs quotidiens par zone et par profil. Le détail par enquêteur et par jour figure dans le fichier Excel du calendrier."),
-            tableau(["Jour"] + data["zones"] + [lib[c] for c in codes] + ["Total", "Cumul"], cal, "Quotas journaliers", taille=8.5),
+            p("Objectifs quotidiens par " + ("zone et par profil" if zones_cal else "profil") + ". Le détail par "
+              + ("" if zones_cal else "pays, ") + "enquêteur et jour figure dans le fichier Excel du calendrier."),
+            tableau(["Jour"] + zones_cal + [lib[c] for c in codes] + ["Total", "Cumul"], cal, "Quotas journaliers", taille=8.5),
             tableau(["Moment", "Activité"], [
                 [date_fr(jours[0] - timedelta(days=1), True), "Formation des enquêteurs, prise en main de l'outil et pré-test"],
                 [date_fr(jours[0], True), "Démarrage de la collecte"],

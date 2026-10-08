@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from .. import llm  # noqa: E402
-from ..banque import TYPES, slug  # noqa: E402
+from ..banque import TYPES, slug, sont_des_pays  # noqa: E402
 from ..charte import chiffres, image, liste, p, section, tableau  # noqa: E402
 from ..outils import aujourdhui, fmt_marge, nombre, pct, solde_txt  # noqa: E402
 from ..store import dossier  # noqa: E402
@@ -320,6 +320,7 @@ def construire_docs(projet, data, ech):
     dg = dossier(projet["slug"]) / "graphiques"
     rel = lambda c: str(c.relative_to(dossier(projet["slug"]).parent.parent))  # noqa: E731
     lp, lz = an["lib_profil"], an["lib_zone"]
+    Z = "Pays" if sont_des_pays(list(lz.values())) else "Zone"
     res = an["resultats"]
     n = an["n"]
     chif = [c for c in (chiffre_cle(r) for r in res) if c][:10]
@@ -341,8 +342,8 @@ def construire_docs(projet, data, ech):
             p(f"L'analyse porte sur {n} questionnaires valides, sur {an['n_brut']} formulaires reçus (refus, hors-cible et entretiens trop rapides exclus)."),
             tableau(["Profil", "Effectif", "Part", "Marge d'erreur"],
                     [[lp[c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in an["effectifs_profil"].items()], "Répartition par profil"),
-            tableau(["Zone", "Effectif", "Part", "Marge d'erreur"],
-                    [[lz[c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in an["effectifs_zone"].items()], "Répartition par zone"),
+            tableau([Z, "Effectif", "Part", "Marge d'erreur"],
+                    [[lz[c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in an["effectifs_zone"].items()], f"Répartition par {Z.lower()}"),
         ], source="auto"),
     ]
     chap = 1
@@ -354,7 +355,7 @@ def construire_docs(projet, data, ech):
         sections.append(section(f"ch_{indice['id']}", f"{ROMAINS[chap - 1]}. {indice['libelle']}", [
             chiffres([{"valeur": f"{nombre(indice['global']['valeur'], 1)}", "libelle": f"{indice['libelle']} (sur 100)"}]),
             p(lecture(indice, an)),
-            image(rel(g), f"{indice['libelle']} par profil et par zone", 15),
+            image(rel(g), f"{indice['libelle']} par profil et par {Z.lower()}", 15),
             p("Composantes : " + "; ".join(noms.get(c, c) for c in indice.get("composantes", [])) + ".", "note"),
         ], source="auto"))
     blocs = []
@@ -378,7 +379,7 @@ def construire_docs(projet, data, ech):
                             lignes.append([labels[c], x["n"], pct(x["positif"]), pct(x["negatif"]), solde_txt(x["solde"])])
                         elif x.get("n"):
                             lignes.append([labels[c], x["n"], "effectif insuffisant", "", ""])
-                blocs_doc.append(tableau(["Groupe", "Base", "Favorables", "Défavorables", "Solde"], lignes, f"{r['libelle']} selon le profil et la zone", taille=9))
+                blocs_doc.append(tableau(["Groupe", "Base", "Favorables", "Défavorables", "Solde"], lignes, f"{r['libelle']} selon le profil et {'le pays' if Z == 'Pays' else 'la zone'}", taille=9))
         sections.append(section(f"ch_{slug(bloc)}", f"{ROMAINS[chap - 1]}. {bloc}", blocs_doc, source="auto"))
     sections += [
         section("enseignements", f"{ROMAINS[chap]}. Enseignements", [liste(data.get("enseignements", []))]),

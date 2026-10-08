@@ -230,7 +230,18 @@ def types():
 
 if __name__ == "__main__":
     import os
+    import socket
     port = int(os.environ.get("PORT", 8765))
+    # Sous Windows, un second serveur peut écouter le même port : les requêtes se répartissent alors
+    # au hasard entre l'ancien et le nouveau code. On réutilise la plateforme déjà ouverte.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sonde:
+        sonde.settimeout(0.5)
+        if sonde.connect_ex(("127.0.0.1", port)) == 0:
+            print(f"\n  La plateforme tourne déjà sur http://127.0.0.1:{port}\n"
+                  "  Pour la redémarrer, fermez d'abord la fenêtre du serveur existant.\n")
+            if not os.environ.get("SANS_NAVIGATEUR"):
+                webbrowser.open(f"http://127.0.0.1:{port}")
+            raise SystemExit(0)
     PROJETS_DIR.mkdir(exist_ok=True)
     if not os.environ.get("SANS_NAVIGATEUR"):
         Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()

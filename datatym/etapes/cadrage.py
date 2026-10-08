@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from .. import llm
 from ..banque import (DOMAINES, TYPES, decouper, definition_auto, indicateurs_par_defaut, profils_concernes,
-                      profils_depuis_cible)
+                      profils_depuis_cible, resume_champ, sont_des_pays)
 from ..charte import liste, p, section, tableau, chiffres
 from ..outils import date_fr, debut_collecte, fcfa, fmt_marge, repartir, aujourdhui
 
@@ -190,7 +190,7 @@ def construire_docs(projet, data):
     for p_, k in zip(profils, par_profil):
         precision.append([f"Profil : {p_['libelle']}", str(k), fmt_marge(k)])
     if len(zones) > 1:
-        precision.append([f"Par zone (moyenne)", str(n // len(zones)), fmt_marge(n // len(zones))])
+        precision.append([f"Par {'pays' if sont_des_pays(zones) else 'zone'} (moyenne)", str(n // len(zones)), fmt_marge(n // len(zones))])
 
     sections = [
         section("contexte", "1. Contexte et justification", [p(t) for t in data.get("contexte", [])]),
@@ -202,7 +202,8 @@ def construire_docs(projet, data):
         section("cible", "3. Cible, champ et taille de l'échantillon", [
             tableau(["Paramètre", "Valeur retenue"], [
                 ["Thème", fiche["theme"]], ["Objectif", fiche["objectif"]], ["Cible", fiche["cible"]],
-                ["Champ géographique", ", ".join(zones)], ["Secteur", fiche.get("secteur") or "Secteur formel"],
+                ["Champ géographique", f"{resume_champ(zones)} : {', '.join(zones)}" if sont_des_pays(zones) else ", ".join(zones)],
+                ["Secteur", fiche.get("secteur") or "Secteur formel"],
                 ["Taille visée", f"{n} répondants"], ["Durée de collecte", f"{fiche['duree']} jours"],
             ], "Paramètres du baromètre", [1, 2.4]),
             p("Les questions sont adaptées à chaque profil : un dirigeant et un agent opérationnel ne reçoivent pas les mêmes questions."),

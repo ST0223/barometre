@@ -220,7 +220,7 @@ const CHAMPS = [
   ["theme", "Thème du baromètre", "Climat des affaires dans le commerce formel", true, "Tous les documents"],
   ["objectif", "Objectif", "Mesurer la confiance des entreprises", true, "Cadrage, méthodologie, rapport"],
   ["cible", "Cible", "DG, responsables, vendeurs", true, "Questionnaire, échantillonnage — un profil par virgule"],
-  ["zones", "Champ d'enquête : zones", "Dakar, Thiès, Saint-Louis", true, "Échantillonnage, calendrier — une zone par virgule"],
+  ["zones", "Champ d'étude : pays", "Sénégal, Côte d'Ivoire, Cameroun", true, "Échantillonnage, calendrier — un pays (ou une zone) par virgule"],
   ["secteur", "Champ d'enquête : secteur", "Commerce formel", false, "Plusieurs secteurs séparés par des virgules ajoutent une question"],
   ["taille", "Taille de population souhaitée", "400", true, "Quotas, nombre d'enquêteurs"],
   ["duree", "Durée de l'enquête (jours)", "15", true, "Calendrier de collecte"],
@@ -310,6 +310,15 @@ function panneauFiche() {
         ${formFiche(p.fiche)}
         <div class="pied-form"><button class="btn btn-primaire" id="enr-fiche">${ico("check")} Enregistrer la fiche</button></div>
       </div></div>${colonneDroite()}</div>`;
+  const zones = $("#f-zones");
+  zones.insertAdjacentHTML("afterend", `<div class="suggestions" style="margin-top:2px">${Object.entries(ESPACES_JS).map(([e, l]) =>
+    `<button type="button" data-ajout-espace="${esc(e)}">+ ${esc(e)}${l.length > 1 ? ` (${l.length} pays)` : ""}</button>`).join("")}</div>`);
+  document.querySelectorAll("[data-ajout-espace]").forEach((b) => (b.onclick = () => {
+    const actuels = zones.value.split(",").map((x) => x.trim()).filter(Boolean);
+    ESPACES_JS[b.dataset.ajoutEspace].forEach((pays) => { if (!actuels.includes(pays)) actuels.push(pays); });
+    zones.value = actuels.join(", ");
+    zones.classList.remove("flash"); void zones.offsetWidth; zones.classList.add("flash");
+  }));
   $("#enr-fiche").onclick = (e) => occupe(e.currentTarget, async () => {
     const r = await api("PUT", `/api/projets/${p.slug}/fiche`, lireFiche());
     majProjet(r, "Fiche enregistrée.");

@@ -2,7 +2,7 @@
 import math
 import re
 
-from ..banque import (TYPES, decouper, modalites, profils_concernes, profils_depuis_cible, slug, texte_question)
+from ..banque import (TYPES, decouper, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
 from ..charte import p, section, tableau, liste
 from ..outils import aujourdhui, repartir
 from .cadrage import indicateurs_actifs
@@ -36,9 +36,9 @@ def questions_identification(fiche, profils, secteurs, domaine):
     qs = [
         _q("id_enqueteur", "Enquêteur Datatym", "select_one", [{"code": f"enq{k}", "label": f"Enq{k}"} for k in range(1, n_enq + 1)],
            fixe=True, terrain_seul=True, consigne="Rempli par l'enquêteur, ne pas lire. Liste mise à jour à l'étape échantillonnage."),
-        _q("id_zone", "Dans quelle zone se situe votre structure ?", "select_one",
-           [{"code": slug(z, maxi=18), "label": z} for z in decouper(fiche["zones"])], fixe=True,
-           consigne="Ne pas lire : cocher la zone d'enquête."),
+        _q("id_zone", "Dans quel pays se situe votre structure ?" if sont_des_pays(fiche["zones"]) else "Dans quelle zone se situe votre structure ?",
+           "select_one", [{"code": slug(z, maxi=18), "label": z} for z in decouper(fiche["zones"])], fixe=True,
+           consigne="Ne pas lire : cocher le pays d'enquête." if sont_des_pays(fiche["zones"]) else "Ne pas lire : cocher la zone d'enquête."),
     ]
     if len(secteurs) > 1:
         qs.append(_q("id_secteur", "Dans quel secteur exerce principalement votre structure ?", "select_one",
