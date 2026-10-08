@@ -9,6 +9,7 @@ from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.util import Emu, Pt
 
 from .config import BLEU, LOGO, LOGO_AGILTYM, LOGO_AGILTYM_BLANC, LOGO_DATATYM_BLANC, MARINE, charger_parametres
+from .banque import nom_barometre
 from .outils import date_fr
 
 W, H = Emu(12192000), Emu(6858000)
@@ -147,7 +148,7 @@ def generer_pptx(chemin, projet, cadrage, quest, ech):
     d.rect(s, 4300000, 0, 90000, 6858000, BLEU)
     d.logos(s, y=650000, h=560000, droite=11592000)
     d.texte(s, 5000000, 2200000, 6600000, 400000, "FORMATION DES ENQUÊTEURS", 14, True, BLEU)
-    d.texte(s, 5000000, 2650000, 6600000, 1600000, f"Baromètre {fiche['theme']}", 34, True, MARINE)
+    d.texte(s, 5000000, 2650000, 6600000, 1600000, nom_barometre(fiche["theme"]), 34, True, MARINE)
     d.texte(s, 5000000, 4500000, 6600000, 800000, [f"Collecte du {date_fr(jours[0])} au {date_fr(jours[-1])}",
                                                    f"{fiche['taille']} questionnaires · {ech['nb_enqueteurs']} enquêteurs"], 16, False, "4B5563")
     d.texte(s, 600000, 5800000, 3400000, 500000, "Datatym", 20, True, "FFFFFF")

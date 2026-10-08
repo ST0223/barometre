@@ -1,7 +1,7 @@
 """Étape 2 — Questionnaire terrain et digital, construit à partir des indicateurs validés du cadrage."""
 import math
 
-from ..banque import (NSP_CODE, decouper, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
+from ..banque import (NSP_CODE, decouper, du_barometre, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
 from ..charte import p, section, tableau, liste
 from ..outils import aujourdhui
 from .cadrage import indicateurs_actifs
@@ -156,7 +156,7 @@ def duree_estimee(toutes, profils, mode):
 
 
 def consentement(fiche, minutes):
-    return (f"Bonjour. Datatym, cabinet d'études et de données, réalise le baromètre « {fiche['theme']} ». "
+    return (f"Bonjour. Datatym, cabinet d'études et de données, réalise {du_barometre(fiche['theme'], 'le')}. "
             f"Ce questionnaire dure environ {math.ceil(minutes)} minutes. Vos réponses sont strictement confidentielles et "
             "seront uniquement exploitées de façon statistique : aucun résultat nominatif ne sera publié. Votre participation "
             "est volontaire et vous pouvez l'interrompre à tout moment. Datatym est responsable de cette étude.")

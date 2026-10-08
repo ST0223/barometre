@@ -3,7 +3,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from .banque import NSP_CODE, TYPES
+from .banque import NSP_CODE, TYPES, nom_barometre
 from .config import MARINE
 
 ENTETE_FILL = PatternFill("solid", fgColor=MARINE)
@@ -130,7 +130,7 @@ def xlsform(chemin, projet, quest, enqueteurs=None):
     _feuille(wb.create_sheet("choices"), ["list_name", "name", "label"], choices, {"label": 45})
     from .banque import slug
     _feuille(wb.create_sheet("settings"), ["form_title", "form_id", "version", "default_language"],
-             [[f"Baromètre {fiche['theme']}", "barometre_" + slug(fiche["theme"], maxi=30), projet["etapes"]["questionnaire"].get("version") or 1, "French (fr)"]])
+             [[nom_barometre(fiche["theme"]), "barometre_" + slug(fiche["theme"], maxi=30), projet["etapes"]["questionnaire"].get("version") or 1, "French (fr)"]])
     wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
     wb.save(chemin)
     return chemin

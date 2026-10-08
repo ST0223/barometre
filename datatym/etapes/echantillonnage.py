@@ -2,7 +2,7 @@
 import math
 from datetime import date, timedelta
 
-from ..banque import decouper, slug, sont_des_pays
+from ..banque import decouper, du_barometre, nom_barometre, slug, sont_des_pays
 from ..charte import liste, p, section, tableau, chiffres
 from ..config import charger_parametres
 from ..outils import aujourdhui, date_courte, date_fr, debut_collecte, fcfa, fmt_marge, jours_collecte, nombre, repartir
@@ -36,10 +36,11 @@ def recrutement_defaut(projet, n_enq, jours):
     fiche = projet["fiche"]
     params = charger_parametres()
     return {
-        "intitule": f"Enquêteurs et enquêtrices — Baromètre {fiche['theme']}",
+        "intitule": f"Enquêteurs et enquêtrices — {nom_barometre(fiche['theme'])}",
         "presentation": params.get("presentation_datatym", ""),
-        "mission": (f"Dans le cadre du baromètre « {fiche['theme']} », Datatym recrute {n_enq} enquêteurs et enquêtrices "
-                    f"pour administrer un questionnaire auprès de {fiche['cible']}, sur {', '.join(decouper(fiche['zones']))}. "
+        "mission": (f"Dans le cadre {du_barometre(fiche['theme'])}, Datatym recrute {n_enq} enquêteurs et enquêtrices "
+                    f"pour administrer un questionnaire auprès de {fiche['cible']}, dans "
+                    f"{'les pays suivants' if sont_des_pays(fiche['zones']) else 'les zones suivantes'} : {', '.join(decouper(fiche['zones']))}. "
                     f"La collecte se déroule sur {len(jours)} jours, du {date_fr(jours[0])} au {date_fr(jours[-1])}, "
                     "précédée d'une journée de formation obligatoire."),
         "taches": [
@@ -55,12 +56,13 @@ def recrutement_defaut(projet, n_enq, jours):
             "Maîtrise d'un outil de collecte mobile (KoboCollect, ODK, QuestionPro ou équivalent).",
             "Aisance relationnelle, sens de l'écoute et présentation soignée.",
             "Rigueur, ponctualité et respect de la confidentialité.",
-            "Maîtrise du français ; la pratique d'une langue locale est un atout.",
+            "Bonne capacité de communication.",
+            "Parler et lire couramment le français ; la pratique d'une langue locale est un atout.",
         ],
-        "dossier": ["CV à jour", "Lettre de motivation (une page)", "Copie du dernier diplôme", "Références de missions d'enquête antérieures"],
+        "dossier": ["CV à jour", "Lettre de motivation", "Copie du dernier diplôme",
+                    "Références de missions d'enquête antérieures (facultatif, constituent un atout)"],
         "date_limite": (jours[0] - timedelta(days=10)).isoformat(),
         "contact": params.get("contact_recrutement", ""),
-        "remuneration": "Forfait journalier selon la grille Datatym, frais de communication inclus.",
     }
 
 
@@ -236,7 +238,7 @@ def construire_docs(projet, data, quest):
     }
     recrut = {
         "titre": "Note de recrutement", "surtitre": "Datatym recrute", "sous_titre": rec["intitule"],
-        "meta": [f"Date limite de candidature : {date_fr(rec['date_limite'])}", f"Contact : {rec['contact']}"],
+        "meta": [f"Date limite de candidature : {date_fr(rec['date_limite'])}", f"Candidature : {rec['contact']}"],
         "en_tete": "Datatym — Note de recrutement",
         "sections": [
             section("datatym", "À propos de Datatym", [p(rec["presentation"])]),
@@ -244,10 +246,9 @@ def construire_docs(projet, data, quest):
             section("profil", "Le profil recherché", [liste([f"Diplôme : {rec['diplome']} minimum.", f"Expérience d'enquête : {rec['experience']} minimum."] + rec["competences"])]),
             section("conditions", "Conditions", [liste([
                 f"Nombre de postes : {data['nb_enqueteurs']}.", f"Zones : {', '.join(data['zones'])}.",
-                f"Période : du {date_fr(jours[0])} au {date_fr(jours[-1])}, formation la veille du démarrage.",
-                f"Rémunération : {rec['remuneration']}"])]),
+                f"Période : du {date_fr(jours[0])} au {date_fr(jours[-1])}, formation la veille du démarrage."])]),
             section("candidature", "Comment postuler", [liste(rec["dossier"]),
-                    p(f"Dossier à envoyer à **{rec['contact']}** au plus tard le **{date_fr(rec['date_limite'])}**, avec la mention « {rec['intitule']} ».")]),
+                    p(f"Candidatures à déposer sur **{rec['contact']}** au plus tard le **{date_fr(rec['date_limite'])}**, en précisant « {rec['intitule']} ».")]),
         ],
     }
     return {"note_echantillonnage": note, "note_recrutement": recrut}

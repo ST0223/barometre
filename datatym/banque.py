@@ -53,6 +53,20 @@ def resume_champ(zones):
 DIRECTION_RE = re.compile(r"\b(dg|pdg|dga|directeur|directrice|direction|dirigeant|responsable|manager|chef|g[ée]rant|cadre|daf|dsi|drh|ceo|patron|propri[ée]taire)", re.I)
 
 
+def _deja_barometre(theme):
+    return str(theme).strip().lower().startswith("baromètre")
+
+
+def nom_barometre(theme):
+    """« Baromètre Climat des affaires » sans doubler le mot si le thème commence déjà par « Baromètre »."""
+    return theme if _deja_barometre(theme) else f"Baromètre {theme}"
+
+
+def du_barometre(theme, article="du"):
+    """« du baromètre « Climat des affaires » » ou « du « Baromètre sur la transformation digitale » »."""
+    return f"{article} « {theme} »" if _deja_barometre(theme) else f"{article} baromètre « {theme} »"
+
+
 def profils_depuis_cible(cible):
     profils = []
     vus = set()

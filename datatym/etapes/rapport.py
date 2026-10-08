@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from .. import llm  # noqa: E402
-from ..banque import NSP_CODE, TYPES, slug, sont_des_pays  # noqa: E402
+from ..banque import NSP_CODE, TYPES, du_barometre, slug, sont_des_pays  # noqa: E402
 from ..charte import chiffres, image, liste, p, section, tableau  # noqa: E402
 from ..outils import aujourdhui, fmt_marge, nombre, pct, solde_txt  # noqa: E402
 from ..store import dossier  # noqa: E402
@@ -328,7 +328,7 @@ def construire_docs(projet, data, ech):
 
     sections = [
         section("guide", "Comment lire ce rapport", [
-            p(f"Ce rapport présente les résultats du baromètre « {fiche['theme']} », établis à partir de **{n} questionnaires valides**. "
+            p(f"Ce rapport présente les résultats {du_barometre(fiche['theme'])}, établis à partir de **{n} questionnaires valides**. "
               "Il se lit d'un bout à l'autre pour disposer du diagnostic complet ; le lecteur pressé trouvera l'essentiel dans les messages clés "
               "et les chiffres à retenir."),
             p("Un **solde d'opinion** est la différence entre la part de réponses favorables et la part de réponses défavorables. Il varie de −100 "

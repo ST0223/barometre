@@ -2,7 +2,7 @@
 import math
 from datetime import date
 
-from ..banque import TYPES
+from ..banque import TYPES, du_barometre
 from ..charte import liste, p, section, tableau
 from ..outils import aujourdhui, date_fr, fmt_marge
 
@@ -42,7 +42,7 @@ def construire_docs(projet, data, cadrage, quest, ech):
 
     sections = [
         section("objet", "1. Objet de la note", [
-            p(f"Cette note décrit la méthode du baromètre « {fiche['theme']} » : échantillonnage, conception du questionnaire, "
+            p(f"Cette note décrit la méthode {du_barometre(fiche['theme'])} : échantillonnage, conception du questionnaire, "
               "indicateurs, outils d'enquête, collecte, traitement et analyse. Elle consolide les décisions validées dans la note de "
               "cadrage, le questionnaire et la note d'échantillonnage."),
             p(f"**Objectif de l'étude :** {fiche['objectif']}."),

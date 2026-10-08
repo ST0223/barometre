@@ -104,7 +104,7 @@ def page_de_garde(projet, docs, cle):
         m["surtitre"] = ""
         m["pied"] = "Datatym" if nom in EXTERNES else "Document interne — Confidentiel"
         # pas de rappel d'échantillon ni de cible en page de garde : version, dates et auteur seulement
-        meta = [x for x in m.get("meta", []) if x.startswith(("Version", "Collecte du", "Date limite", "Contact"))]
+        meta = [x for x in m.get("meta", []) if x.startswith(("Version", "Collecte du", "Date limite", "Candidature"))]
         m["meta"] = meta + [f"Auteur : {AUTEUR}"]
         m["auteur"] = AUTEUR
         m["en_tete"] = f"{m['titre']} — {m['sous_titre']}"

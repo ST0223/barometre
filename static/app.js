@@ -825,12 +825,12 @@ function editeurRecrutement(z, e) {
   z.innerHTML = `<div class="grille-2">
     ${champ("intitule", "Intitulé de l'annonce", "input", true)}
     ${champ("experience", "Expérience d'enquête minimale")}${champ("diplome", "Diplôme minimum")}
-    ${champ("date_limite", "Date limite de candidature", "date")}${champ("contact", "Adresse de candidature")}
+    ${champ("date_limite", "Date limite de candidature", "date")}${champ("contact", "Lien de dépôt des candidatures")}
     ${champ("presentation", "Présentation de Datatym", "area", true)}
     ${champ("mission", "Mission proposée", "area", true)}
     ${champ("taches", "Tâches (une par ligne)", "area", true)}
     ${champ("competences", "Compétences (une par ligne)", "area", true)}
-    ${champ("dossier", "Pièces du dossier (une par ligne)", "area")}${champ("remuneration", "Rémunération", "area")}
+    ${champ("dossier", "Pièces du dossier (une par ligne)", "area", true)}
   </div>`;
   z.oninput = (ev) => {
     const t = ev.target;
@@ -1009,7 +1009,7 @@ function vueParametres(app) {
         </div></div>
       <div class="carte"><div class="carte-titre"><h3>Textes Datatym</h3></div><div class="carte-corps">
         <div class="champ" style="margin-bottom:14px"><label>Présentation de Datatym (notes de recrutement, formation)</label><textarea class="saisie" id="p-pres" rows="5">${esc(P.presentation_datatym)}</textarea></div>
-        <div class="champ"><label>Adresse de candidature par défaut</label><input class="saisie" id="p-contact" value="${esc(P.contact_recrutement)}"></div>
+        <div class="champ"><label>Lien de dépôt des candidatures par défaut</label><input class="saisie" id="p-contact" value="${esc(P.contact_recrutement)}"></div>
         <div class="pied-form"><button class="btn btn-primaire" id="p-enr">${ico("check")} Enregistrer</button></div>
       </div></div>
     </div>`;

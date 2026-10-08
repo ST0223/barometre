@@ -32,7 +32,7 @@ PARAMS_DEFAUT = {
     "ia_active": False,
     "modele": "claude-opus-5-5",
     "presentation_datatym": DATATYM_PRESENTATION,
-    "contact_recrutement": "recrutement@datatym.com",
+    "contact_recrutement": "https://www.intowork.co/offres",
 }
 
 
