@@ -80,6 +80,25 @@ def du_barometre(theme, article="du"):
     return f"{article} « {theme} »" if _deja_barometre(theme) else f"{article} baromètre « {theme} »"
 
 
+MOTS_VIDES = {"barometre", "le", "la", "les", "l", "un", "une", "des", "de", "du", "d", "sur", "dans", "et", "en", "au", "aux",
+              "a", "pour", "par", "avec", "chez", "entre", "son", "sa", "ses", "leur", "leurs"}
+
+
+def mots_theme(theme):
+    """Mots qui portent le thème : « Baromètre sur la transformation digitale » → [transformation, digitale]."""
+    return [m for m in slug(theme, " ", 120).split() if m not in MOTS_VIDES] or ["barometre"]
+
+
+def nom_court(theme, maxi=32):
+    """Nom court du baromètre pour les fichiers techniques : baro_transformation_digitale."""
+    nom = "baro"
+    for m in mots_theme(theme):
+        if len(nom) + 1 + len(m) > maxi:
+            break
+        nom += "_" + m
+    return nom
+
+
 def profils_depuis_cible(cible):
     profils = []
     vus = set()

@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 from . import formulaires, formation, store
-from .banque import profils_depuis_cible
+from .banque import nom_court, profils_depuis_cible
 from .charte import rendre_modele
 from .etapes import cadrage, collecte, echantillonnage, methodologie, questionnaire, rapport, suivi
 from .outils import propre
@@ -154,7 +154,7 @@ def exporter(projet, cle):
         f = store.nom_fichier(projet, "Dictionnaire", v, "xlsx")
         formulaires.dictionnaire(out / f, e["data"], c)
         ajout("Dictionnaire des indicateurs et des variables", f)
-        f = store.nom_fichier(projet, "XLSForm_Kobo", v, "xlsx")
+        f = f"{nom_court(projet['fiche']['theme'])}.xlsx"  # nom court, identique au form_id du formulaire
         formulaires.xlsform(out / f, projet, e["data"], c)
         ajout("Formulaire XLSForm (KoboToolbox)", f)
         # fichier média à joindre au formulaire dans Kobo (nom imposé par le XLSForm)

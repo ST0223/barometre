@@ -6,7 +6,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from .banque import NSP_CODE, TYPES, nom_barometre, slug, sont_des_pays
+from .banque import NSP_CODE, TYPES, nom_barometre, nom_court, slug, sont_des_pays
 from .config import MARINE
 
 ENTETE_FILL = PatternFill("solid", fgColor=MARINE)
@@ -251,7 +251,7 @@ def xlsform(chemin, projet, quest, cadrage=None, enqueteurs=None):
     _feuille(ws, COLONNES_SURVEY, survey, {"label": 60, "relevant": 40, "constraint": 40, "calculation": 50, "hint": 30})
     _feuille(wb.create_sheet("choices"), ["list_name", "name", "label"], choices, {"label": 45})
     _feuille(wb.create_sheet("settings"), ["form_title", "form_id", "version", "style", "allow_choice_duplicates"],
-             [[nom_barometre(fiche["theme"]), slug(nom_barometre(fiche["theme"]), maxi=40), datetime.now().strftime("%Y%m%d%H%M"), "pages", "yes"]])
+             [[nom_barometre(fiche["theme"]), nom_court(fiche["theme"]), datetime.now().strftime("%Y%m%d%H%M"), "pages", "yes"]])
     wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
     wb.save(chemin)
     return chemin

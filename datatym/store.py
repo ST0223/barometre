@@ -2,9 +2,8 @@
 import json
 import shutil
 from datetime import datetime
-from pathlib import Path
 
-from .banque import slug
+from .banque import mots_theme, slug
 from .config import PROJETS_DIR
 
 ETAPES = [
@@ -127,8 +126,7 @@ def journaliser(projet, message):
 
 
 def theme_court(fiche):
-    mots = [m for m in slug(fiche.get("theme", ""), " ", 80).split() if len(m) > 2][:4]
-    return "".join(m.capitalize() for m in mots) or "Barometre"
+    return "".join(m.capitalize() for m in mots_theme(fiche.get("theme", ""))[:4])
 
 
 def nom_fichier(projet, document, version, ext):
