@@ -10,3 +10,7 @@ parametres.json
 __pycache__/
 *.pyc
 .venv/
+# Captures d'écran déposées dans le dossier
+/*.png
+/*.PNG
+/*.jpg
