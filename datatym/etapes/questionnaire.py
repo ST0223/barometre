@@ -44,7 +44,7 @@ def questions_identification(fiche, profils, secteurs, domaine):
                      [{"code": slug(s, maxi=18), "label": s} for s in secteurs], fixe=True))
     qs.append(_q("id_profil", "Quelle fonction occupez-vous ?", "select_one",
                  [{"code": pr["code"], "label": pr["libelle"]} for pr in profils] + [{"code": "autre_hors", "label": "Autre fonction"}],
-                 fixe=True, consigne="Si « Autre fonction » : hors cible, remercier et arrêter l'entretien."))
+                 fixe=True))
     qs.append(_q("id_anciennete", "Depuis combien de temps occupez-vous cette fonction ?", "select_one", [
         {"code": "1", "label": "Moins d'1 an"}, {"code": "2", "label": "De 1 à 3 ans"},
         {"code": "3", "label": "De 3 à 5 ans"}, {"code": "4", "label": "Plus de 5 ans"}], fixe=True))
@@ -63,7 +63,7 @@ def question_indicateur(ind, profils):
            profils=None if len(concernes) == len(profils) else concernes)
     if t == "multiple":
         q["max_choix"] = 3
-        q["consigne"] = "Lire les modalités. 3 réponses maximum."
+        q["consigne"] = "Lire les modalités."
     elif t in ("jugement", "satisfaction", "intention", "evolution", "perspective"):
         q["consigne"] = "Lire les modalités sauf « Ne sait pas »."
     return q
@@ -283,6 +283,89 @@ def _version(projet, data, cadrage, mode):
             "en_tete": "", "paysage": True, "sections": sections}
 
 
+CONSIGNE_TYPE = {"select_one": "Choix unique", "select_multiple": "Choix multiple", "text": "Texte libre",
+                 "integer": "Nombre", "email": "Texte court (e-mail)", "note": "Message affiché"}
+
+
+def _version_terrain(projet, data, cadrage):
+    """Version enquêteur au format « version longue » : Code | Question | Consigne | Réponses, sauts en clair."""
+    fiche = projet["fiche"]
+    outil = "KoboToolbox" if fiche.get("outil") == "kobo" else "QuestionPro"
+    toutes = data["questions_plates"]
+    par_id = {q["id"]: q for q in toutes}
+    lib_profil = {pr["code"]: pr["libelle"] for pr in data["profils"]}
+    q_profil = par_id.get("id_profil")
+
+    def libelle(q, code):
+        return next((m["label"] for m in q.get("modalites", []) if m["code"] == code), code)
+
+    # sauts déclenchés par chaque question (lecture côté question parente)
+    declenche = {}
+    for q in toutes:
+        if q.get("condition_sur"):
+            parent = par_id.get(q["condition_sur"][0])
+            if parent:
+                declenche.setdefault(parent["id"], []).append(
+                    f"Si « {libelle(parent, q['condition_sur'][1])} » : poser {q['var']}.")
+
+    def consigne(q):
+        lignes = [CONSIGNE_TYPE.get(q["type"], q["type"])]
+        if q.get("terrain_seul"):
+            lignes.append("Facultatif. Rempli par l'enquêteur, ne pas lire.")
+        elif not q.get("obligatoire", True):
+            lignes.append("Facultatif.")
+        if q.get("max_choix"):
+            lignes.append(f"{q['max_choix']} réponses au maximum.")
+        if q["type"] == "select_multiple" and any(m["code"] == NSP_CODE for m in q.get("modalites", [])):
+            lignes.append("« Ne sait pas » ne se coche pas avec une autre réponse.")
+        if q.get("profils") and q_profil:
+            lignes.append(f"Poser seulement si {q_profil['var']} est "
+                          + " ou ".join(f"« {lib_profil.get(c, c)} »" for c in q["profils"]) + ".")
+        if q.get("condition_sur") and q["condition_sur"][0] in par_id:
+            parent = par_id[q["condition_sur"][0]]
+            lignes.append(f"Poser seulement si {parent['var']} est « {libelle(parent, q['condition_sur'][1])} ».")
+        if q["id"] == "id_profil":
+            lignes.append("Si « Autre fonction » : remercier et terminer.")
+        lignes += declenche.get(q["id"], [])
+        if q["type"] == "text":
+            lignes.append("Noter la réponse mot pour mot.")
+        if q.get("consigne") and not q.get("terrain_seul"):
+            lignes.append(q["consigne"])
+        return "\n".join(lignes)
+
+    def reponses(q):
+        return "\n".join(f"• {m['label']}" for m in q.get("modalites", [])) if q["type"] in ("select_one", "select_multiple") else ""
+
+    colonnes, largeurs = ["Code", "Question", "Consigne", "Réponses"], [3, 9.2, 5.2, 8.7]
+    n_questions = len(toutes)
+    derniere = data["sections"][-1]["lettre"]
+    sections = [
+        section("intro", "", [p(
+            f"Version longue du questionnaire, à administrer par l'enquêteur. Elle reprend toutes les questions du formulaire {outil} "
+            f"du {aujourdhui()}, dans le même ordre, avec les mêmes codes, libellés et réponses.")], source="auto"),
+        section("mode_emploi", "Mode d'emploi", [liste([
+            f"Le questionnaire compte {n_questions} questions, réparties en {len(data['sections'])} sections de A à {derniere}, après l'accueil.",
+            "L'enquêteur lit la question en gras, puis les réponses.",
+            "La colonne Consigne indique le type de question, les sauts et les limites de réponses. Elle ne se lit pas au répondant.",
+            "Sauf mention « Facultatif », toutes les questions sont obligatoires.",
+        ])], source="auto"),
+        section("accueil", "Accueil et consentement", [tableau(colonnes, [[
+            "consentement", f"{data['consentement']}\n**Acceptez-vous de participer à cette étude ?**",
+            "Choix unique\nSi « Non » : remercier et terminer.", "• Oui\n• Non"]], largeurs=largeurs, taille=10.5)], source="auto"),
+    ]
+    for sec in data["sections"]:
+        lignes = []
+        for q in sec["ids"]:
+            lignes.append([q["var"], f"**{q['texte']}**", consigne(q), reponses(q)])
+            if q["type"] == "select_multiple" and any(m["code"] == "autre" for m in q["modalites"]):
+                lignes.append([f"{q['var']}_autre_txt", "**Préciser « Autre »**",
+                               f"Texte libre\nPoser seulement si « Autre » est coché en {q['var']}. Noter la réponse mot pour mot.", ""])
+        sections.append(section(f"sec_{sec['lettre']}", f"Section {sec['lettre']} : {sec['titre']}", [
+            tableau(colonnes, lignes, largeurs=largeurs, taille=10.5)], source="auto"))
+    return {"titre": fiche["theme"], "sous_titre": "", "surtitre": "", "meta": [f"Version du {aujourdhui()}"],
+            "en_tete": "", "paysage": True, "sections": sections}
+
+
 def construire_docs(projet, data, cadrage):
-    return {"questionnaire_terrain": _version(projet, data, cadrage, "terrain"),
+    return {"questionnaire_terrain": _version_terrain(projet, data, cadrage),
             "questionnaire_digital": _version(projet, data, cadrage, "digital")}

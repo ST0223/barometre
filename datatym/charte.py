@@ -295,6 +295,7 @@ class DocDatatym:
             p = c.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             p.paragraph_format.line_spacing = 1.0
+            p.paragraph_format.keep_with_next = True  # l'en-tête ne reste jamais seul en bas de page
             ajouter_texte(p, str(colonnes[i]) if i < len(colonnes) else "", taille, "FFFFFF", gras_defaut=True)
         for k, ligne in enumerate(lignes):
             rangee = t.add_row()
