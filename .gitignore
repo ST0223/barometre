@@ -1,0 +1,12 @@
+# Données des études et documents générés (confidentiels)
+projets/
+# Exemplaires clients et visuels d'inspiration (non diffusables)
+Resources/
+media/
+*.pdf
+# Configuration locale (contient la clé API)
+parametres.json
+# Python
+__pycache__/
+*.pyc
+.venv/

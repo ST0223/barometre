@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Datatym Baromètres</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/pages.css">
+</head>
+<body>
+  <header class="nav" id="nav">
+    <a href="#/" class="nav-marque" aria-label="Accueil Datatym">
+      <img class="logo-clair" src="/static/logo_datatym.png" alt="Datatym">
+      <img class="logo-sombre" src="/static/logo_datatym_blanc.png" alt="">
+    </a>
+    <nav class="nav-liens">
+      <a href="#/" data-nav="accueil">Accueil</a>
+      <a href="#/nouveau" data-nav="nouveau">Lancer une étude</a>
+      <a href="#/etudes" data-nav="etudes">Mes études <span class="nav-compte" id="nav-compte"></span></a>
+      <a href="#/parametres" data-nav="parametres">Paramètres</a>
+    </nav>
+    <div class="nav-droite">
+      <span id="badge-ia" class="badge-ia"></span>
+      <a href="#/nouveau" class="btn btn-primaire btn-petit nav-cta">Nouvelle étude</a>
+    </div>
+  </header>
+  <div class="curseur-halo" id="halo" aria-hidden="true"></div>
+  <main id="app" class="principal"></main>
+  <div id="toasts" class="toasts"></div>
+  <div id="modale" class="modale" hidden></div>
+  <div id="rideau" class="rideau" hidden></div>
+  <script src="/static/js/anim.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/js/accueil.js"></script>
+  <script src="/static/js/etude.js"></script>
+  <script src="/static/js/demarrage.js"></script>
+</body>
+</html>
