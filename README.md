@@ -14,6 +14,7 @@ python app.py
 ```
 
 L'interface s'ouvre sur http://127.0.0.1:8765 (port modifiable avec la variable `PORT`).
+Le serveur se recharge tout seul quand le code Python est modifié : pas besoin de relancer après une mise à jour.
 Si la plateforme tourne déjà, un second lancement ouvre simplement le navigateur sur l'instance existante :
 pour prendre en compte une mise à jour du code, fermez d'abord la fenêtre du serveur en cours.
 

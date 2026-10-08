@@ -267,18 +267,24 @@ if __name__ == "__main__":
     import os
     import socket
     port = int(os.environ.get("PORT", 8765))
-    # Sous Windows, un second serveur peut écouter le même port : les requêtes se répartissent alors
-    # au hasard entre l'ancien et le nouveau code. On réutilise la plateforme déjà ouverte.
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sonde:
-        sonde.settimeout(0.5)
-        if sonde.connect_ex(("127.0.0.1", port)) == 0:
-            print(f"\n  La plateforme tourne déjà sur http://127.0.0.1:{port}\n"
-                  "  Pour la redémarrer, fermez d'abord la fenêtre du serveur existant.\n")
-            if not os.environ.get("SANS_NAVIGATEUR"):
-                webbrowser.open(f"http://127.0.0.1:{port}")
-            raise SystemExit(0)
-    PROJETS_DIR.mkdir(exist_ok=True)
-    if not os.environ.get("SANS_NAVIGATEUR"):
-        Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
-    print(f"\n  Plateforme Datatym : http://127.0.0.1:{port}\n")
-    app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
+    # Le rechargeur relance un processus enfant à chaque modification du code : seul le processus
+    # principal vérifie le port et ouvre le navigateur.
+    enfant = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+    if not enfant:
+        # Sous Windows, un second serveur peut écouter le même port : les requêtes se répartissent alors
+        # au hasard entre l'ancien et le nouveau code. On réutilise la plateforme déjà ouverte.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sonde:
+            sonde.settimeout(0.5)
+            if sonde.connect_ex(("127.0.0.1", port)) == 0:
+                print(f"\n  La plateforme tourne déjà sur http://127.0.0.1:{port}\n"
+                      "  Pour la redémarrer, fermez d'abord la fenêtre du serveur existant.\n")
+                if not os.environ.get("SANS_NAVIGATEUR"):
+                    webbrowser.open(f"http://127.0.0.1:{port}")
+                raise SystemExit(0)
+        PROJETS_DIR.mkdir(exist_ok=True)
+        if not os.environ.get("SANS_NAVIGATEUR"):
+            Timer(2.5, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
+        print(f"\n  Plateforme Datatym : http://127.0.0.1:{port}"
+              "\n  Le serveur se recharge tout seul quand le code est mis à jour.\n")
+    # use_reloader : toute modification d'un fichier Python relance le serveur, plus besoin de relancer lancer.bat
+    app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=True)
