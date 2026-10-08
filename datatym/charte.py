@@ -297,7 +297,11 @@ class DocDatatym:
             p.paragraph_format.line_spacing = 1.0
             ajouter_texte(p, str(colonnes[i]) if i < len(colonnes) else "", taille, "FFFFFF", gras_defaut=True)
         for k, ligne in enumerate(lignes):
-            cells = t.add_row().cells
+            rangee = t.add_row()
+            insecable = OxmlElement("w:cantSplit")  # une ligne ne se coupe jamais entre deux pages
+            insecable.set(qn("w:val"), "true")
+            rangee._tr.get_or_add_trPr().append(insecable)
+            cells = rangee.cells
             for i in range(n):
                 val = ligne[i] if i < len(ligne) else ""
                 c = cells[i]

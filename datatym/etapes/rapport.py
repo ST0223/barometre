@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from .. import llm  # noqa: E402
-from ..banque import TYPES, slug, sont_des_pays  # noqa: E402
+from ..banque import NSP_CODE, TYPES, slug, sont_des_pays  # noqa: E402
 from ..charte import chiffres, image, liste, p, section, tableau  # noqa: E402
 from ..outils import aujourdhui, fmt_marge, nombre, pct, solde_txt  # noqa: E402
 from ..store import dossier  # noqa: E402
@@ -35,12 +35,12 @@ def stats_echelle(s, ind, mods):
     if not n:
         return {"n": 0}
     dist = {m["code"]: 100 * (s == m["code"]).sum() / n for m in mods}
-    hors_nsp = s[s != "nsp"]
+    hors_nsp = s[s != NSP_CODE]
     nh = len(hors_nsp) or 1
     pos = 100 * hors_nsp.isin(TYPES[ind["type"]]["positifs"]).sum() / nh
     neg = 100 * hors_nsp.isin(TYPES[ind["type"]]["negatifs"]).sum() / nh
-    dist_exp = {m["code"]: 100 * (hors_nsp == m["code"]).sum() / nh for m in mods if m["code"] != "nsp"}
-    r = {"n": n, "dist": dist, "dist_exp": dist_exp, "nsp": 100 * (s == "nsp").sum() / n, "positif": pos, "negatif": neg, "solde": pos - neg}
+    dist_exp = {m["code"]: 100 * (hors_nsp == m["code"]).sum() / nh for m in mods if m["code"] != NSP_CODE}
+    r = {"n": n, "dist": dist, "dist_exp": dist_exp, "nsp": 100 * (s == NSP_CODE).sum() / n, "positif": pos, "negatif": neg, "solde": pos - neg}
     if ind["type"] == "satisfaction":
         r["moyenne"] = pd.to_numeric(hors_nsp, errors="coerce").mean()
     return r
@@ -149,7 +149,8 @@ def graphique(r, an, dossier_g):
         ax.spines["bottom"].set_visible(False)
         return _sauver(fig, chemin)
     # échelles : barres empilées Ensemble + profils
-    mods = [m for m in r["modalites"] if m["code"] != "nsp"]
+    # du plus favorable au plus défavorable : codes ordinaux décroissants (bleu = favorable)
+    mods = sorted((m for m in r["modalites"] if m["code"] != NSP_CODE), key=lambda m: -int(m["code"]) if m["code"].isdigit() else 0)
     lignes = [("Ensemble", r["global"])] + [(lp[c], v) for c, v in r["par_profil"].items() if v.get("n", 0) >= SEUIL]
     fig, ax = plt.subplots(figsize=(6.4, 0.5 * len(lignes) + 1.0))
     couleurs = DIVERGENT if len(mods) == 5 else ([DIVERGENT[0], DIVERGENT[2], DIVERGENT[4]] if len(mods) == 3 else [DIVERGENT[0], DIVERGENT[1], DIVERGENT[3], DIVERGENT[4]])

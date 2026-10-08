@@ -3,7 +3,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from .banque import TYPES
+from .banque import NSP_CODE, TYPES
 from .config import MARINE
 
 ENTETE_FILL = PatternFill("solid", fgColor=MARINE)
@@ -106,8 +106,8 @@ def xlsform(chemin, projet, quest, enqueteurs=None):
                 contrainte, msg = f"count-selected(.) <= {q['max_choix']}", f"{q['max_choix']} réponses au maximum."
             if q["type"] == "email":
                 contrainte, msg = "regex(., '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')", "Adresse e-mail invalide."
-            if any(m["code"] == "nsp" for m in q.get("modalites", [])) and q["type"] == "select_multiple":
-                contrainte = (contrainte + " and " if contrainte else "") + "not(selected(., 'nsp') and count-selected(.) > 1)"
+            if any(m["code"] == NSP_CODE for m in q.get("modalites", [])) and q["type"] == "select_multiple":
+                contrainte = (contrainte + " and " if contrainte else "") + f"not(selected(., '{NSP_CODE}') and count-selected(.) > 1)"
             ligne(type=t, name=q["var"], label=q["texte"], hint=q.get("consigne", "") if q.get("terrain_seul") else "",
                   required="yes" if q.get("obligatoire", True) else "", relevant=q.get("relevant", ""),
                   constraint=contrainte, constraint_message=msg)

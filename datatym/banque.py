@@ -69,26 +69,28 @@ def profils_depuis_cible(cible):
 
 
 # ----------------------------------------------------------------- types
-NSP = {"code": "nsp", "label": "Ne sait pas"}
+# Échelles ordinales codées en chiffres, du plus défavorable au plus favorable ; « Ne sait pas » = 99.
+NSP_CODE = "99"
+NSP = {"code": NSP_CODE, "label": "Ne sait pas"}
 
 TYPES = {
     "jugement": {
         "libelle": "Jugement (échelle 5 niveaux)",
         "calcul": "Solde d'opinion = % de réponses positives (très bon + bon) − % de réponses négatives (mauvais + très mauvais), sur les répondants concernés hors « Ne sait pas ».",
-        "modalites": [("tres_bon", "Très bon(ne)"), ("bon", "Bon(ne)"), ("moyen", "Moyen(ne)"), ("mauvais", "Mauvais(e)"), ("tres_mauvais", "Très mauvais(e)")],
-        "positifs": ["tres_bon", "bon"], "negatifs": ["mauvais", "tres_mauvais"],
+        "modalites": [("1", "Très mauvais(e)"), ("2", "Mauvais(e)"), ("3", "Moyen(ne)"), ("4", "Bon(ne)"), ("5", "Très bon(ne)")],
+        "positifs": ["4", "5"], "negatifs": ["1", "2"],
         "secondes": 14,
     },
     "evolution": {
         "libelle": "Évolution passée (6 derniers mois)",
         "calcul": "Solde d'opinion = % « en hausse / amélioration » − % « en baisse / dégradation », hors « Ne sait pas ».",
-        "positifs": ["hausse"], "negatifs": ["baisse"],
+        "positifs": ["3"], "negatifs": ["1"],
         "secondes": 12,
     },
     "perspective": {
         "libelle": "Perspective (6 prochains mois)",
         "calcul": "Solde d'opinion = % « hausse / amélioration » attendue − % « baisse / dégradation » attendue, hors « Ne sait pas ».",
-        "positifs": ["hausse"], "negatifs": ["baisse"],
+        "positifs": ["3"], "negatifs": ["1"],
         "secondes": 12,
     },
     "satisfaction": {
@@ -101,8 +103,8 @@ TYPES = {
     "intention": {
         "libelle": "Intention (4 niveaux)",
         "calcul": "Taux d'intention = % « Oui, certainement » + % « Oui, probablement », sur les répondants concernés.",
-        "modalites": [("oui_cert", "Oui, certainement"), ("oui_prob", "Oui, probablement"), ("non_prob", "Non, probablement pas"), ("non_cert", "Non, certainement pas")],
-        "positifs": ["oui_cert", "oui_prob"], "negatifs": ["non_prob", "non_cert"],
+        "modalites": [("1", "Non, certainement pas"), ("2", "Non, probablement pas"), ("3", "Oui, probablement"), ("4", "Oui, certainement")],
+        "positifs": ["3", "4"], "negatifs": ["1", "2"],
         "secondes": 12,
     },
     "multiple": {
@@ -128,8 +130,8 @@ TYPES = {
 }
 
 SENS = {
-    "hausse": (("hausse", "En hausse"), ("stable", "Stable"), ("baisse", "En baisse")),
-    "amelioration": (("hausse", "En amélioration"), ("stable", "Stable"), ("baisse", "En dégradation")),
+    "hausse": (("1", "En baisse"), ("2", "Stable"), ("3", "En hausse")),
+    "amelioration": (("1", "En dégradation"), ("2", "Stable"), ("3", "En amélioration")),
 }
 
 
@@ -141,12 +143,12 @@ def modalites(ind):
     elif t in ("evolution", "perspective"):
         mods = [{"code": c, "label": l} for c, l in SENS.get(ind.get("sens", "amelioration"), SENS["amelioration"])]
     elif t in ("multiple", "unique"):
+        # choix unique : codes chiffrés 1, 2, 3… ; choix multiple : codes en mots (une colonne 0/1 par modalité)
         mods = []
-        for o in ind.get("options", []):
-            if isinstance(o, dict):
-                mods.append({"code": o.get("code") or slug(o.get("label", ""), maxi=18), "label": o.get("label", "")})
-            else:
-                mods.append({"code": slug(o, maxi=18), "label": str(o)})
+        for k, o in enumerate(ind.get("options", []), 1):
+            label = o.get("label", "") if isinstance(o, dict) else str(o)
+            code = (o.get("code") if isinstance(o, dict) else None) or (str(k) if t == "unique" else slug(label, maxi=18))
+            mods.append({"code": code, "label": label})
         if t == "multiple" and not any(m["code"] == "autre" for m in mods):
             mods.append({"code": "autre", "label": "Autre (préciser)"})
         return mods

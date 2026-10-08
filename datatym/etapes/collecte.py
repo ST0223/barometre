@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-from ..banque import slug
+from ..banque import NSP_CODE, slug
 from ..store import dossier
 
 COLONNES_SYSTEME = {"start", "end", "today", "_submission_time", "duree_minutes", "enqueteur", "consentement", "_id", "_uuid"}
@@ -65,7 +65,7 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
     jours = [date.fromisoformat(j) for j in ech["jours"]]
     n_jours = max(1, round(len(jours) * taux))
     # biais propres à chaque question pour produire des résultats contrastés
-    biais = {q["var"]: [(0.04 if m["code"] == "nsp" else rnd.random() ** 1.6 + 0.05) for m in q.get("modalites", [])] for q in quest["questions_plates"]}
+    biais = {q["var"]: [(0.04 if m["code"] == NSP_CODE else rnd.random() ** 1.6 + 0.05) for m in q.get("modalites", [])] for q in quest["questions_plates"]}
     ecart_profil = {pr["code"]: rnd.uniform(-0.25, 0.25) for pr in quest["profils"]}
     lignes = []
     for m in ech["enqueteurs"]:
@@ -100,7 +100,7 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                             if q["type"] == "select_one":
                                 l[var] = rnd.choices([mm["code"] for mm in mods], poids)[0]
                             else:
-                                choix = set(rnd.choices([mm["code"] for mm in mods if mm["code"] != "nsp"], poids[:len(mods) - 1] if mods[-1]["code"] == "nsp" else poids, k=rnd.randint(1, 3)))
+                                choix = set(rnd.choices([mm["code"] for mm in mods if mm["code"] != NSP_CODE], poids[:len(mods) - 1] if mods[-1]["code"] == NSP_CODE else poids, k=rnd.randint(1, 3)))
                                 l[var] = " ".join(sorted(choix))
                                 if "autre" in choix:
                                     l[f"{var}_autre_txt"] = "Autre réponse"

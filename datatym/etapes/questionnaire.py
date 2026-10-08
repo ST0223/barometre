@@ -1,10 +1,9 @@
 """Étape 2 — Questionnaire terrain et digital, construit à partir des indicateurs validés du cadrage."""
 import math
-import re
 
-from ..banque import (TYPES, decouper, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
+from ..banque import (NSP_CODE, decouper, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
 from ..charte import p, section, tableau, liste
-from ..outils import aujourdhui, repartir
+from ..outils import aujourdhui
 from .cadrage import indicateurs_actifs
 
 DOCS = {
@@ -47,12 +46,12 @@ def questions_identification(fiche, profils, secteurs, domaine):
                  [{"code": pr["code"], "label": pr["libelle"]} for pr in profils] + [{"code": "autre_hors", "label": "Autre fonction"}],
                  fixe=True, consigne="Si « Autre fonction » : hors cible, remercier et arrêter l'entretien."))
     qs.append(_q("id_anciennete", "Depuis combien de temps occupez-vous cette fonction ?", "select_one", [
-        {"code": "moins1", "label": "Moins d'1 an"}, {"code": "1_3", "label": "De 1 à 3 ans"},
-        {"code": "3_5", "label": "De 3 à 5 ans"}, {"code": "plus5", "label": "Plus de 5 ans"}], fixe=True))
+        {"code": "1", "label": "Moins d'1 an"}, {"code": "2", "label": "De 1 à 3 ans"},
+        {"code": "3", "label": "De 3 à 5 ans"}, {"code": "4", "label": "Plus de 5 ans"}], fixe=True))
     if domaine == "Climat des affaires":
         qs.append(_q("id_effectif", "Combien de personnes travaillent dans votre structure ?", "select_one", [
-            {"code": "moins10", "label": "Moins de 10"}, {"code": "10_49", "label": "10 à 49"},
-            {"code": "50_249", "label": "50 à 249"}, {"code": "250plus", "label": "250 et plus"}], fixe=True))
+            {"code": "1", "label": "Moins de 10"}, {"code": "2", "label": "10 à 49"},
+            {"code": "3", "label": "50 à 249"}, {"code": "4", "label": "250 et plus"}], fixe=True))
     return qs
 
 
@@ -193,90 +192,97 @@ def _mods_txt(q):
     return ""
 
 
-def construire_docs(projet, data, cadrage):
-    fiche = projet["fiche"]
-    profils = data["profils"]
-    noms_ind = {i["id"]: i["libelle"] for i in cadrage.get("indicateurs", [])}
-    dt, dd = data["duree_terrain"], data["duree_digital"]
-    lib = {pr["code"]: pr["libelle"] for pr in profils}
+def _controle(q, mode):
+    c = ["Obligatoire" if q.get("obligatoire", True) else "Facultatif"]
+    if q.get("terrain_seul") and mode == "digital":
+        c = ["Facultatif", "Présélectionné par le lien de l'enquêteur"]
+    if q.get("max_choix"):
+        c.append(f"{q['max_choix']} réponses au maximum")
+    if q["type"] == "select_multiple" and any(m["code"] == NSP_CODE for m in q.get("modalites", [])):
+        c.append("« Ne sait pas » exclut les autres réponses")
+    if q["type"] == "email":
+        c.append("Format e-mail valide")
+    return "\n".join(c)
 
-    conv = section("conventions", "Conventions", [
-        liste([
-            "**N°** : numéro de la question. **Variable** : nom de la colonne dans la base de données (lettre de la section et numéro).",
-            "**Modalités** : code enregistré = libellé affiché. Toutes les questions sont obligatoires sauf mention « Facultatif ».",
-            "**Condition** : la question n'apparaît que si la condition est remplie (profil du répondant, réponse précédente).",
-            "**Indicateur** : code de l'indicateur de la note de cadrage alimenté par la question.",
-            "Durée estimée (version terrain) : " + " ; ".join(f"{lib[c]} {str(v).replace('.', ',')} min" for c, v in dt.items()) + f". Plafond : {DUREE_MAX} minutes.",
-        ]),
-    ], source="auto")
-    accueil = section("accueil", "Accueil et consentement", [
-        p(data["consentement"], "encadre"),
-        tableau(["N°", "Variable", "Question", "Modalités", "Consigne"], [
-            ["", "consentement", "Acceptez-vous de participer à cette étude ?", "oui = Oui\nnon = Non", "Si Non : remercier et arrêter."]],
-            largeurs=[0.5, 1, 3, 1.5, 2.4], taille=9),
-    ], source="auto")
-    secs_t = [conv, accueil]
-    for s in data["sections"]:
+
+def _version(projet, data, cadrage, mode):
+    """Questionnaire au format de l'exemplaire Datatym : un tableau par section, avec sauts et contrôles."""
+    fiche = projet["fiche"]
+    terrain = mode == "terrain"
+    noms_ind = {i["id"]: i["libelle"] for i in cadrage.get("indicateurs", [])}
+    durees = data["duree_terrain"] if terrain else data["duree_digital"]
+    lib = {pr["code"]: pr["libelle"] for pr in data["profils"]}
+    outil = "KoboToolbox" if fiche.get("outil") == "kobo" else "QuestionPro"
+    q_profil = next((q for q in data["questions_plates"] if q["id"] == "id_profil"), None)
+    colonnes = ["N°", "Variable", "Question", "Modalités (code = libellé)", "Type", "Condition d'affichage", "Contrôle"]
+    largeurs = [0.55, 0.65, 2.6, 2.2, 0.85, 1.6, 1.1]
+    if terrain:
+        colonnes.append("Consigne enquêteur")
+        largeurs = [0.55, 0.6, 2.3, 2.0, 0.8, 1.45, 1.0, 1.5]
+
+    def ligne(num, var, texte, mods, type_, condition, controle, consigne=""):
+        l = [num, var, texte, mods, type_, condition, controle]
+        return l + [consigne] if terrain else l
+
+    intro = (f"Questionnaire aligné sur le formulaire {outil} (XLSForm), version du {aujourdhui()}. "
+             + ("L'enquêteur lit chaque question et ses modalités telles qu'elles sont écrites, puis saisit la réponse. " if terrain else
+                "Le répondant remplit lui-même le questionnaire, section par section, à partir du lien ou du code QR de son enquêteur. ")
+             + f"Durée estimée : environ {math.ceil(max(durees.values()))} minutes ("
+             + " ; ".join(f"{lib[c]} {str(v).replace('.', ',')} min" for c, v in durees.items()) + f"), plafonnée à {DUREE_MAX} minutes.")
+    sections = [
+        section("intro", "", [p(intro)], source="auto"),
+        section("conventions", "Conventions", [liste([
+            "**N°** : numéro affiché au répondant. Les sections vont de A à " + data["sections"][-1]["lettre"]
+            + " ; la page d'accueil (message et consentement) n'est pas numérotée.",
+            "**Variable** : nom de la colonne dans la base. Les noms suivent la numérotation affichée : lettre de la section en minuscule et "
+            "numéro de la question (A2 est enregistrée dans a2).",
+            "**Modalités** : code enregistré = libellé affiché. Les échelles ordinales sont codées en chiffres, de la modalité la plus "
+            f"défavorable à la plus favorable ; « Ne sait pas » est codé {NSP_CODE}.",
+            "**Condition d'affichage** : la question n'apparaît que si la condition est remplie ; la condition de la section s'ajoute "
+            "à celle de la question.",
+            "Toutes les questions sont obligatoires sauf mention **Facultatif**.",
+            "Champs automatiques, non affichés : start, end, today, enqueteur, duree_minutes (annexe A).",
+        ])], source="auto"),
+        section("accueil", "Accueil et consentement", [tableau(colonnes, [
+            ligne("", "message", data["consentement"], "", "Message affiché", "", "", "Lire le message en entier" if terrain else ""),
+            ligne("Consentement", "consentement", "Acceptez-vous de participer à cette étude ?", "oui = Oui\nnon = Non", "Choix unique", "",
+                  "Obligatoire", "Sans « Oui », l'entretien s'arrête" if terrain else ""),
+            ligne("", "consentement_fin", "Merci de votre attention.", "", "Message affiché", "Si Consentement = Non", ""),
+        ], largeurs=largeurs, taille=8.5)], source="auto"),
+    ]
+    for k, sec in enumerate(data["sections"]):
+        cond_sec = "Si Consentement = Oui" + (f" et {q_profil['num']} ≠ Autre fonction" if k and q_profil else "")
         lignes = []
-        for q in s["ids"]:
-            ctrl = [] if q.get("obligatoire", True) else ["Facultatif"]
-            if q.get("max_choix"):
-                ctrl.append(f"{q['max_choix']} réponses max.")
-            consigne = "\n".join([x for x in [q.get("consigne", ""), q.get("condition", "")] + ctrl if x])
-            lignes.append([q["num"], q["var"], q["texte"], _mods_txt(q), TYPE_LIB.get(q["type"], q["type"]),
-                           consigne, q.get("indicateur") or ""])
-        secs_t.append(section(f"sec_{s['lettre']}", f"Section {s['lettre']} : {s['titre']}", [
-            tableau(["N°", "Variable", "Question", "Modalités (code = libellé)", "Type", "Consigne / condition", "Ind."], lignes,
-                    largeurs=[0.45, 0.6, 2.6, 2.3, 0.9, 2.2, 0.45], taille=8.5)], source="auto"))
-    secs_t.append(section("annexe_ind", "Annexe : indicateurs et questions correspondantes", [
+        for q in sec["ids"]:
+            lignes.append(ligne(q["num"], q["var"], q["texte"], _mods_txt(q), TYPE_LIB.get(q["type"], q["type"]),
+                                q.get("condition", ""), _controle(q, mode), q.get("consigne", "")))
+            if q["type"] == "select_multiple" and any(m["code"] == "autre" for m in q["modalites"]):
+                lignes.append(ligne(f"{q['num']} (préciser)", f"{q['var']}_autre_txt", "Préciser Autre", "", "Texte libre",
+                                    f"Si Autre coché en {q['num']}", "Obligatoire", "Noter les mots du répondant"))
+            if q["id"] == "id_profil":
+                lignes.append(ligne("", "hors_cible", "Ce baromètre ne concerne pas votre fonction. Merci de votre attention.", "",
+                                    "Message affiché", f"Si {q['num']} = Autre fonction", "", "Remercier et arrêter l'entretien"))
+        if k == len(data["sections"]) - 1:
+            lignes.append(ligne("", "merci", "Merci pour votre participation.", "", "Message affiché", "", ""))
+        sections.append(section(f"sec_{sec['lettre']}", f"Section {sec['lettre']} : {sec['titre']}", [
+            p(f"Condition de la section : {cond_sec}"),
+            tableau(colonnes, lignes, largeurs=largeurs, taille=8.5)], source="auto"))
+    champs = [["start", "Début de l'entretien (horodatage)"], ["end", "Fin de l'entretien (horodatage)"],
+              ["today", "Date de l'entretien"], ["enqueteur", "Code de l'enquêteur (copie de la question d'identification)"],
+              ["duree_minutes", "Durée de l'entretien en minutes, calculée à partir de start et end"]]
+    sections.append(section("annexe_a", "Annexe A : champs calculés", [
+        p("Calculés automatiquement par le formulaire, invisibles pour le répondant, enregistrés dans la base."),
+        tableau(["Variable", "Signification"], champs, largeurs=[1, 4], taille=9)], source="auto"))
+    sections.append(section("annexe_b", "Annexe B : indicateurs de la note de cadrage et questions correspondantes", [
         tableau(["Indicateur", "Questions", "Variables"], [
             [f"{iid} — {noms_ind.get(iid, '')}", ", ".join(q["num"] for q in data["questions_plates"] if q.get("indicateur") == iid),
              ", ".join(q["var"] for q in data["questions_plates"] if q.get("indicateur") == iid)]
             for iid in dict.fromkeys(q["indicateur"] for q in data["questions_plates"] if q.get("indicateur"))],
             largeurs=[3, 1, 1], taille=9)], source="auto"))
+    return {"titre": fiche["theme"], "sous_titre": "", "surtitre": "", "meta": [f"Version du {aujourdhui()}"],
+            "en_tete": "", "paysage": True, "sections": sections}
 
-    terrain = {
-        "titre": "Questionnaire — version terrain", "surtitre": "Baromètre Datatym", "sous_titre": fiche["theme"],
-        "meta": ["Questionnaire administré par l'enquêteur", f"Version du {aujourdhui()}"],
-        "en_tete": f"Baromètre {fiche['theme']} — Questionnaire terrain", "paysage": True, "sections": secs_t,
-    }
 
-    # Version digitale : présentation lisible par le répondant
-    secs_d = [section("intro", "", [
-        p(re.sub(r"environ \d+ minutes", f"environ {math.ceil(max(dd.values()))} minutes", data["consentement"]).replace("Bonjour. ", "Madame, Monsieur, "), "encadre"),
-        p(f"Durée estimée : environ {math.ceil(max(dd.values()))} minutes. Cochez la ou les cases correspondant à votre réponse.", "note"),
-        p("☐ J'accepte de participer à cette étude.     ☐ Je ne souhaite pas participer."),
-    ], source="auto")]
-    for s in data["sections"]:
-        blocs = []
-        for q in s["ids"]:
-            if q.get("terrain_seul"):
-                continue
-            titre = f"**{q['num']}. {q['texte']}**"
-            precisions = []
-            if q.get("profils"):
-                precisions.append("Question réservée aux : " + ", ".join(lib.get(c, c) for c in q["profils"]))
-            if q.get("max_choix"):
-                precisions.append(f"{q['max_choix']} réponses au maximum")
-            if q.get("condition_sur"):
-                precisions.append(q.get("condition", ""))
-            if not q.get("obligatoire", True):
-                precisions.append("facultatif")
-            if precisions:
-                titre += f" ({' ; '.join(precisions)})"
-            blocs.append(p(titre))
-            if q["type"] in ("select_one", "select_multiple"):
-                case = "☐" if q["type"] == "select_multiple" else "○"
-                blocs.append(p("     ".join(f"{case} {m['label']}" for m in q["modalites"])))
-                if any(m["code"] == "autre" for m in q["modalites"]):
-                    blocs.append(p("Si autre, préciser : ………………………………………………"))
-            else:
-                blocs.append(p("……………………………………………………………………………………………"))
-        secs_d.append(section(f"sec_{s['lettre']}", f"{s['lettre']}. {s['titre']}", blocs, source="auto"))
-    secs_d.append(section("merci", "", [p("**Merci pour votre participation.** Vos réponses contribuent à éclairer les décisions sur ce sujet.")], source="texte"))
-    digital = {
-        "titre": "Questionnaire — version digitale", "surtitre": "Baromètre Datatym", "sous_titre": fiche["theme"],
-        "meta": ["Questionnaire auto-administré", f"Version du {aujourdhui()}"],
-        "en_tete": f"Baromètre {fiche['theme']} — Questionnaire digital", "sections": secs_d,
-    }
-    return {"questionnaire_terrain": terrain, "questionnaire_digital": digital}
+def construire_docs(projet, data, cadrage):
+    return {"questionnaire_terrain": _version(projet, data, cadrage, "terrain"),
+            "questionnaire_digital": _version(projet, data, cadrage, "digital")}

@@ -18,6 +18,7 @@ from datatym.etapes import collecte
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+app.json.sort_keys = False  # garde l'ordre des documents (version terrain avant version digitale)
 
 
 def _projet(slug):
