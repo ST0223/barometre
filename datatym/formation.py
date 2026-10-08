@@ -98,7 +98,7 @@ class Deck:
             self.texte(s, 600000, 380000, 9000000, 300000, surtitre.upper(), 12, True, BLEU)
         self.texte(s, 600000, 640000, 10500000, 700000, titre, 30, True, MARINE)
         self.logos(s)
-        self.texte(s, 600000, 6330000, 3000000, 250000, str(self.n), 11, False, "9CA3AF")
+        self.texte(s, 600000, 6330000, 6000000, 250000, f"{self.n}   ·   Document interne — Confidentiel", 10, False, "9CA3AF")
         return s
 
     def intercalaire(self, num, titre, sous):

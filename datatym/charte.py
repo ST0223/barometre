@@ -105,7 +105,8 @@ def ajouter_texte(paragraphe, texte, taille=None, couleur=None, gras_defaut=Fals
 class DocDatatym:
     """Document Word préconfiguré : Times New Roman 12, interligne 1,5, justifié, logo Datatym."""
 
-    def __init__(self, en_tete="", paysage=False):
+    def __init__(self, en_tete="", paysage=False, pied="Document interne — Confidentiel"):
+        self.pied = pied
         self.doc = Document()
         self._styles()
         sec = self.doc.sections[0]
@@ -196,7 +197,7 @@ class DocDatatym:
         for pied in (sec.footer, sec.first_page_footer):
             fp = pied.paragraphs[0]
             fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            r = fp.add_run("Datatym — Confidentiel   ·   Page ")
+            r = fp.add_run(f"{self.pied}   ·   Page ")
             _police_run(r, 9, couleur="6B7280")
             _champ(fp, "PAGE")
             r = fp.add_run(" / ")
@@ -373,7 +374,8 @@ class DocDatatym:
 
 def rendre_modele(modele, chemin):
     """Produit le .docx d'un modèle de document."""
-    d = DocDatatym(modele.get("en_tete", ""), paysage=modele.get("paysage", False))
+    d = DocDatatym(modele.get("en_tete", ""), paysage=modele.get("paysage", False),
+                   pied=modele.get("pied", "Document interne — Confidentiel"))
     d.proprietes(modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("auteur", "DATATYM"))
     d.couverture(modele.get("surtitre", ""), modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("meta", []))
     if modele.get("sommaire"):

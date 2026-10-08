@@ -532,6 +532,7 @@ function rendreModele(m, maj) {
       <div class="meta">${(m.meta || []).map(esc).join("<br>")}</div></div>
     ${m.sommaire ? `<h2>Sommaire</h2><ul>${m.sections.filter((s) => s.titre && (s.niveau || 1) === 1).map((s) => `<li>${esc(s.titre)}</li>`).join("")}</ul>` : ""}
     ${m.sections.map((s) => `<div class="${s.source === "auto" ? "sec-auto" : ""}">${s.titre ? `<h${(s.niveau || 1) + 1}>${esc(s.titre)}</h${(s.niveau || 1) + 1}>` : ""}${s.blocs.map(blocs).join("")}</div>`).join("")}
+  <div class="pg-pied">${esc(m.pied || "Document interne — Confidentiel")}</div>
   </div>`;
 }
 

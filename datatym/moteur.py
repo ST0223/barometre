@@ -100,7 +100,9 @@ def page_de_garde(projet, docs, cle):
             m["titre"] = projet["fiche"]["theme"]
         if not (cle == "rapport" and m.get("sous_titre")):
             m["sous_titre"] = types.get(nom, m.get("sous_titre", ""))
-        m["surtitre"] = "Baromètre Datatym" if nom in EXTERNES else "Document interne — Confidentiel"
+        # la mention de confidentialité figure en note de bas de page, pas sur la couverture
+        m["surtitre"] = ""
+        m["pied"] = "Datatym" if nom in EXTERNES else "Document interne — Confidentiel"
         # pas de rappel d'échantillon ni de cible en page de garde : version, dates et auteur seulement
         meta = [x for x in m.get("meta", []) if x.startswith(("Version", "Collecte du", "Date limite", "Contact"))]
         m["meta"] = meta + [f"Auteur : {AUTEUR}"]

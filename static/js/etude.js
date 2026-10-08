@@ -273,7 +273,6 @@ function rafraichirEtude(complet) {
 
   // aperçu vivant
   $("#av-papier").innerHTML = `<div class="avp-entete"><img src="/static/logo_datatym.png" alt=""><img src="/static/logo_agiltym.png" alt=""></div>
-    <div class="avp-sur">Document interne — Confidentiel</div>
     <div class="avp-titre ${f.theme ? "" : "fantome"}">${esc(f.theme || "Thème du baromètre")}</div>
     <div class="avp-obj">Note de cadrage</div>
     <div class="avp-trait"></div>

@@ -196,6 +196,7 @@ select.saisie { padding-right: 28px; }
 .page { max-width: 800px; margin: 0 auto 20px; background: #fff; box-shadow: 0 2px 12px rgba(25, 36, 62, .12); padding: 56px 64px; font-family: "Times New Roman", Times, serif; font-size: 15px; line-height: 1.5; color: #111; text-align: justify; }
 .page.paysage { max-width: 1060px; }
 .page .pg-entete { display: flex; flex-direction: column; gap: 4px; border-bottom: 1.5px solid var(--bleu); padding-bottom: 6px; margin-bottom: 26px; font-family: var(--police); font-size: 10.5px; color: #6B7280; text-align: right; }
+.page .pg-pied { margin-top: 30px; padding-top: 8px; border-top: 1px solid #E3E8EF; text-align: center; font-family: var(--police); font-size: 10.5px; color: #6B7280; }
 .page .pg-logos { display: flex; justify-content: space-between; align-items: center; }
 .page .pg-logos img { height: 22px; margin: 0 !important; }
 .page .pg-logos img + img { height: 19px; }
