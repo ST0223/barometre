@@ -518,8 +518,8 @@ function rendreModele(m, maj) {
     return "";
   };
   return `<div class="page ${m.paysage ? "paysage" : ""}">
-    <div class="pg-entete"><img src="/static/logo_datatym.png" alt=""><span>${esc(m.en_tete)}</span></div>
-    <div class="couv"><div class="st">${esc(m.surtitre)}</div><h1>${esc(m.titre)}</h1><div class="sous">${esc(m.sous_titre)}</div>
+    <div class="pg-entete"><div class="pg-logos"><img src="/static/logo_datatym.png" alt="Datatym"><img src="/static/logo_agiltym.png" alt="Agiltym"></div><span>${esc(m.en_tete)}</span></div>
+    <div class="couv"><div class="pg-logos grands"><img src="/static/logo_datatym.png" alt=""><img src="/static/logo_agiltym.png" alt=""></div><div class="st">${esc(m.surtitre)}</div><h1>${esc(m.titre)}</h1><div class="sous">${esc(m.sous_titre)}</div>
       <div class="meta">${(m.meta || []).map(esc).join("<br>")}</div></div>
     ${m.sommaire ? `<h2>Sommaire</h2><ul>${m.sections.filter((s) => s.titre && (s.niveau || 1) === 1).map((s) => `<li>${esc(s.titre)}</li>`).join("")}</ul>` : ""}
     ${m.sections.map((s) => `<div class="${s.source === "auto" ? "sec-auto" : ""}">${s.titre ? `<h${(s.niveau || 1) + 1}>${esc(s.titre)}</h${(s.niveau || 1) + 1}>` : ""}${s.blocs.map(blocs).join("")}</div>`).join("")}

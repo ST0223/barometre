@@ -249,7 +249,7 @@ function rafraichirEtude(complet) {
     ["Budget", f.cout ? `${f.cout} FCFA` : "Non renseigné"]].map(([k, v]) => `<div><span>${k}</span><b class="${v ? "" : "manque"}">${esc(v || "à compléter")}</b></div>`).join("");
 
   // aperçu vivant
-  $("#av-papier").innerHTML = `<div class="avp-entete"><img src="/static/logo_datatym.png" alt=""><span>Note de cadrage</span></div>
+  $("#av-papier").innerHTML = `<div class="avp-entete"><img src="/static/logo_datatym.png" alt=""><img src="/static/logo_agiltym.png" alt=""></div>
     <div class="avp-sur">Baromètre Datatym</div>
     <div class="avp-titre ${f.theme ? "" : "fantome"}">${esc(f.theme || "Thème du baromètre")}</div>
     <div class="avp-obj ${f.objectif ? "" : "fantome"}">${esc(f.objectif || "Objectif de l'étude")}</div>

@@ -392,6 +392,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
 .av-papier::after { content: ""; position: absolute; inset: auto 8px -8px 8px; height: 10px; background: #F2F6FC; border-radius: 0 0 6px 6px; z-index: -1; }
 .avp-entete { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--bleu); padding-bottom: 6px; margin-bottom: 28px; font-family: var(--police); font-size: 10px; color: #6B7280; }
 .avp-entete img { height: 18px; }
+.avp-entete img + img { height: 15px; }
 .avp-sur { color: var(--bleu); font-weight: 700; font-size: 11px; text-transform: uppercase; }
 .avp-titre { font-size: 24px; font-weight: 700; color: var(--marine); line-height: 1.2; margin: 6px 0; transition: color .3s; }
 .avp-obj { font-size: 15px; color: var(--marine); }

@@ -62,7 +62,7 @@ de proposer des indicateurs et des textes adaptés au thème, et de rédiger les
 app.py                 serveur web (API + interface)
 datatym/
   config.py            chemins, couleurs, paramètres locaux
-  charte.py            charte Word : Times New Roman 12, interligne 1,5, justifié, logo Datatym
+  charte.py            charte Word : Times New Roman 12, interligne 1,5, justifié, logos Datatym et Agiltym
   banque.py            types d'indicateurs, questions, modalités, modes de calcul
   moteur.py            génération, validation, propagation, versions, export PDF
   formulaires.py       dictionnaire, XLSForm, import QuestionPro

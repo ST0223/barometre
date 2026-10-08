@@ -6,6 +6,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 PROJETS_DIR = BASE_DIR / "projets"
 STATIC_DIR = BASE_DIR / "static"
 LOGO = STATIC_DIR / "logo_datatym.png"
+LOGO_AGILTYM = STATIC_DIR / "logo_agiltym.png"
+LOGO_AGILTYM_BLANC = STATIC_DIR / "logo_agiltym_blanc.png"
+LOGO_DATATYM_BLANC = STATIC_DIR / "logo_datatym_blanc.png"
 PARAMS_FILE = BASE_DIR / "parametres.json"
 
 # Couleurs extraites du logo Datatym

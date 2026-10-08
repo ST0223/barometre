@@ -8,7 +8,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.util import Emu, Pt
 
-from .config import BLEU, LOGO, MARINE, charger_parametres
+from .config import BLEU, LOGO, LOGO_AGILTYM, LOGO_AGILTYM_BLANC, LOGO_DATATYM_BLANC, MARINE, charger_parametres
 from .outils import date_fr
 
 W, H = Emu(12192000), Emu(6858000)
@@ -80,19 +80,30 @@ class Deck:
             r.font.color.rgb = _c(couleur)
         return tb
 
+    def logos(self, s, sombre=False, y=300000, h=300000, droite=11592000):
+        """Datatym puis Agiltym, alignés en haut à droite de la diapositive."""
+        datatym, agiltym = (LOGO_DATATYM_BLANC, LOGO_AGILTYM_BLANC) if sombre else (LOGO, LOGO_AGILTYM)
+        if agiltym.exists():
+            a = s.shapes.add_picture(str(agiltym), Emu(0), Emu(y), height=Emu(int(h * .85)))
+            a.left = Emu(droite - a.width)
+            droite = a.left - 260000
+        if datatym.exists():
+            d = s.shapes.add_picture(str(datatym), Emu(0), Emu(y), height=Emu(h))
+            d.left = Emu(droite - d.width)
+
     def contenu(self, titre, surtitre=""):
         s = self.slide()
         self.rect(s, 0, 0, 12192000, 90000, BLEU)
         if surtitre:
             self.texte(s, 600000, 380000, 9000000, 300000, surtitre.upper(), 12, True, BLEU)
         self.texte(s, 600000, 640000, 10500000, 700000, titre, 30, True, MARINE)
-        if LOGO.exists():
-            s.shapes.add_picture(str(LOGO), Emu(10050000), Emu(6250000), height=Emu(330000))
+        self.logos(s)
         self.texte(s, 600000, 6330000, 3000000, 250000, str(self.n), 11, False, "9CA3AF")
         return s
 
     def intercalaire(self, num, titre, sous):
         s = self.slide(MARINE)
+        self.logos(s, sombre=True)
         self.rect(s, 600000, 2500000, 120000, 1700000, BLEU)
         self.texte(s, 950000, 2350000, 3000000, 900000, f"{num:02d}", 54, True, BLEU)
         self.texte(s, 950000, 3150000, 10000000, 700000, titre, 36, True, "FFFFFF")
@@ -134,8 +145,7 @@ def generer_pptx(chemin, projet, cadrage, quest, ech):
     s = d.slide()
     d.rect(s, 0, 0, 4300000, 6858000, MARINE)
     d.rect(s, 4300000, 0, 90000, 6858000, BLEU)
-    if LOGO.exists():
-        s.shapes.add_picture(str(LOGO), Emu(5000000), Emu(700000), height=Emu(620000))
+    d.logos(s, y=650000, h=560000, droite=11592000)
     d.texte(s, 5000000, 2200000, 6600000, 400000, "FORMATION DES ENQUÊTEURS", 14, True, BLEU)
     d.texte(s, 5000000, 2650000, 6600000, 1600000, f"Baromètre {fiche['theme']}", 34, True, MARINE)
     d.texte(s, 5000000, 4500000, 6600000, 800000, [f"Collecte du {date_fr(jours[0])} au {date_fr(jours[-1])}",
@@ -294,6 +304,7 @@ def generer_pptx(chemin, projet, cadrage, quest, ech):
         "6. À quel moment envoyez-vous vos formulaires ?"], 16)
 
     s = d.slide(MARINE)
+    d.logos(s, sombre=True)
     d.texte(s, 600000, 2500000, 10900000, 900000, "Merci et bonne collecte", 44, True, "FFFFFF", PP_ALIGN.CENTER)
     d.texte(s, 600000, 3500000, 10900000, 600000, "Place aux questions et à la mise en situation", 20, False, "C7D2E3", PP_ALIGN.CENTER)
     d.prs.save(chemin)

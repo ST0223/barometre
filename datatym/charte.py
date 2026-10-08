@@ -1,4 +1,4 @@
-"""Charte documentaire Datatym appliquée aux sorties Word.
+"""Charte documentaire Datatym appliquée aux sorties Word (logos Datatym et Agiltym en tête).
 
 Tous les documents sont décrits par un « modèle de document » (dict sérialisable) :
     {titre, surtitre, sous_titre, meta[], en_tete, paysage, sommaire,
@@ -15,9 +15,9 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Pt, RGBColor
+from docx.shared import Cm, Pt, RGBColor, Twips
 
-from .config import BLEU, BLEU_CLAIR, GRIS, LOGO, MARINE, POLICE, BASE_DIR
+from .config import BLEU, BLEU_CLAIR, GRIS, LOGO, LOGO_AGILTYM, MARINE, POLICE, BASE_DIR
 
 GRAS_RE = re.compile(r"\*\*(.+?)\*\*")
 
@@ -158,29 +158,41 @@ class DocDatatym:
         if lp is not None:
             lp.font.name = POLICE
 
+    def logos(self, paragraphe, h_datatym, h_agiltym):
+        """Datatym à gauche, Agiltym à droite, sur une même ligne."""
+        paragraphe.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        taquets = paragraphe.paragraph_format.tab_stops
+        for pos in (4680, 9360):  # taquets hérités du style « En-tête » de Word
+            taquets.add_tab_stop(Twips(pos), WD_TAB_ALIGNMENT.CLEAR)
+        taquets.add_tab_stop(self.largeur_utile, WD_TAB_ALIGNMENT.RIGHT)
+        if LOGO.exists():
+            paragraphe.add_run().add_picture(str(LOGO), height=Cm(h_datatym))
+        if LOGO_AGILTYM.exists():
+            paragraphe.add_run("	").add_picture(str(LOGO_AGILTYM), height=Cm(h_agiltym))
+
     def _entete_pied(self, sec, en_tete):
         header = sec.header
         p = header.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        if LOGO.exists():
-            p.add_run().add_picture(str(LOGO), height=Cm(0.6))
+        self.logos(p, 0.62, 0.52)
+        p.paragraph_format.space_after = Pt(2)
         en_tete = en_tete or ""
-        if len(en_tete) > 70:
+        if len(en_tete) > 90:
             debut, _, fin = en_tete.rpartition(" — ")
             if not debut:
                 debut, fin = en_tete, ""
-            reste = max(20, 66 - len(fin))
+            reste = max(20, 86 - len(fin))
             debut = debut[:reste].rsplit(" ", 1)[0] + "…" if len(debut) > reste else debut
             en_tete = f"{debut} — {fin}" if fin else debut
-        run = p.add_run("\t" + en_tete)
-        _police_run(run, 8, couleur="6B7280")
-        p.paragraph_format.tab_stops.add_tab_stop(self.largeur_utile, WD_TAB_ALIGNMENT.RIGHT)
+        p2 = header.add_paragraph()
+        p2.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p2.paragraph_format.space_after = Pt(0)
+        _police_run(p2.add_run(en_tete), 8, couleur="6B7280")
         bordure = OxmlElement("w:pBdr")
         bas = OxmlElement("w:bottom")
         for k, v in (("w:val", "single"), ("w:sz", "6"), ("w:space", "4"), ("w:color", BLEU)):
             bas.set(qn(k), v)
         bordure.append(bas)
-        p._p.get_or_add_pPr().append(bordure)
+        p2._p.get_or_add_pPr().append(bordure)
 
         for pied in (sec.footer, sec.first_page_footer):
             fp = pied.paragraphs[0]
@@ -195,10 +207,7 @@ class DocDatatym:
     # ---------- blocs ----------
     def couverture(self, surtitre, titre, sous_titre="", meta=()):
         d = self.doc
-        if LOGO.exists():
-            p = d.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p.add_run().add_picture(str(LOGO), width=Cm(7))
+        self.logos(d.add_paragraph(), 1.3, 1.05)
         for _ in range(4):
             d.add_paragraph()
         if surtitre:
