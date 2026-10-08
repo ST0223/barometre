@@ -307,5 +307,8 @@ def generer_pptx(chemin, projet, cadrage, quest, ech):
     d.logos(s, sombre=True)
     d.texte(s, 600000, 2500000, 10900000, 900000, "Merci et bonne collecte", 44, True, "FFFFFF", PP_ALIGN.CENTER)
     d.texte(s, 600000, 3500000, 10900000, 600000, "Place aux questions et à la mise en situation", 20, False, "C7D2E3", PP_ALIGN.CENTER)
+    cp = d.prs.core_properties
+    cp.author = cp.last_modified_by = "DATATYM"
+    cp.title, cp.subject = fiche["theme"], "Formation des enquêteurs"
     d.prs.save(chemin)
     return chemin

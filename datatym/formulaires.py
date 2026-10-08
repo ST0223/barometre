@@ -60,6 +60,7 @@ def dictionnaire(chemin, quest, cadrage):
         l2.append([i["id"], i["libelle"], i.get("definition", ""), TYPES[i["type"]]["libelle"], TYPES[i["type"]]["calcul"], vars_])
     _feuille(ws2, ["code", "indicateur", "définition", "type de mesure", "mode de calcul", "variables"], l2,
              {"définition": 50, "mode de calcul": 70, "indicateur": 40})
+    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
     wb.save(chemin)
     return chemin
 
@@ -130,6 +131,7 @@ def xlsform(chemin, projet, quest, enqueteurs=None):
     from .banque import slug
     _feuille(wb.create_sheet("settings"), ["form_title", "form_id", "version", "default_language"],
              [[f"Baromètre {fiche['theme']}", "barometre_" + slug(fiche["theme"], maxi=30), projet["etapes"]["questionnaire"].get("version") or 1, "French (fr)"]])
+    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
     wb.save(chemin)
     return chemin
 

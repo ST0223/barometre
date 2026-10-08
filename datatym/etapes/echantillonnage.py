@@ -270,5 +270,6 @@ def calendrier_xlsx(chemin, data):
     ws2 = wb.create_sheet("Enquêteurs")
     _feuille(ws2, ["code", "nom", "zone", "objectif total"] + [lib[c] for c in lib],
              [[m["code"], m["nom"], m["zone"], m["objectif"]] + [m["par_profil"].get(c, 0) for c in lib] for m in data["enqueteurs"]])
+    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
     wb.save(chemin)
     return chemin

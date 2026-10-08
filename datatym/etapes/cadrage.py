@@ -206,13 +206,10 @@ def construire_docs(projet, data):
                 ["Secteur", fiche.get("secteur") or "Secteur formel"],
                 ["Taille visée", f"{n} répondants"], ["Durée de collecte", f"{fiche['duree']} jours"],
             ], "Paramètres du baromètre", [1, 2.4]),
-            p("Les questions sont adaptées à chaque profil : un dirigeant et un agent opérationnel ne reçoivent pas les mêmes questions."),
             tableau(["Profil", "Niveau", "Effectif indicatif"],
                     [[p_["libelle"], "Direction" if p_["niveau"] == "direction" else "Opérationnel", str(k)] for p_, k in zip(profils, par_profil)],
                     "Profils de répondants et répartition indicative"),
             tableau(["Niveau de lecture", "Effectif", "Marge d'erreur (IC 95 %)"], precision, "Précision statistique attendue"),
-            p("L'échantillon est construit par quotas : il décrit la population interrogée et non l'ensemble de la population de référence. "
-              "Aucun résultat n'est publié en dessous de 30 répondants.", "note"),
         ], source="auto"),
         section("indicateurs", "4. Indicateurs recherchés", [
             p("Les indicateurs ci-dessous constituent la base de l'ensemble des livrables : chacun est rattaché à une ou plusieurs questions, "

@@ -85,7 +85,35 @@ def fusionner(nouveaux, anciens):
     return res
 
 
+AUTEUR = "DATATYM"
+# Documents destinés à l'extérieur : pas de mention « document interne »
+EXTERNES = {"note_recrutement", "questionnaire_digital"}
+
+
+def page_de_garde(projet, docs, cle):
+    """Titre = thème du baromètre, sous-titre = type de document, auteur DATATYM."""
+    types = {nom: affiche for nom, (_, affiche) in getattr(MODULES[cle], "DOCS", {}).items()}
+    for nom, m in docs.items():
+        if m.get("entete_manuel"):
+            continue
+        if not (cle == "rapport" and m.get("titre") and m["titre"] != projet["fiche"]["theme"]):
+            m["titre"] = projet["fiche"]["theme"]
+        if not (cle == "rapport" and m.get("sous_titre")):
+            m["sous_titre"] = types.get(nom, m.get("sous_titre", ""))
+        m["surtitre"] = "Baromètre Datatym" if nom in EXTERNES else "Document interne — Confidentiel"
+        # pas de rappel d'échantillon ni de cible en page de garde : version, dates et auteur seulement
+        meta = [x for x in m.get("meta", []) if x.startswith(("Version", "Collecte du", "Date limite", "Contact"))]
+        m["meta"] = meta + [f"Auteur : {AUTEUR}"]
+        m["auteur"] = AUTEUR
+        m["en_tete"] = f"{m['titre']} — {m['sous_titre']}"
+    return docs
+
+
 def construire_docs(projet, cle):
+    return page_de_garde(projet, _construire_docs(projet, cle), cle)
+
+
+def _construire_docs(projet, cle):
     d = _data(projet, cle)
     if cle == "cadrage":
         return cadrage.construire_docs(projet, d)

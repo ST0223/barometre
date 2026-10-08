@@ -117,7 +117,6 @@ class DocDatatym:
             setattr(sec, marge, Cm(2.2))
         sec.top_margin, sec.bottom_margin = Cm(2.3), Cm(2)
         self.largeur_utile = (sec.page_width - sec.left_margin - sec.right_margin)
-        sec.different_first_page_header_footer = True
         self._entete_pied(sec, en_tete)
         self.n_tableaux = 0
         self.n_figures = 0
@@ -207,8 +206,7 @@ class DocDatatym:
     # ---------- blocs ----------
     def couverture(self, surtitre, titre, sous_titre="", meta=()):
         d = self.doc
-        self.logos(d.add_paragraph(), 1.3, 1.05)
-        for _ in range(4):
+        for _ in range(5):
             d.add_paragraph()
         if surtitre:
             p = d.add_paragraph()
@@ -361,6 +359,12 @@ class DocDatatym:
     def saut_page(self):
         self.doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
+    def proprietes(self, titre="", sujet="", auteur="DATATYM"):
+        cp = self.doc.core_properties
+        cp.author = cp.last_modified_by = auteur
+        cp.title, cp.subject = titre, sujet
+        cp.keywords = "Datatym; baromètre; confidentiel"
+
     def enregistrer(self, chemin):
         Path(chemin).parent.mkdir(parents=True, exist_ok=True)
         self.doc.save(str(chemin))
@@ -370,6 +374,7 @@ class DocDatatym:
 def rendre_modele(modele, chemin):
     """Produit le .docx d'un modèle de document."""
     d = DocDatatym(modele.get("en_tete", ""), paysage=modele.get("paysage", False))
+    d.proprietes(modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("auteur", "DATATYM"))
     d.couverture(modele.get("surtitre", ""), modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("meta", []))
     if modele.get("sommaire"):
         d.sommaire()

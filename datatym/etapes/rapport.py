@@ -299,7 +299,7 @@ def generer(projet, cadrage, quest, ech, precedent=None):
     prec = precedent or {}
     an = analyser(projet, cadrage, quest, ech)
     data = {"analyse": an, "titre": prec.get("titre") or projet["fiche"]["theme"],
-            "sous_titre": prec.get("sous_titre") or f"Rapport d'analyse du baromètre Datatym"}
+            "sous_titre": prec.get("sous_titre") or "Rapport d'analyse"}
     if an:
         ia = _redaction_ia(projet, an) if llm.disponible() else None
         data["messages"] = (ia or {}).get("messages_cles") or messages_regles(an)
@@ -386,7 +386,6 @@ def construire_docs(projet, data, ech):
         section("methode", "Annexe : méthode et limites", [
             p(f"Enquête quantitative par questionnaire, échantillonnage non probabiliste par quotas (zone × profil), {n} questionnaires valides "
               f"collectés auprès de {fiche['cible']}. Marge d'erreur indicative sur l'ensemble : {fmt_marge(n)} (intervalle de confiance à 95 %, cas le plus défavorable)."),
-            p("Les résultats décrivent la population interrogée. Les comparaisons entre sous-groupes sont des tendances à confirmer par les éditions suivantes.", "note"),
         ], source="auto"),
         section("conclusion", "Conclusion", [p(data.get("conclusion", ""))]),
     ]

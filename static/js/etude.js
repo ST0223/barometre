@@ -273,11 +273,11 @@ function rafraichirEtude(complet) {
 
   // aperçu vivant
   $("#av-papier").innerHTML = `<div class="avp-entete"><img src="/static/logo_datatym.png" alt=""><img src="/static/logo_agiltym.png" alt=""></div>
-    <div class="avp-sur">Baromètre Datatym</div>
+    <div class="avp-sur">Document interne — Confidentiel</div>
     <div class="avp-titre ${f.theme ? "" : "fantome"}">${esc(f.theme || "Thème du baromètre")}</div>
-    <div class="avp-obj ${f.objectif ? "" : "fantome"}">${esc(f.objectif || "Objectif de l'étude")}</div>
+    <div class="avp-obj">Note de cadrage</div>
     <div class="avp-trait"></div>
-    <div class="avp-meta">${n} répondants · ${f.zones.length > 3 ? `${f.zones.length} pays` : esc(f.zones.join(", ") || "pays")} · ${f.duree} jours</div>
+    <div class="avp-meta">Auteur : DATATYM</div>
     <div class="avp-lignes"><i></i><i></i><i></i><i class="court"></i></div>`;
   $("#av-jauges").innerHTML = [
     [mg ? `±${mg.toFixed(1).replace(".", ",")}` : "–", "pts de marge globale"],
