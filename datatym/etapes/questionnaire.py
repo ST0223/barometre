@@ -1,7 +1,7 @@
 """Étape 2 — Questionnaire terrain et digital, construit à partir des indicateurs validés du cadrage."""
 import math
 
-from ..banque import (NSP_CODE, decouper, du_barometre, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
+from ..banque import (NSP_CODE, code_zone, decouper, du_barometre, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
 from ..charte import p, section, tableau, liste
 from ..outils import aujourdhui
 from .cadrage import indicateurs_actifs
@@ -36,7 +36,7 @@ def questions_identification(fiche, profils, secteurs, domaine):
         _q("id_enqueteur", "Enquêteur Datatym", "select_one", [{"code": f"enq{k}", "label": f"Enq{k}"} for k in range(1, n_enq + 1)],
            fixe=True, terrain_seul=True, consigne="Rempli par l'enquêteur, ne pas lire. Liste mise à jour à l'étape échantillonnage."),
         _q("id_zone", "Dans quel pays se situe votre structure ?" if sont_des_pays(fiche["zones"]) else "Dans quelle zone se situe votre structure ?",
-           "select_one", [{"code": slug(z, maxi=18), "label": z} for z in decouper(fiche["zones"])], fixe=True,
+           "select_one", [{"code": code_zone(z), "label": z} for z in decouper(fiche["zones"])], fixe=True,
            consigne="Ne pas lire : cocher le pays d'enquête." if sont_des_pays(fiche["zones"]) else "Ne pas lire : cocher la zone d'enquête."),
     ]
     if len(secteurs) > 1:
@@ -257,7 +257,7 @@ def _version(projet, data, cadrage, mode):
             lignes.append(ligne(q["num"], q["var"], q["texte"], _mods_txt(q), TYPE_LIB.get(q["type"], q["type"]),
                                 q.get("condition", ""), _controle(q, mode), q.get("consigne", "")))
             if q["type"] == "select_multiple" and any(m["code"] == "autre" for m in q["modalites"]):
-                lignes.append(ligne(f"{q['num']} (préciser)", f"{q['var']}_autre_txt", "Préciser Autre", "", "Texte libre",
+                lignes.append(ligne(f"{q['num']} (préciser)", f"{q['var']}_autre", "Préciser Autre", "", "Texte libre",
                                     f"Si Autre coché en {q['num']}", "Obligatoire", "Noter les mots du répondant"))
             if q["id"] == "id_profil":
                 lignes.append(ligne("", "hors_cible", "Ce baromètre ne concerne pas votre fonction. Merci de votre attention.", "",
@@ -358,7 +358,7 @@ def _version_terrain(projet, data, cadrage):
         for q in sec["ids"]:
             lignes.append([q["var"], f"**{q['texte']}**", consigne(q), reponses(q)])
             if q["type"] == "select_multiple" and any(m["code"] == "autre" for m in q["modalites"]):
-                lignes.append([f"{q['var']}_autre_txt", "**Préciser « Autre »**",
+                lignes.append([f"{q['var']}_autre", "**Préciser « Autre »**",
                                f"Texte libre\nPoser seulement si « Autre » est coché en {q['var']}. Noter la réponse mot pour mot.", ""])
         sections.append(section(f"sec_{sec['lettre']}", f"Section {sec['lettre']} : {sec['titre']}", [
             tableau(colonnes, lignes, largeurs=largeurs, taille=10.5)], source="auto"))

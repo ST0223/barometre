@@ -35,8 +35,8 @@ Les animations respectent le réglage système « réduire les animations ».
 |---|---|
 | 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, coût (facultatif) |
 | 1. Note de cadrage | Note de cadrage (.docx/.pdf) avec la liste des indicateurs |
-| 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo, import QuestionPro |
-| 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, XLSForm avec la liste des enquêteurs |
+| 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteur.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro |
+| 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteur.csv` avec les noms définitifs |
 | 4. Méthodologie | Note méthodologique, assemblée depuis les étapes 1 à 3 |
 | 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées |
 | 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité |
@@ -51,6 +51,13 @@ Règles de propagation :
 - Les sections rédigées à la main sont conservées lors des mises à jour ; les sections calculées
   (tableaux d'indicateurs, quotas, résultats) sont toujours reconstruites à partir des paramètres.
 - Un indicateur désactivé dans le cadrage disparaît du questionnaire et du dictionnaire.
+
+## Déployer le formulaire sur KoboToolbox
+
+1. Importer le fichier `…_XLSForm_Kobo_vN.xlsx` comme nouveau projet.
+2. Dans **Paramètres › Médias**, joindre `liste_enqueteur.csv` (nom à conserver tel quel) : il alimente la
+   question « Enquêteur » et les champs calculés nom, superviseur et catégorie.
+3. Déployer. Le fichier a été contrôlé avec `pyxform`, le convertisseur utilisé par KoboToolbox.
 
 ## Synchroniser la collecte avec QuestionPro
 

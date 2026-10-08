@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 
-from ..banque import NSP_CODE, slug
+from ..banque import NSP_CODE, code_zone, slug
 from ..store import dossier
 
 COLONNES_SYSTEME = {"start", "end", "today", "_submission_time", "duree_minutes", "enqueteur", "consentement", "_id", "_uuid"}
@@ -152,7 +152,7 @@ def convertir_questionpro(reponses, quest):
                     codes.append(str(val.get("text") or val.get("result") or v.get("answerText") or ""))
             ligne[q["var"]] = " ".join(codes) if q["type"] == "select_multiple" else (codes[0] if codes else "")
             if autre:
-                ligne[f"{q['var']}_autre_txt"] = autre
+                ligne[f"{q['var']}_autre"] = autre
         # enquêteur : question d'identification si présente, sinon variable personnalisée du lien (?custom1=enq3)
         perso = rep.get("customVariables") or {}
         code_enq = ligne.get(v_enq) or str(perso.get("custom1") or rep.get("externalReference") or "").strip().lower()
@@ -199,7 +199,7 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                         if q["id"] == "id_enqueteur":
                             l[var] = m["code"]
                         elif q["id"] == "id_zone":
-                            l[var] = slug(m["zone"], maxi=18)
+                            l[var] = code_zone(m["zone"])
                         elif q["id"] == "id_profil":
                             l[var] = code_prof
                         elif q.get("profils") and code_prof not in q["profils"]:
@@ -218,7 +218,7 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                                 choix = set(rnd.choices([mm["code"] for mm in mods if mm["code"] != NSP_CODE], poids[:len(mods) - 1] if mods[-1]["code"] == NSP_CODE else poids, k=rnd.randint(1, 3)))
                                 l[var] = " ".join(sorted(choix))
                                 if "autre" in choix:
-                                    l[f"{var}_autre_txt"] = "Autre réponse"
+                                    l[f"{var}_autre"] = "Autre réponse"
                         elif q["type"] == "text":
                             l[var] = "" if rnd.random() < 0.7 else "Remarque libre du répondant."
                         else:
@@ -267,7 +267,6 @@ def tableau_de_bord(projet, quest, ech):
         return None
     v_enq, v_zone, v_prof = variables_cles(quest)
     lib = {pr["code"]: pr["libelle"] for pr in quest["profils"]}
-    zone_de = {slug(z, maxi=18): z for z in ech["zones"]}
     jours = [date.fromisoformat(j) for j in ech["jours"]]
     total_brut = len(df)
     refus = int((df.get("consentement", pd.Series(dtype=str)).str.lower() == "non").sum())
@@ -292,7 +291,7 @@ def tableau_de_bord(projet, quest, ech):
                         "taux": round(100 * len(sel) / m["objectif"], 1) if m["objectif"] else 0})
     quotas = []
     for z, c, obj in ech["quotas"]:
-        r = int(((v.get(v_zone, "") == slug(z, maxi=18)) & (v.get(v_prof, "") == c)).sum()) if v_zone in v and v_prof in v else 0
+        r = int(((v.get(v_zone, "") == code_zone(z)) & (v.get(v_prof, "") == c)).sum()) if v_zone in v and v_prof in v else 0
         quotas.append({"zone": z, "profil": lib.get(c, c), "code": c, "objectif": obj, "realise": r, "taux": round(100 * r / obj, 1) if obj else 0})
     par_zone = [{"zone": z, "objectif": ech["tot_zone"][z], "realise": sum(q["realise"] for q in quotas if q["zone"] == z)} for z in ech["zones"]]
     par_profil = [{"profil": lib[c], "code": c, "objectif": sum(q["objectif"] for q in quotas if q["code"] == c),

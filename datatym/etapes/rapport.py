@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from .. import llm  # noqa: E402
-from ..banque import NSP_CODE, TYPES, du_barometre, slug, sont_des_pays  # noqa: E402
+from ..banque import NSP_CODE, TYPES, code_zone, du_barometre, slug, sont_des_pays  # noqa: E402
 from ..charte import chiffres, image, liste, p, section, tableau  # noqa: E402
 from ..outils import aujourdhui, fmt_marge, nombre, pct, solde_txt  # noqa: E402
 from ..store import dossier  # noqa: E402
@@ -78,7 +78,7 @@ def analyser(projet, cadrage, quest, ech):
     df = valides(brut, quest)
     _, v_zone, v_prof = variables_cles(quest)
     lib_prof = {pr["code"]: pr["libelle"] for pr in quest["profils"]}
-    lib_zone = {slug(z, maxi=18): z for z in ech["zones"]}
+    lib_zone = {code_zone(z): z for z in ech["zones"]}
     groupes = {"par_profil": (v_prof, list(lib_prof)), "par_zone": (v_zone, list(lib_zone))}
     q_de = {q["indicateur"]: q for q in quest["questions_plates"] if q.get("indicateur")}
     resultats = []

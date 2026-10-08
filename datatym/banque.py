@@ -30,6 +30,19 @@ ESPACES = {
     "RD Congo": ["RD Congo"],
 }
 ESPACE_DU_PAYS = {slug(p): e for e, liste in ESPACES.items() for p in liste}
+# Codes ISO 3166 (alpha-2, minuscules), comme dans le XLSForm de référence Datatym
+CODES_PAYS = {
+    "benin": "bj", "burkina_faso": "bf", "cote_d_ivoire": "ci", "guinee_bissau": "gw", "mali": "ml", "niger": "ne",
+    "senegal": "sn", "togo": "tg", "cameroun": "cm", "centrafrique": "cf", "congo": "cg", "gabon": "ga",
+    "guinee_equatoriale": "gq", "tchad": "td", "guinee": "gn", "rd_congo": "cd", "maroc": "ma", "ghana": "gh",
+    "nigeria": "ng", "mauritanie": "mr", "cap_vert": "cv", "gambie": "gm", "liberia": "lr", "sierra_leone": "sl",
+}
+
+
+def code_zone(zone):
+    """Code enregistré pour une zone : code ISO du pays s'il est connu, sinon un code court dérivé du nom."""
+    s = slug(zone, maxi=40)
+    return CODES_PAYS.get(s, s[:18])
 
 
 def sont_des_pays(zones):
