@@ -12,7 +12,7 @@ from .config import MARINE
 ENTETE_FILL = PatternFill("solid", fgColor=MARINE)
 ENTETE_FONT = Font(bold=True, color="FFFFFF", name="Calibri")
 OBLIGATOIRE = "Réponse obligatoire."
-FICHIER_ENQUETEURS = "liste_enqueteur.csv"
+FICHIER_ENQUETEURS = "liste_enqueteurs.csv"
 EXCLUSIVES = (NSP_CODE, "aucun", "aucune", "non")
 
 
@@ -163,7 +163,7 @@ def xlsform(chemin, projet, quest, cadrage=None, enqueteurs=None):
     """Formulaire XLSForm complet pour KoboToolbox, sur le modèle du formulaire de référence Datatym.
 
     Accueil et consentement, groupe grp_consent (si consentement = oui) puis grp_eligible (profil dans la cible),
-    sections en groupes, enquêteur lu dans liste_enqueteur.csv (select_one_from_file + pulldata), libellés en gras,
+    sections en groupes, enquêteur lu dans liste_enqueteurs.csv (select_one_from_file + pulldata), libellés en gras,
     messages d'obligation, apparences, exclusivités, variables calculées d'indicateurs.
     """
     fiche = projet["fiche"]
