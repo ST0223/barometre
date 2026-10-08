@@ -46,17 +46,54 @@ def importer_fichier(projet, chemin):
     return len(df)
 
 
-def importer_kobo(projet, serveur, jeton, asset):
-    """Récupère les soumissions via l'API v2 de KoboToolbox."""
-    url = f"{serveur.rstrip('/')}/api/v2/assets/{asset}/data.json?limit=30000"
-    req = urllib.request.Request(url, headers={"Authorization": f"Token {jeton}"})
+ASSET_RE = re.compile(r"\ba[A-Za-z0-9]{21}\b")
+# Serveur de l'API selon le domaine du lien de saisie Enketo
+SERVEUR_DU_LIEN = {"ee.kobotoolbox.org": "https://kf.kobotoolbox.org", "ee-eu.kobotoolbox.org": "https://eu.kobotoolbox.org"}
+
+
+def _kobo_json(url, jeton):
+    req = urllib.request.Request(url, headers={"Authorization": f"Token {jeton}", "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:
-        res = json.loads(r.read().decode("utf-8"))
-    df = pd.DataFrame(res.get("results", [])).astype(str)
+        return json.loads(r.read().decode("utf-8"))
+
+
+def resoudre_kobo(serveur, jeton, reference):
+    """Serveur API et identifiant du projet (asset UID) à partir d'un UID, d'une adresse du projet
+    (kf.kobotoolbox.org/#/forms/aXXXX…) ou du lien de saisie Enketo (ee.kobotoolbox.org/x/XXXX)."""
+    reference = (reference or "").strip()
+    trouve = ASSET_RE.search(reference)
+    if trouve:
+        return serveur, trouve.group(0)
+    lien = re.search(r"https?://([^/]+)/(?:x|single|preview)/([A-Za-z0-9]+)", reference)
+    if not lien:
+        raise ValueError("Identifiant du formulaire non reconnu : donnez le lien de saisie (ee.kobotoolbox.org/x/…) "
+                         "ou l'identifiant du projet (asset UID, commençant par « a »).")
+    serveur = SERVEUR_DU_LIEN.get(lien.group(1), serveur)
+    code = lien.group(2)
+    url = f"{serveur.rstrip('/')}/api/v2/assets/?asset_type=survey&limit=200"
+    while url:
+        page = _kobo_json(url, jeton)
+        for asset in page.get("results", []):
+            liens = asset.get("deployment__links")
+            if liens is None and asset.get("deployment__active") is not False and asset.get("url"):
+                # la liste n'expose pas toujours les liens de déploiement : on lit la fiche du projet
+                liens = _kobo_json(asset["url"], jeton).get("deployment__links")
+            if any(isinstance(v, str) and v.rstrip("/").endswith("/" + code) for v in (liens or {}).values()):
+                return serveur, asset["uid"]
+        url = page.get("next")
+    raise ValueError(f"Aucun projet de ce compte Kobo ne correspond au lien …/{code}. Vérifiez le jeton API "
+                     "(il doit appartenir au compte propriétaire du formulaire).")
+
+
+def importer_kobo(projet, serveur, jeton, asset):
+    """Récupère les soumissions via l'API v2 de KoboToolbox ; renvoie (nombre, serveur, asset UID)."""
+    serveur, asset = resoudre_kobo(serveur, jeton, asset)
+    res = _kobo_json(f"{serveur.rstrip('/')}/api/v2/assets/{asset}/data.json?limit=30000", jeton)
+    df = pd.DataFrame(res.get("results", [])).fillna("").astype(str)  # sans fillna, les champs absents deviendraient « nan »
     df = _nettoyer_colonnes(df)
     chemin_donnees(projet).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(chemin_donnees(projet), index=False)
-    return len(df)
+    return len(df), serveur, asset
 
 
 # ------------------------------------------------------------------ QuestionPro

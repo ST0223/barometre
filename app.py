@@ -167,14 +167,19 @@ def kobo(slug):
     p = _projet(slug)
     _etat_collecte(p)
     c = request.get_json(force=True)
-    if not (c.get("serveur") and c.get("jeton") and c.get("asset")):
-        return jsonify({"erreur": "Serveur, jeton API et identifiant du formulaire sont requis."}), 400
+    if not (c.get("jeton") and c.get("asset")):
+        return jsonify({"erreur": "Le lien du formulaire (ou son identifiant) et le jeton API Kobo sont requis."}), 400
     try:
-        n = collecte.importer_kobo(p, c["serveur"], c["jeton"], c["asset"])
+        n, serveur, asset = collecte.importer_kobo(p, c.get("serveur") or "https://kf.kobotoolbox.org", c["jeton"].strip(), c["asset"])
+    except urllib.error.HTTPError as exc:
+        motif = {401: "jeton API refusé", 403: "ce jeton n'a pas accès au formulaire", 404: "formulaire introuvable sur ce serveur"}
+        return jsonify({"erreur": f"KoboToolbox : {motif.get(exc.code, f'erreur {exc.code}')}."}), 400
+    except ValueError as exc:
+        return jsonify({"erreur": str(exc)}), 400
     except Exception as exc:
         return jsonify({"erreur": f"Connexion à KoboToolbox impossible : {exc}"}), 400
     p["etapes"]["collecte"]["data"]["source"] = "API KoboToolbox"
-    p["etapes"]["collecte"]["data"]["kobo"] = {"serveur": c["serveur"], "asset": c["asset"]}
+    p["etapes"]["collecte"]["data"]["kobo"] = {"serveur": serveur, "asset": asset, "lien": c["asset"] if c["asset"].startswith("http") else ""}
     store.journaliser(p, f"Collecte : {n} soumissions synchronisées depuis KoboToolbox.")
     moteur.rafraichir_collecte(p)
     return ok(p)

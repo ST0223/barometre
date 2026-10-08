@@ -59,6 +59,13 @@ Règles de propagation :
    question « Enquêteur » et les champs calculés nom, superviseur et catégorie.
 3. Déployer. Le fichier a été contrôlé avec `pyxform`, le convertisseur utilisé par KoboToolbox.
 
+## Synchroniser la collecte avec KoboToolbox
+
+Onglet **Collecte › Données**, carte KoboToolbox : coller le **lien de saisie** du formulaire
+(`https://ee.kobotoolbox.org/x/…`), l'adresse du projet ou son identifiant (asset UID), et le **jeton API**
+(Kobo : menu du compte › Paramètres du compte › Sécurité › Clé API ; non conservé). La plateforme retrouve
+le projet correspondant au lien, puis récupère les soumissions.
+
 ## Synchroniser la collecte avec QuestionPro
 
 Onglet **Collecte › Données** : identifiant de l'enquête (survey ID), centre de données (`com`, `eu`, `ca`…)

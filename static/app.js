@@ -876,8 +876,9 @@ function ongletImport(z, e) {
       ${(() => {
         const kobo = `<div class="source" data-outil-source="kobo"><div class="source-tete"><span class="source-logo kobo">K</span><div><b>KoboToolbox</b><small>Synchronisation par l'API v2</small></div></div>
           <input class="saisie petite" id="k-serveur" value="${esc((d.kobo || {}).serveur || "https://kf.kobotoolbox.org")}" placeholder="Serveur">
-          <input class="saisie petite" id="k-asset" value="${esc((d.kobo || {}).asset || "")}" placeholder="Identifiant du formulaire (asset uid)">
+          <input class="saisie petite" id="k-asset" value="${esc((d.kobo || {}).lien || (d.kobo || {}).asset || "")}" placeholder="Lien du formulaire (ee.kobotoolbox.org/x/…) ou asset UID">
           <input class="saisie petite" id="k-jeton" type="password" placeholder="Jeton API (non conservé)">
+          <small class="aide">Jeton : sur Kobo, menu du compte › <b>Paramètres du compte › Sécurité › Clé API</b>.</small>
           <button class="btn btn-petit" id="k-sync">${ico("refresh")} Synchroniser</button></div>`;
         const qp = `<div class="source" data-outil-source="questionpro"><div class="source-tete"><span class="source-logo qp">QP</span><div><b>QuestionPro</b><small>Synchronisation par l'API v2</small></div></div>
           <div style="display:flex;gap:8px"><input class="saisie petite" id="q-enquete" value="${esc((d.questionpro || {}).enquete || "")}" placeholder="Identifiant de l'enquête (survey ID)">
