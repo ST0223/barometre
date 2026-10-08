@@ -33,6 +33,9 @@ PARAMS_DEFAUT = {
     "modele": "claude-opus-5-5",
     "presentation_datatym": DATATYM_PRESENTATION,
     "contact_recrutement": "https://www.intowork.co/offres",
+    # jetons des plateformes de collecte, conservés sur ce poste uniquement (parametres.json est exclu de Git)
+    "kobo_jeton": "",
+    "questionpro_cle": "",
 }
 
 

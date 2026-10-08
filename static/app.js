@@ -877,14 +877,16 @@ function ongletImport(z, e) {
         const kobo = `<div class="source" data-outil-source="kobo"><div class="source-tete"><span class="source-logo kobo">K</span><div><b>KoboToolbox</b><small>Synchronisation par l'API v2</small></div></div>
           <input class="saisie petite" id="k-serveur" value="${esc((d.kobo || {}).serveur || "https://kf.kobotoolbox.org")}" placeholder="Serveur">
           <input class="saisie petite" id="k-asset" value="${esc((d.kobo || {}).lien || (d.kobo || {}).asset || "")}" placeholder="Lien du formulaire (ee.kobotoolbox.org/x/…) ou asset UID">
-          <input class="saisie petite" id="k-jeton" type="password" placeholder="Jeton API (non conservé)">
+          <input class="saisie petite" id="k-jeton" type="password" placeholder="${S.params.kobo_jeton_defini ? "Jeton mémorisé sur ce poste (laisser vide)" : "Jeton API"}">
+          <label class="bascule" style="font-size:12.5px"><input type="checkbox" id="k-memo" checked> Mémoriser le jeton sur ce poste</label>
           <small class="aide">Jeton : sur Kobo, menu du compte › <b>Paramètres du compte › Sécurité › Clé API</b>.</small>
           <button class="btn btn-petit" id="k-sync">${ico("refresh")} Synchroniser</button></div>`;
         const qp = `<div class="source" data-outil-source="questionpro"><div class="source-tete"><span class="source-logo qp">QP</span><div><b>QuestionPro</b><small>Synchronisation par l'API v2</small></div></div>
           <div style="display:flex;gap:8px"><input class="saisie petite" id="q-enquete" value="${esc((d.questionpro || {}).enquete || "")}" placeholder="Identifiant de l'enquête (survey ID)">
             <input class="saisie petite" id="q-env" list="dl-env" style="width:76px" value="${esc((d.questionpro || {}).env || "com")}" title="Centre de données : com, eu, ca…"></div>
           <datalist id="dl-env"><option value="com"><option value="eu"><option value="ca"></datalist>
-          <input class="saisie petite" id="q-cle" type="password" placeholder="Clé API (non conservée)">
+          <input class="saisie petite" id="q-cle" type="password" placeholder="${S.params.questionpro_cle_definie ? "Clé mémorisée sur ce poste (laisser vide)" : "Clé API"}">
+          <label class="bascule" style="font-size:12.5px"><input type="checkbox" id="q-memo" checked> Mémoriser la clé sur ce poste</label>
           <button class="btn btn-petit" id="q-sync">${ico("refresh")} Synchroniser</button>
           <small class="aide">Enquêteur : partagez le lien avec <code>?custom1=enq1</code>, <code>enq2</code>… pour le suivi par enquêteur.</small></div>`;
         const fichier = `<div class="source"><div class="source-tete"><span class="source-logo fic">${ico("upload")}</span><div><b>Fichier d'export</b><small>CSV ou Excel, Kobo ou QuestionPro</small></div></div>
@@ -912,12 +914,14 @@ function ongletImport(z, e) {
   dep.ondragleave = () => dep.classList.remove("survol");
   dep.ondrop = (ev) => { ev.preventDefault(); dep.classList.remove("survol"); ev.dataTransfer.files[0] && envoyer(ev.dataTransfer.files[0]); };
   $("#q-sync").onclick = (ev) => occupe(ev.currentTarget, async () => {
-    const r = await api("POST", `/api/projets/${slug}/collecte/questionpro`, { enquete: $("#q-enquete").value, env: $("#q-env").value, cle: $("#q-cle").value });
+    const r = await api("POST", `/api/projets/${slug}/collecte/questionpro`, { enquete: $("#q-enquete").value, env: $("#q-env").value, cle: $("#q-cle").value, memoriser: $("#q-memo").checked });
+    chargerParams();
     S.onglet = "tableau";
     majProjet(r, "Synchronisation QuestionPro réussie.");
   });
   $("#k-sync").onclick = (ev) => occupe(ev.currentTarget, async () => {
-    const r = await api("POST", `/api/projets/${slug}/collecte/kobo`, { serveur: $("#k-serveur").value, asset: $("#k-asset").value, jeton: $("#k-jeton").value });
+    const r = await api("POST", `/api/projets/${slug}/collecte/kobo`, { serveur: $("#k-serveur").value, asset: $("#k-asset").value, jeton: $("#k-jeton").value, memoriser: $("#k-memo").checked });
+    chargerParams();
     S.onglet = "tableau";
     majProjet(r, "Synchronisation KoboToolbox réussie.");
   });
@@ -936,6 +940,8 @@ function ongletTableau(z, e) {
     $("#vers-import").onclick = () => { S.onglet = "import"; panneauEtape("collecte"); };
     return;
   }
+  const api_ = ["API KoboToolbox", "API QuestionPro"].includes(e.data.source);
+  const auto = (e.data.source === "API KoboToolbox" && S.params.kobo_jeton_defini) || (e.data.source === "API QuestionPro" && S.params.questionpro_cle_definie);
   const ecart = s.realise - s.prevu_a_date;
   const coul = (t) => (t >= 100 ? "#0E9F6E" : t >= 75 ? "#5AAEE8" : t >= 40 ? "#F5C26B" : "#F2A07B");
   const barre = (lbl, r, obj, prevu) => {
@@ -946,8 +952,9 @@ function ongletTableau(z, e) {
   const zones = [...new Set(s.quotas.map((q) => q.zone))];
   const profs = [...new Set(s.quotas.map((q) => q.profil))];
   z.innerHTML = `
-    <div class="aide" style="margin-bottom:12px;font-size:12.5px">Situation au ${dateFr(s.reference)} · jour ${s.jour_index} sur ${s.nb_jours} · mise à jour ${heureFr(s.maj)}
-      <button class="btn btn-fantome btn-petit" id="maj-tb">${ico("refresh")} Actualiser</button></div>
+    <div class="aide" style="margin-bottom:12px;font-size:12.5px">Situation au ${dateFr(s.reference)} · jour ${s.jour_index} sur ${s.nb_jours} · dernière synchronisation ${heureFr(s.maj)}
+      ${api_ ? `· <b>${esc(e.data.source)}</b>${auto ? " · resynchronisation automatique toutes les 5 minutes" : " · mémorisez le jeton pour la resynchronisation automatique"}` : ""}
+      <button class="btn btn-fantome btn-petit" id="maj-tb">${ico("refresh")} ${api_ ? "Synchroniser maintenant" : "Recalculer"}</button></div>
     <div class="kpis-tb">
       <div class="carte kpi"><div class="t">Questionnaires valides</div><div class="v"><span data-compte="${s.realise}">0</span><span style="font-size:15px;color:var(--texte-3)"> / ${s.objectif}</span></div><div class="s">${nf(s.taux, 1)} % de l'objectif</div></div>
       <div class="carte kpi"><div class="t">Écart au calendrier</div><div class="v" data-compte="${ecart}" data-prefixe="${ecart > 0 ? "+" : ""}">0</div><div class="s ${ecart >= 0 ? "pos" : "neg"}">${s.prevu_a_date} prévus à date</div></div>
@@ -972,10 +979,24 @@ function ongletTableau(z, e) {
   A.compter(z);
   z.querySelectorAll(".carte-chaleur td").forEach((td, k) => (td.style.animationDelay = `${k * 45}ms`));
   z.querySelectorAll(".barre-l .piste i").forEach((b, k) => (b.style.animationDelay = `${200 + k * 50}ms`));
-  $("#maj-tb").onclick = (ev) => occupe(ev.currentTarget, async () => {
+  const synchroniser = async () => {
+    const avant = s.brut;
     const r = await api("POST", `/api/projets/${S.projet.slug}/collecte/actualiser`);
-    majProjet(r, "Tableau de bord actualisé.");
+    const apres = (r.etapes.collecte.data.stats || {}).brut || 0;
+    return { r, nouveaux: apres - avant };
+  };
+  $("#maj-tb").onclick = (ev) => occupe(ev.currentTarget, async () => {
+    const { r, nouveaux } = await synchroniser();
+    majProjet(r, api_ ? (nouveaux > 0 ? `${nouveaux} nouvelle(s) soumission(s) reçue(s).` : "Aucune nouvelle soumission.") : "Tableau de bord recalculé.");
   });
+  // resynchronisation automatique tant que le tableau de bord reste affiché (onglet visible, rien en cours d'édition)
+  if (auto) A.intervalle(async () => {
+    if (document.hidden || S.sale || S.etape !== "collecte" || S.onglet !== "tableau") return;
+    try {
+      const { r, nouveaux } = await synchroniser();
+      if (nouveaux > 0) majProjet(r, `${nouveaux} nouvelle(s) soumission(s) reçue(s).`);
+    } catch (err) { /* nouvel essai au prochain passage */ }
+  }, 5 * 60 * 1000);
 }
 
 function graphCumul(s) {

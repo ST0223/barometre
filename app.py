@@ -162,25 +162,53 @@ def importer(slug):
     return ok(p)
 
 
+def _sync_kobo(p, serveur, jeton, reference):
+    """Télécharge les soumissions Kobo ; renvoie le message du journal, ou lève ErreurChaine."""
+    try:
+        n, serveur, asset = collecte.importer_kobo(p, serveur or "https://kf.kobotoolbox.org", jeton, reference)
+    except urllib.error.HTTPError as exc:
+        motif = {401: "jeton API refusé", 403: "ce jeton n'a pas accès au formulaire", 404: "formulaire introuvable sur ce serveur"}
+        raise moteur.ErreurChaine(f"KoboToolbox : {motif.get(exc.code, f'erreur {exc.code}')}.")
+    except ValueError as exc:
+        raise moteur.ErreurChaine(str(exc))
+    except Exception as exc:
+        raise moteur.ErreurChaine(f"Connexion à KoboToolbox impossible : {exc}")
+    d = p["etapes"]["collecte"]["data"]
+    d["source"] = "API KoboToolbox"
+    d["kobo"] = {"serveur": serveur, "asset": asset, "lien": reference if str(reference).startswith("http") else (d.get("kobo") or {}).get("lien", "")}
+    return f"Collecte : {n} soumissions synchronisées depuis KoboToolbox."
+
+
+def _sync_questionpro(p, env, cle, enquete):
+    try:
+        n, ecartees, ignorees = collecte.importer_questionpro(p, p["etapes"]["questionnaire"]["data"], env, cle, enquete)
+    except urllib.error.HTTPError as exc:
+        motif = {401: "clé API refusée", 403: "accès refusé à cette enquête", 404: "enquête introuvable (vérifiez l'identifiant et le centre de données)"}
+        raise moteur.ErreurChaine(f"QuestionPro : {motif.get(exc.code, f'erreur {exc.code}')}.")
+    except Exception as exc:
+        raise moteur.ErreurChaine(f"Connexion à QuestionPro impossible : {exc}")
+    d = p["etapes"]["collecte"]["data"]
+    d["source"] = "API QuestionPro"
+    d["questionpro"] = {"env": env, "enquete": enquete}
+    message = f"Collecte : {n} réponses complétées synchronisées depuis QuestionPro"
+    if ecartees:
+        message += f", {ecartees} incomplètes écartées"
+    if ignorees:
+        message += f" ; {len(ignorees)} question(s) non reconnue(s) : {', '.join(ignorees[:5])}"
+    return message + "."
+
+
 @app.post("/api/projets/<slug>/collecte/kobo")
 def kobo(slug):
     p = _projet(slug)
     _etat_collecte(p)
     c = request.get_json(force=True)
-    if not (c.get("jeton") and c.get("asset")):
+    jeton = (c.get("jeton") or "").strip() or charger_parametres().get("kobo_jeton", "")
+    if not (jeton and c.get("asset")):
         return jsonify({"erreur": "Le lien du formulaire (ou son identifiant) et le jeton API Kobo sont requis."}), 400
-    try:
-        n, serveur, asset = collecte.importer_kobo(p, c.get("serveur") or "https://kf.kobotoolbox.org", c["jeton"].strip(), c["asset"])
-    except urllib.error.HTTPError as exc:
-        motif = {401: "jeton API refusé", 403: "ce jeton n'a pas accès au formulaire", 404: "formulaire introuvable sur ce serveur"}
-        return jsonify({"erreur": f"KoboToolbox : {motif.get(exc.code, f'erreur {exc.code}')}."}), 400
-    except ValueError as exc:
-        return jsonify({"erreur": str(exc)}), 400
-    except Exception as exc:
-        return jsonify({"erreur": f"Connexion à KoboToolbox impossible : {exc}"}), 400
-    p["etapes"]["collecte"]["data"]["source"] = "API KoboToolbox"
-    p["etapes"]["collecte"]["data"]["kobo"] = {"serveur": serveur, "asset": asset, "lien": c["asset"] if c["asset"].startswith("http") else ""}
-    store.journaliser(p, f"Collecte : {n} soumissions synchronisées depuis KoboToolbox.")
+    store.journaliser(p, _sync_kobo(p, c.get("serveur"), jeton, c["asset"]))
+    if c.get("memoriser", True) and c.get("jeton"):
+        enregistrer_parametres({"kobo_jeton": jeton})
     moteur.rafraichir_collecte(p)
     return ok(p)
 
@@ -190,25 +218,13 @@ def questionpro(slug):
     p = _projet(slug)
     _etat_collecte(p)
     c = request.get_json(force=True)
-    env, cle, enquete = (c.get("env") or "com").strip(), (c.get("cle") or "").strip(), str(c.get("enquete") or "").strip()
+    env, enquete = (c.get("env") or "com").strip(), str(c.get("enquete") or "").strip()
+    cle = (c.get("cle") or "").strip() or charger_parametres().get("questionpro_cle", "")
     if not (cle and enquete):
         return jsonify({"erreur": "Clé API et identifiant de l'enquête QuestionPro sont requis."}), 400
-    try:
-        n, ecartees, ignorees = collecte.importer_questionpro(p, p["etapes"]["questionnaire"]["data"], env, cle, enquete)
-    except urllib.error.HTTPError as exc:
-        motif = {401: "clé API refusée", 403: "accès refusé à cette enquête", 404: "enquête introuvable (vérifiez l'identifiant et le centre de données)"}
-        return jsonify({"erreur": f"QuestionPro : {motif.get(exc.code, f'erreur {exc.code}')}."}), 400
-    except Exception as exc:
-        return jsonify({"erreur": f"Connexion à QuestionPro impossible : {exc}"}), 400
-    d = p["etapes"]["collecte"]["data"]
-    d["source"] = "API QuestionPro"
-    d["questionpro"] = {"env": env, "enquete": enquete}
-    message = f"Collecte : {n} réponses complétées synchronisées depuis QuestionPro"
-    if ecartees:
-        message += f", {ecartees} incomplètes écartées"
-    if ignorees:
-        message += f" ; {len(ignorees)} question(s) non reconnue(s) : {', '.join(ignorees[:5])}"
-    store.journaliser(p, message + ".")
+    store.journaliser(p, _sync_questionpro(p, env, cle, enquete))
+    if c.get("memoriser", True) and c.get("cle"):
+        enregistrer_parametres({"questionpro_cle": cle})
     moteur.rafraichir_collecte(p)
     return ok(p)
 
@@ -227,8 +243,15 @@ def simuler(slug):
 
 @app.post("/api/projets/<slug>/collecte/actualiser")
 def actualiser(slug):
+    """Retélécharge les soumissions depuis la plateforme de collecte (jeton mémorisé), puis recalcule le tableau de bord."""
     p = _projet(slug)
     _etat_collecte(p)
+    d, params = p["etapes"]["collecte"]["data"], charger_parametres()
+    if d.get("source") == "API KoboToolbox" and d.get("kobo", {}).get("asset") and params.get("kobo_jeton"):
+        store.journaliser(p, _sync_kobo(p, d["kobo"].get("serveur"), params["kobo_jeton"], d["kobo"]["asset"]))
+    elif d.get("source") == "API QuestionPro" and d.get("questionpro", {}).get("enquete") and params.get("questionpro_cle"):
+        q = d["questionpro"]
+        store.journaliser(p, _sync_questionpro(p, q.get("env", "com"), params["questionpro_cle"], q["enquete"]))
     moteur.rafraichir_collecte(p)
     return ok(p)
 
@@ -240,6 +263,8 @@ def lire_parametres():
     cle = p.get("anthropic_api_key", "")
     p["anthropic_api_key"] = (cle[:7] + "…" + cle[-4:]) if cle else ""
     p["cle_definie"] = bool(cle)
+    # les jetons de collecte ne quittent jamais le serveur : seule leur présence est signalée
+    p["kobo_jeton_defini"], p["questionpro_cle_definie"] = bool(p.pop("kobo_jeton", "")), bool(p.pop("questionpro_cle", ""))
     return jsonify(p)
 
 
@@ -248,6 +273,9 @@ def ecrire_parametres():
     maj = request.get_json(force=True)
     if "…" in str(maj.get("anthropic_api_key", "")):
         maj.pop("anthropic_api_key")
+    for oublier in ("kobo_jeton", "questionpro_cle"):  # seule l'action « oublier » (valeur vide) est acceptée ici
+        if maj.get(oublier):
+            maj.pop(oublier)
     enregistrer_parametres(maj)
     return lire_parametres()
 
