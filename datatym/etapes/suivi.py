@@ -1,6 +1,4 @@
 """Étape 6 — Note de suivi des enquêtes, produite à la clôture à partir du tableau de bord."""
-from datetime import date
-
 from ..charte import chiffres, liste, p, section, tableau
 from ..banque import sont_des_pays
 from ..outils import aujourdhui, date_courte, date_fr, nombre, pct
@@ -23,6 +21,25 @@ def generer(projet, precedent=None):
     }
 
 
+COLONNES_SUIVI = ["Objectif", "Réalisé", "Restant", "Taux de réalisation"]
+
+
+def _restant(objectif, realise):
+    """Questionnaires restant à collecter ; un dépassement est signalé plutôt qu'affiché en négatif."""
+    reste = objectif - realise
+    return str(reste) if reste >= 0 else f"0 (+{-reste})"
+
+
+def _suivi(objectif, realise):
+    return [objectif, realise, _restant(objectif, realise), pct(100 * realise / objectif if objectif else 0)]
+
+
+def _total(libelles, lignes):
+    """Ligne de total en gras ; libelles = cellules de tête (ex. ["**Total**"] ou ["**Total**", ""])."""
+    obj, rea = sum(l["objectif"] for l in lignes), sum(l["realise"] for l in lignes)
+    return libelles + [f"**{v}**" for v in _suivi(obj, rea)]
+
+
 def construire_docs(projet, data, stats):
     fiche = projet["fiche"]
     if not stats:
@@ -38,26 +55,31 @@ def construire_docs(projet, data, stats):
             chiffres([{"valeur": str(s["realise"]), "libelle": f"questionnaires valides sur {s['objectif']} visés"},
                       {"valeur": pct(s["taux"]), "libelle": "taux de réalisation"},
                       {"valeur": pct(s["taux_completion"]), "libelle": "taux de complétion"},
-                      {"valeur": f"{nombre(s['duree_mediane'], 1)} min" if s["duree_mediane"] else "–", "libelle": "durée médiane"}]),
+                      {"valeur": str(max(s["objectif"] - s["realise"], 0)), "libelle": "questionnaires restants"}]),
             p(f"La collecte s'est déroulée du {date_fr(j0)} au {date_fr(j1)}. **{s['realise']} questionnaires valides** ont été recueillis "
               f"pour un objectif de {s['objectif']}, soit un taux de réalisation de {pct(s['taux'])}"
               + (f" ({ecart:+d} questionnaires)." if ecart else ".")),
             p(f"Sur {s['brut']} formulaires reçus, {s['refus']} correspondent à des refus de participation, {s['hors_cible']} à des répondants hors cible "
-              f"et {s['rapides']} à des entretiens trop rapides, écartés de l'analyse."),
+              f"et {s['rapides']} à des entretiens trop rapides, écartés de l'analyse."
+              + (f" La durée médiane d'un entretien est de {nombre(s['duree_mediane'], 1)} minutes." if s["duree_mediane"] else "")),
         ], source="auto"),
         section("realise", "2. Réalisé contre prévu", [
-            tableau([Z, "Objectif", "Réalisé", "Taux"], [[z["zone"], z["objectif"], z["realise"], pct(z["taux"])] for z in s["par_zone"]], f"Réalisation par {Z.lower()}"),
-            tableau(["Profil", "Objectif", "Réalisé", "Taux"], [[x["profil"], x["objectif"], x["realise"], pct(x["taux"])] for x in s["par_profil"]], "Réalisation par profil"),
-            tableau([Z, "Profil", "Objectif", "Réalisé", "Taux"], [[q["zone"], q["profil"], q["objectif"], q["realise"], pct(q["taux"])] for q in s["quotas"]], f"Atteinte des quotas {Z.lower()} × profil", taille=9),
+            tableau([Z] + COLONNES_SUIVI, [[z["zone"]] + _suivi(z["objectif"], z["realise"]) for z in s["par_zone"]]
+                    + [_total(["**Total**"], s["par_zone"])], f"Réalisation par {Z.lower()}"),
+            tableau(["Profil"] + COLONNES_SUIVI, [[x["profil"]] + _suivi(x["objectif"], x["realise"]) for x in s["par_profil"]]
+                    + [_total(["**Total**"], s["par_profil"])], "Réalisation par profil"),
+            tableau([Z, "Profil"] + COLONNES_SUIVI, [[q["zone"], q["profil"]] + _suivi(q["objectif"], q["realise"]) for q in s["quotas"]]
+                    + [_total(["**Total**", ""], s["quotas"])], f"Atteinte des quotas {Z.lower()} × profil", taille=9),
         ], source="auto"),
         section("enqueteurs", "3. Performance des enquêteurs", [
-            tableau(["Enquêteur", Z, "Objectif", "Réalisé", "Taux", "Écart"],
-                    [[e["nom"], e["zone"], e["objectif"], e["realise"], pct(e["taux"]), f"{e['realise'] - e['objectif']:+d}"] for e in s["par_enqueteur"]],
-                    "Réalisation par enquêteur", taille=9),
+            tableau(["Enquêteur", Z] + COLONNES_SUIVI,
+                    [[e["nom"], e["zone"]] + _suivi(e["objectif"], e["realise"]) for e in s["par_enqueteur"]]
+                    + [_total(["**Total**", ""], s["par_enqueteur"])], "Réalisation par enquêteur", taille=9),
         ], source="auto"),
         section("rythme", "4. Rythme de collecte", [
-            tableau(["Jour", "Prévu", "Réalisé", "Cumul prévu", "Cumul réalisé"],
-                    [[date_courte(j["date"]), j["prevu"], j["realise"], j["cumul_prevu"], j["cumul_realise"]] for j in s["par_jour"]],
+            tableau(["Jour", "Prévu", "Réalisé", "Cumul prévu", "Cumul réalisé", "Reste à collecter"],
+                    [[date_courte(j["date"]), j["prevu"], j["realise"], j["cumul_prevu"], j["cumul_realise"],
+                      _restant(s["objectif"], j["cumul_realise"])] for j in s["par_jour"]],
                     "Rythme quotidien", taille=9),
         ], source="auto"),
         section("qualite", "5. Incidents et qualité des données", [
