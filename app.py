@@ -4,6 +4,7 @@ Lancement : python app.py  puis ouvrir http://127.0.0.1:8765
 """
 import logging
 import tempfile
+import urllib.error
 import webbrowser
 from pathlib import Path
 from threading import Timer
@@ -175,6 +176,34 @@ def kobo(slug):
     p["etapes"]["collecte"]["data"]["source"] = "API KoboToolbox"
     p["etapes"]["collecte"]["data"]["kobo"] = {"serveur": c["serveur"], "asset": c["asset"]}
     store.journaliser(p, f"Collecte : {n} soumissions synchronisées depuis KoboToolbox.")
+    moteur.rafraichir_collecte(p)
+    return ok(p)
+
+
+@app.post("/api/projets/<slug>/collecte/questionpro")
+def questionpro(slug):
+    p = _projet(slug)
+    _etat_collecte(p)
+    c = request.get_json(force=True)
+    env, cle, enquete = (c.get("env") or "com").strip(), (c.get("cle") or "").strip(), str(c.get("enquete") or "").strip()
+    if not (cle and enquete):
+        return jsonify({"erreur": "Clé API et identifiant de l'enquête QuestionPro sont requis."}), 400
+    try:
+        n, ecartees, ignorees = collecte.importer_questionpro(p, p["etapes"]["questionnaire"]["data"], env, cle, enquete)
+    except urllib.error.HTTPError as exc:
+        motif = {401: "clé API refusée", 403: "accès refusé à cette enquête", 404: "enquête introuvable (vérifiez l'identifiant et le centre de données)"}
+        return jsonify({"erreur": f"QuestionPro : {motif.get(exc.code, f'erreur {exc.code}')}."}), 400
+    except Exception as exc:
+        return jsonify({"erreur": f"Connexion à QuestionPro impossible : {exc}"}), 400
+    d = p["etapes"]["collecte"]["data"]
+    d["source"] = "API QuestionPro"
+    d["questionpro"] = {"env": env, "enquete": enquete}
+    message = f"Collecte : {n} réponses complétées synchronisées depuis QuestionPro"
+    if ecartees:
+        message += f", {ecartees} incomplètes écartées"
+    if ignorees:
+        message += f" ; {len(ignorees)} question(s) non reconnue(s) : {', '.join(ignorees[:5])}"
+    store.journaliser(p, message + ".")
     moteur.rafraichir_collecte(p)
     return ok(p)
 

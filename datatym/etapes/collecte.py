@@ -1,8 +1,9 @@
 """Étape 5 — Collecte : import des soumissions et tableau de bord de suivi."""
 import json
 import random
+import re
 import urllib.request
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -56,6 +57,120 @@ def importer_kobo(projet, serveur, jeton, asset):
     chemin_donnees(projet).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(chemin_donnees(projet), index=False)
     return len(df)
+
+
+# ------------------------------------------------------------------ QuestionPro
+NUM_RE = re.compile(r"^\s*([A-Z]\d+)\s*[.)]\s*")
+
+
+def _norm(texte):
+    """Texte comparable : minuscules, sans accents ni ponctuation."""
+    return re.sub(r"[^a-z0-9]+", " ", slug(str(texte or ""), " ", 400)).strip()
+
+
+def _lire_questionpro(env, cle_api, enquete):
+    """Toutes les réponses d'une enquête QuestionPro (API v2, pagination comprise)."""
+    reponses, page = [], 1
+    while True:
+        url = f"https://api.questionpro.{env.strip('. ') or 'com'}/a/api/v2/surveys/{enquete}/responses?page={page}&perPage=100"
+        req = urllib.request.Request(url, headers={"api-key": cle_api, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            res = json.loads(r.read().decode("utf-8"))
+        reponses += res.get("response") or []
+        pag = res.get("pagination") or {}
+        if page >= int(pag.get("totalPages") or 1):
+            return reponses
+        page += 1
+
+
+def convertir_questionpro(reponses, quest):
+    """Transforme les réponses QuestionPro en lignes aux noms de variables du questionnaire Datatym.
+
+    Correspondance des questions : code de question (a2) → numéro en tête du texte (« A2. … », tel
+    qu'écrit par notre fichier d'import) → texte de la question. Les libellés deviennent des codes.
+    """
+    plates = quest["questions_plates"]
+    par_var = {q["var"]: q for q in plates}
+    par_num = {q["num"].upper(): q for q in plates}
+    par_texte = {_norm(q["texte"]): q for q in plates}
+    v_enq = next((q["var"] for q in plates if q["id"] == "id_enqueteur"), None)
+    ignorees = set()
+
+    def question_de(item):
+        code = str(item.get("questionCode") or "").strip().lower()
+        if code in par_var:
+            return par_var[code]
+        texte = item.get("questionText") or item.get("questionDescription") or ""
+        m = NUM_RE.match(texte)
+        if m and m.group(1).upper() in par_num:
+            return par_num[m.group(1).upper()]
+        sans_num = NUM_RE.sub("", texte)
+        return par_texte.get(_norm(sans_num)) or ("consentement" if "accept" in _norm(sans_num) and "particip" in _norm(sans_num) else None)
+
+    lignes, ecartees = [], 0
+    for rep in reponses:
+        statut = str(rep.get("responseStatus") or "").lower()
+        if statut and statut not in ("completed", "complete", "terminé", "complété"):
+            ecartees += 1
+            continue
+        ligne = {"_id": str(rep.get("responseID", "")), "_source": "questionpro"}
+        fin = None
+        if rep.get("utctimestamp"):
+            t = int(rep["utctimestamp"])
+            fin = datetime.fromtimestamp(t / 1000 if t > 10 ** 11 else t, timezone.utc).replace(tzinfo=None)
+        elif rep.get("timestamp"):
+            fin = pd.to_datetime(rep["timestamp"], errors="coerce")
+            fin = None if pd.isna(fin) else fin.to_pydatetime().replace(tzinfo=None)
+        duree = int(rep.get("timeTaken") or 0)
+        if fin is not None:
+            ligne["end"] = ligne["_submission_time"] = fin.isoformat(timespec="seconds")
+            ligne["start"] = (fin - timedelta(seconds=duree)).isoformat(timespec="seconds")
+        ligne["duree_minutes"] = f"{duree / 60:.1f}" if duree else ""
+        for item in rep.get("responseSet") or []:
+            q = question_de(item)
+            valeurs = item.get("answerValues") or []
+            if q == "consentement":
+                texte = _norm(valeurs[0].get("answerText")) if valeurs else ""
+                ligne["consentement"] = "oui" if texte.startswith("oui") or texte.startswith("j accepte") else "non"
+                continue
+            if q is None:
+                ignorees.add(item.get("questionText") or item.get("questionCode") or str(item.get("questionID")))
+                continue
+            codes, autre = [], ""
+            par_label = {_norm(m["label"]): m["code"] for m in q.get("modalites", [])}
+            for v in valeurs:
+                val = v.get("value") or {}
+                if q["type"] in ("select_one", "select_multiple"):
+                    code = par_label.get(_norm(v.get("answerText")))
+                    if code is None and _norm(v.get("answerText")).startswith("autre"):
+                        code = "autre"
+                    if code:
+                        codes.append(code)
+                    if val.get("other"):
+                        autre = val["other"]
+                else:
+                    codes.append(str(val.get("text") or val.get("result") or v.get("answerText") or ""))
+            ligne[q["var"]] = " ".join(codes) if q["type"] == "select_multiple" else (codes[0] if codes else "")
+            if autre:
+                ligne[f"{q['var']}_autre_txt"] = autre
+        # enquêteur : question d'identification si présente, sinon variable personnalisée du lien (?custom1=enq3)
+        perso = rep.get("customVariables") or {}
+        code_enq = ligne.get(v_enq) or str(perso.get("custom1") or rep.get("externalReference") or "").strip().lower()
+        if code_enq:
+            ligne["enqueteur"] = code_enq
+            if v_enq:
+                ligne[v_enq] = code_enq
+        ligne.setdefault("consentement", "oui")  # une réponse complétée vaut consentement
+        lignes.append(ligne)
+    return pd.DataFrame(lignes).fillna(""), ecartees, sorted(ignorees)
+
+
+def importer_questionpro(projet, quest, env, cle_api, enquete):
+    reponses = _lire_questionpro(env, cle_api, enquete)
+    df, ecartees, ignorees = convertir_questionpro(reponses, quest)
+    chemin_donnees(projet).parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(chemin_donnees(projet), index=False)
+    return len(df), ecartees, ignorees
 
 
 def simuler(projet, quest, ech, taux=1.0, graine=7):

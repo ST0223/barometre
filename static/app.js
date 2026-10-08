@@ -872,25 +872,28 @@ function ongletImport(z, e) {
   z.className = "carte-corps";
   z.innerHTML = `
     ${d.source ? `<div class="bandeau succes">${ico("check")}<div>Source actuelle : <b>${esc(d.source)}</b>${d.stats ? ` — ${d.stats.brut} formulaires reçus, ${d.stats.realise} valides.` : ""}</div></div>` : ""}
-    <div class="grille-2">
-      <div>
-        <div class="lib" style="margin-bottom:8px">1. Importer un export de formulaire</div>
-        <label class="depot" id="depot">${ico("upload")}<div style="font-weight:600;margin-top:6px">Déposer un fichier CSV ou Excel</div>
-          <div class="aide" style="font-size:12px">Export KoboToolbox (valeurs XML, en-têtes XML) ou QuestionPro</div>
-          <input type="file" id="fic" accept=".csv,.xlsx,.xls" hidden></label>
-      </div>
-      <div>
-        <div class="lib" style="margin-bottom:8px">2. Synchroniser avec l'API KoboToolbox</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
+    <div class="sources">
+      ${(() => {
+        const kobo = `<div class="source" data-outil-source="kobo"><div class="source-tete"><span class="source-logo kobo">K</span><div><b>KoboToolbox</b><small>Synchronisation par l'API v2</small></div></div>
           <input class="saisie petite" id="k-serveur" value="${esc((d.kobo || {}).serveur || "https://kf.kobotoolbox.org")}" placeholder="Serveur">
           <input class="saisie petite" id="k-asset" value="${esc((d.kobo || {}).asset || "")}" placeholder="Identifiant du formulaire (asset uid)">
           <input class="saisie petite" id="k-jeton" type="password" placeholder="Jeton API (non conservé)">
-          <button class="btn btn-petit" id="k-sync">${ico("refresh")} Synchroniser</button>
-        </div>
-      </div>
+          <button class="btn btn-petit" id="k-sync">${ico("refresh")} Synchroniser</button></div>`;
+        const qp = `<div class="source" data-outil-source="questionpro"><div class="source-tete"><span class="source-logo qp">QP</span><div><b>QuestionPro</b><small>Synchronisation par l'API v2</small></div></div>
+          <div style="display:flex;gap:8px"><input class="saisie petite" id="q-enquete" value="${esc((d.questionpro || {}).enquete || "")}" placeholder="Identifiant de l'enquête (survey ID)">
+            <input class="saisie petite" id="q-env" list="dl-env" style="width:76px" value="${esc((d.questionpro || {}).env || "com")}" title="Centre de données : com, eu, ca…"></div>
+          <datalist id="dl-env"><option value="com"><option value="eu"><option value="ca"></datalist>
+          <input class="saisie petite" id="q-cle" type="password" placeholder="Clé API (non conservée)">
+          <button class="btn btn-petit" id="q-sync">${ico("refresh")} Synchroniser</button>
+          <small class="aide">Enquêteur : partagez le lien avec <code>?custom1=enq1</code>, <code>enq2</code>… pour le suivi par enquêteur.</small></div>`;
+        const fichier = `<div class="source"><div class="source-tete"><span class="source-logo fic">${ico("upload")}</span><div><b>Fichier d'export</b><small>CSV ou Excel, Kobo ou QuestionPro</small></div></div>
+          <label class="depot" id="depot"><div style="font-weight:600">Déposer un fichier</div><div class="aide" style="font-size:12px">ou cliquer pour choisir</div>
+          <input type="file" id="fic" accept=".csv,.xlsx,.xls" hidden></label></div>`;
+        return S.projet.fiche.outil === "questionpro" ? qp + kobo + fichier : kobo + qp + fichier;
+      })()}
     </div>
     <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--bord)">
-      <div class="lib" style="margin-bottom:4px">3. Tester la chaîne avec des données simulées</div>
+      <div class="lib" style="margin-bottom:4px">Tester la chaîne avec des données simulées</div>
       <p class="aide" style="margin:0 0 10px">Génère des soumissions cohérentes avec les quotas et le questionnaire, pour vérifier le tableau de bord, la note de suivi et le rapport avant le terrain.</p>
       <div class="actions"><button class="btn btn-petit" data-sim="0.3">Collecte à 30 %</button><button class="btn btn-petit" data-sim="0.6">Collecte à 60 %</button><button class="btn btn-petit" data-sim="1">Collecte terminée</button></div>
     </div>`;
@@ -907,6 +910,11 @@ function ongletImport(z, e) {
   dep.ondragover = (ev) => { ev.preventDefault(); dep.classList.add("survol"); };
   dep.ondragleave = () => dep.classList.remove("survol");
   dep.ondrop = (ev) => { ev.preventDefault(); dep.classList.remove("survol"); ev.dataTransfer.files[0] && envoyer(ev.dataTransfer.files[0]); };
+  $("#q-sync").onclick = (ev) => occupe(ev.currentTarget, async () => {
+    const r = await api("POST", `/api/projets/${slug}/collecte/questionpro`, { enquete: $("#q-enquete").value, env: $("#q-env").value, cle: $("#q-cle").value });
+    S.onglet = "tableau";
+    majProjet(r, "Synchronisation QuestionPro réussie.");
+  });
   $("#k-sync").onclick = (ev) => occupe(ev.currentTarget, async () => {
     const r = await api("POST", `/api/projets/${slug}/collecte/kobo`, { serveur: $("#k-serveur").value, asset: $("#k-asset").value, jeton: $("#k-jeton").value });
     S.onglet = "tableau";

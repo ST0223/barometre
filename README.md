@@ -38,7 +38,7 @@ Les animations respectent le réglage système « réduire les animations ».
 | 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo, import QuestionPro |
 | 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, XLSForm avec la liste des enquêteurs |
 | 4. Méthodologie | Note méthodologique, assemblée depuis les étapes 1 à 3 |
-| 5. Collecte | Tableau de bord (import CSV/Excel, API KoboToolbox, ou données de test simulées) |
+| 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées |
 | 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité |
 | 7. Rapport d'analyse | Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés |
 
@@ -51,6 +51,16 @@ Règles de propagation :
 - Les sections rédigées à la main sont conservées lors des mises à jour ; les sections calculées
   (tableaux d'indicateurs, quotas, résultats) sont toujours reconstruites à partir des paramètres.
 - Un indicateur désactivé dans le cadrage disparaît du questionnaire et du dictionnaire.
+
+## Synchroniser la collecte avec QuestionPro
+
+Onglet **Collecte › Données** : identifiant de l'enquête (survey ID), centre de données (`com`, `eu`, `ca`…)
+et clé API QuestionPro (non conservée). Seules les réponses complétées sont importées.
+
+- Les questions sont reconnues par leur code (a2, b1…) s'il est renseigné dans QuestionPro, sinon par le
+  numéro « A2. » placé en tête de chaque question par le fichier d'import généré à l'étape Questionnaire.
+- Les libellés des réponses sont retraduits en codes (1, 2, 99…) ; les réponses « Autre » sont conservées.
+- Pour le suivi par enquêteur, chaque enquêteur partage le lien de l'enquête avec `?custom1=enq1`, `enq2`…
 
 ## Rédaction assistée par Claude (facultatif)
 
