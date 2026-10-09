@@ -287,10 +287,8 @@ CONSIGNE_TYPE = {"select_one": "Choix unique", "select_multiple": "Choix multipl
                  "integer": "Nombre", "email": "Texte court (e-mail)", "note": "Message affiché"}
 
 
-def _version_terrain(projet, data, cadrage):
-    """Version enquêteur au format « version longue » : Code | Question | Consigne | Réponses, sauts en clair."""
-    fiche = projet["fiche"]
-    outil = "KoboToolbox" if fiche.get("outil") == "kobo" else "QuestionPro"
+def consignes_terrain(data):
+    """Consignes de l'enquêteur par question (type, sauts, limites), communes au questionnaire terrain et à la formation."""
     toutes = data["questions_plates"]
     par_id = {q["id"]: q for q in toutes}
     lib_profil = {pr["code"]: pr["libelle"] for pr in data["profils"]}
@@ -331,7 +329,20 @@ def _version_terrain(projet, data, cadrage):
             lignes.append("Noter la réponse mot pour mot.")
         if q.get("consigne") and not q.get("terrain_seul"):
             lignes.append(q["consigne"])
-        return "\n".join(lignes)
+        return lignes
+
+    return {q["id"]: consigne(q) for q in toutes}
+
+
+def _version_terrain(projet, data, cadrage):
+    """Version enquêteur au format « version longue » : Code | Question | Consigne | Réponses, sauts en clair."""
+    fiche = projet["fiche"]
+    outil = "KoboToolbox" if fiche.get("outil") == "kobo" else "QuestionPro"
+    toutes = data["questions_plates"]
+    consignes = consignes_terrain(data)
+
+    def consigne(q):
+        return "\n".join(consignes[q["id"]])
 
     def reponses(q):
         return "\n".join(f"• {m['label']}" for m in q.get("modalites", [])) if q["type"] in ("select_one", "select_multiple") else ""
