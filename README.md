@@ -103,6 +103,11 @@ static/                interface sans dépendance
   js/accueil.js        page d'accueil
   js/etude.js          assistant « Lancer une étude »
 projets/               un dossier par baromètre : projet.json, livrables, versions, données, graphiques
+Resources/             documents de référence, hors Git (confidentiels)
+  exemplaires/         modèles fournis par le cabinet (cadrage, questionnaires, XLSForm, formation)
+  rapports-reference/  rapports Gen Z (Côte d'Ivoire, Sénégal) servant de modèle au rapport
+  logos/               logos d'origine Datatym et Agiltym
+  inspirations/        visuels d'inspiration de l'interface
 ```
 
 ## Points à confirmer avec le cabinet
