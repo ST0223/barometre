@@ -22,7 +22,7 @@ pour prendre en compte une mise à jour du code, fermez d'abord la fenêtre du s
 
 | Page | Rôle |
 |---|---|
-| **Accueil** | Présente le cabinet et tout le parcours d'une étude baromètre : fond liquide animé, pile de documents en 3D, cartes de phases empilées au défilement, piliers de méthode, carrousel minuté des modèles de baromètres |
+| **Accueil** | Présente le cabinet et tout le parcours d'une étude baromètre : fond liquide animé, pile de documents en 3D, les 5 piliers Datatym (Data, Insight, Signal, Decision, Execution), cartes de phases empilées au défilement, piliers de méthode, carrousel minuté des modèles de baromètres |
 | **Lancer une étude** | Assistant en 4 temps (sujet, cible, terrain, lancement) avec modèles Datatym, sélection des pays par espace (UEMOA, CEMAC, Guinée, RD Congo) ou pays par pays, saisie libre de tout autre pays, alerte si moins de 30 répondants par pays, aperçu vivant de la note de cadrage, marge d'erreur et nombre d'enquêteurs calculés en direct, séquence de lancement plein écran |
 | **Mes études** | Portefeuille filtrable, répartition des études par étape, cartes inclinables |
 | **Étude** (projet) | Bandeau à la couleur de l'étape, chaîne des 8 étapes, transitions directionnelles, voile animé pendant la génération, tampon « Validé », tableau de bord de collecte animé |

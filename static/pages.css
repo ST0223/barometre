@@ -173,10 +173,13 @@ body[data-page="nouveau"] .nav-cta, body[data-page="etude"] .nav-cta { display: 
 /* le cabinet */
 .cabinet { max-width: 1480px; margin: 0 auto; padding: 130px clamp(16px, 4vw, 48px) 110px; display: grid; grid-template-columns: 1fr 1.1fr; gap: 60px; align-items: start; }
 .cabinet-intro { font-size: 19px; line-height: 1.65; color: var(--texte); margin: 34px 0 34px; }
-.piliers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.piliers5 { grid-column: 1 / -1; }
+.piliers { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 22px; }
+.piliers::before { content: ""; position: absolute; left: 10%; right: 10%; top: 45px; height: 2px; background: linear-gradient(90deg, #00B4D8, #000F22); opacity: .35; }
+.pilier-num { position: absolute; top: 20px; right: 20px; font-family: var(--titre); font-weight: 700; font-size: 13px; color: var(--texte-3); }
 .pilier { position: relative; padding: 22px 20px; border-radius: 20px; background: #fff; border: 1px solid var(--glace); box-shadow: 0 10px 30px rgba(8, 31, 92, .06); transition: transform .3s var(--ease), box-shadow .3s; transform-style: preserve-3d; }
 .pilier:hover { box-shadow: 0 24px 50px rgba(8, 31, 92, .14); }
-.pilier-ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--bleu), var(--azur)); box-shadow: 0 8px 20px rgba(0, 135, 224, .35); margin-bottom: 16px; }
+.pilier-ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: #fff; background: var(--c, var(--bleu)); box-shadow: 0 8px 20px color-mix(in srgb, var(--c, var(--bleu)) 40%, transparent); margin-bottom: 16px; }
 .pilier-ic svg { width: 20px; height: 20px; }
 .pilier h3 { font-family: var(--titre); font-size: 18px; margin-bottom: 6px; }
 .pilier p { margin: 0; color: var(--texte-2); font-size: 13.5px; }
@@ -602,7 +605,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
 @media (max-width: 1100px) {
   .hero2-contenu, .cabinet, .methode, .etude-corps { grid-template-columns: 1fr; }
   .pile3d { height: 440px; }
-  .piliers { grid-template-columns: 1fr; }
+  .piliers { grid-template-columns: repeat(3, 1fr); }
+  .piliers::before { display: none; }
   .modeles { grid-template-columns: 1fr 1fr; }
   .apercu-vivant { position: static; }
   .vitrine-cartes { display: none; }
@@ -617,6 +621,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
   .hero2-chiffres { grid-template-columns: 1fr 1fr; }
   .carte-phase { grid-template-columns: 1fr; padding: 26px; gap: 12px; }
   .cp-ic { display: none; }
+  .piliers { grid-template-columns: 1fr; }
   .palette { height: 380px; padding-left: 20px; overflow-x: auto; }
   .ass-etapes { grid-template-columns: 1fr 1fr; }
   .curseurs, .choix-outil, .recap, .profils-niveaux { grid-template-columns: 1fr; }

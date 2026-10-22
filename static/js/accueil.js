@@ -30,6 +30,14 @@ const PHASES = [
   { n: "07", mot: "ANALYSER", titre: "Rapport d'analyse", desc: "Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés et enseignements pour la décision.", liv: ["Rapport d'analyse", "Graphiques", "Messages clés"], ic: "sparkle", c: "#000F22" },
 ];
 
+const PILIERS = [
+  { nom: "Data", ic: "base", c: "#00B4D8", desc: "Collecter des données fiables : enquêtes par quotas, bases nettoyées, documentées et déposées sur l'espace DATA." },
+  { nom: "Insight", ic: "eye", c: "#0087E0", desc: "Faire parler les données : indicateurs calculés, lecture par profil, par zone et par secteur." },
+  { nom: "Signal", ic: "signal", c: "#334EAC", desc: "Repérer ce qui change : tendances d'une édition à l'autre, écarts significatifs, alertes." },
+  { nom: "Decision", ic: "target", c: "#081F5C", desc: "Traduire les résultats en messages clés et en options claires pour les décideurs." },
+  { nom: "Execution", ic: "play", c: "#000F22", desc: "Accompagner la mise en œuvre, puis mesurer son effet à l'édition suivante." },
+];
+
 const PRINCIPES = [
   ["Quotas raisonnés", "Zone × profil, marges d'erreur affichées, aucun chiffre publié sous 30 répondants."],
   ["15 minutes", "Des formulations simples, une durée estimée et plafonnée pour chaque profil."],
@@ -88,11 +96,11 @@ function vueAccueil(app) {
     </div>
     <div class="cabinet-droite">
       <p class="cabinet-intro" data-reveal="haut">${esc(presentation)}</p>
+    </div>
+    <div class="piliers5">
+      <span class="sur" data-reveal="haut">Les 5 piliers Datatym</span>
       <div class="piliers">
-        ${[["chart", "Données", "Collecte, nettoyage, bases documentées et déposées sur l'espace DATA de Datatym."],
-           ["target", "Études", "Baromètres, enquêtes par quotas, indicateurs reconductibles d'une édition à l'autre."],
-           ["sparkle", "IA appliquée", "Rédaction assistée, codification, analyse : chaque résultat reste vérifié par un analyste."]]
-          .map(([i, t, d], k) => `<div class="pilier" data-reveal="haut" data-delai="${k * 120}"><div class="pilier-ic">${ico(i)}</div><h3>${t}</h3><p>${d}</p></div>`).join("")}
+        ${PILIERS.map((p, k) => `<div class="pilier" style="--c:${p.c}" data-reveal="haut" data-delai="${k * 120}"><span class="pilier-num">0${k + 1}</span><div class="pilier-ic">${ico(p.ic)}</div><h3>${p.nom}</h3><p>${p.desc}</p></div>`).join("")}
       </div>
     </div>
   </section>
