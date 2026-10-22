@@ -26,7 +26,7 @@ pour prendre en compte une mise à jour du code, fermez d'abord la fenêtre du s
 | **Lancer une étude** | Assistant en 4 temps (sujet, cible, terrain, lancement) avec modèles Datatym, sélection des pays par espace (UEMOA, CEMAC, Guinée, RD Congo) ou pays par pays, saisie libre de tout autre pays, alerte si moins de 30 répondants par pays, aperçu vivant de la note de cadrage, marge d'erreur et nombre d'enquêteurs calculés en direct, séquence de lancement plein écran |
 | **Mes études** | Portefeuille filtrable, répartition des études par étape, cartes inclinables |
 | **Étude** (projet) | Bandeau à la couleur de l'étape, chaîne des 8 étapes, transitions directionnelles, voile animé pendant la génération, tampon « Validé », tableau de bord de collecte animé |
-| **Paramètres** | Rédaction assistée par Claude (cadre lumineux animé), textes du cabinet et coûts unitaires de référence |
+| **Paramètres** | Textes du cabinet et coûts unitaires de référence |
 
 Les animations respectent le réglage système « réduire les animations ».
 
@@ -91,11 +91,12 @@ et clé API QuestionPro (non conservée). Seules les réponses complétées sont
 - Les libellés des réponses sont retraduits en codes (1, 2, 99…) ; les réponses « Autre » sont conservées.
 - Pour le suivi par enquêteur, chaque enquêteur partage le lien de l'enquête avec `?custom1=enq1`, `enq2`…
 
-## Rédaction assistée par Claude (facultatif)
+## Rédaction assistée par Claude (masquée)
 
-Sans clé API, la rédaction s'appuie sur des règles et une banque d'indicateurs (climat des affaires,
-numérique/IA, emploi/talents, générique). Dans **Paramètres**, une clé API Anthropic permet à Claude
-de proposer des indicateurs et des textes adaptés au thème, et de rédiger les messages clés du rapport.
+La rédaction s'appuie sur des règles et une banque d'indicateurs (climat des affaires, numérique/IA,
+emploi/talents, générique) : aucune clé API n'est nécessaire. La rédaction assistée par Claude (clé API
+Anthropic) est masquée de l'interface ; pour la réafficher, passer `IA_VISIBLE` à `true` dans `static/app.js`.
+Claude propose alors des indicateurs et des textes adaptés au thème, et rédige les messages clés du rapport.
 
 ## Organisation du code
 

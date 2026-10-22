@@ -108,9 +108,13 @@ async function chargerListe() {
   if (c) c.textContent = S.projets.length || "";
 }
 
+// Rédaction assistée par Claude (clé API Anthropic) : masquée de l'interface ; passer à true pour la réafficher
+const IA_VISIBLE = false;
+
 async function chargerParams() {
   S.params = await api("GET", "/api/parametres");
   const b = $("#badge-ia");
+  b.hidden = !IA_VISIBLE;
   const on = S.params.ia_active && S.params.cle_definie;
   b.className = "badge-ia" + (on ? " on" : "");
   b.textContent = on ? "IA active" : "IA inactive";
@@ -381,7 +385,7 @@ function panneauEtape(cle) {
   const redac = e.data && e.data.redaction;
   const large = genere && ["parametres", "redaction", "recrutement", "tableau"].includes(S.onglet);
   const titre = `<div style="display:flex;align-items:center;gap:10px;margin-top:3px;flex-wrap:wrap"><h2>${esc(e.libelle)}</h2><span class="statut ${st}">${STATUTS[st]}</span>
-    ${redac ? `<span class="tag ${redac === "ia" ? "ia" : ""}">${redac === "ia" ? "Rédigé avec Claude" : "Rédaction par règles"}</span>` : ""}</div>
+    ${redac && IA_VISIBLE ? `<span class="tag ${redac === "ia" ? "ia" : ""}">${redac === "ia" ? "Rédigé avec Claude" : "Rédaction par règles"}</span>` : ""}</div>
     ${e.valide_le && st === "valide" ? `<div class="aide" style="font-size:12px;margin-top:2px">Validée le ${heureFr(e.valide_le)}</div>` : ""}`;
   $("#zone-etape").innerHTML = `
     <div class="panneau ${large ? "large" : ""}"><div class="carte carte-etape" id="carte-etape">
@@ -1095,8 +1099,8 @@ function vueParametres(app) {
     <div class="parametres">
       <div class="engrenages" aria-hidden="true"><i></i><i></i><i></i></div>
       <span class="sur" data-reveal="haut">Configuration</span><h1 class="titre-section-l" data-reveal="haut" data-delai="60">Paramètres</h1>
-      <p class="aide-l" data-reveal="haut" data-delai="120" style="margin-bottom:22px">Rédaction assistée et textes de présentation du cabinet.</p>
-      <div class="carte neon" style="margin-bottom:16px"><div class="carte-titre"><h3>${ico("sparkle")} Rédaction assistée par Claude</h3><span class="badge-ia ${P.ia_active && P.cle_definie ? "on" : ""}">${P.ia_active && P.cle_definie ? "Active" : "Inactive"}</span></div>
+      <p class="aide-l" data-reveal="haut" data-delai="120" style="margin-bottom:22px">${IA_VISIBLE ? "Rédaction assistée, textes de présentation du cabinet et coûts unitaires de référence." : "Textes de présentation du cabinet et coûts unitaires de référence."}</p>
+      <div class="carte neon" style="margin-bottom:16px" ${IA_VISIBLE ? "" : "hidden"}><div class="carte-titre"><h3>${ico("sparkle")} Rédaction assistée par Claude</h3><span class="badge-ia ${P.ia_active && P.cle_definie ? "on" : ""}">${P.ia_active && P.cle_definie ? "Active" : "Inactive"}</span></div>
         <div class="carte-corps">
           <p class="aide" style="margin-top:0">Sans IA, la plateforme rédige à partir de règles et d'une banque d'indicateurs Datatym. Avec une clé API Anthropic, Claude propose des indicateurs et des textes adaptés au thème, puis rédige les messages clés du rapport. Tout reste relu et validé par le cabinet.</p>
           <div class="grille-2">
