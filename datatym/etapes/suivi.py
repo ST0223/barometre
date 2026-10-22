@@ -1,7 +1,8 @@
 """Étape 6 — Note de suivi des enquêtes, produite à la clôture à partir du tableau de bord."""
+from .. import budget
 from ..charte import chiffres, liste, p, section, tableau
 from ..banque import sont_des_pays
-from ..outils import aujourdhui, date_courte, date_fr, nombre, pct
+from ..outils import aujourdhui, date_courte, date_fr, fcfa, nombre, pct
 
 DOCS = {"note_suivi": ("NoteSuivi", "Note de suivi des enquêtes")}
 
@@ -18,6 +19,8 @@ def generer(projet, precedent=None):
             "Renforcer le contrôle de la durée des entretiens dès les premiers jours.",
             "Conserver les mêmes échelles et formulations pour la prochaine édition afin d'assurer la comparabilité.",
         ],
+        # dépenses réelles par poste du budget de collecte, saisies à la clôture
+        "depenses": prec.get("depenses") or {},
     }
 
 
@@ -90,8 +93,37 @@ def construire_docs(projet, data, stats):
         section("observations", "6. Observations de terrain", [liste(data.get("observations", []))]),
         section("recommandations", "7. Recommandations pour la prochaine édition", [liste(data.get("recommandations", []))]),
     ]
+    bil = budget.bilan(projet["etapes"]["echantillonnage"]["data"].get("budget"), data.get("depenses"), s)
+    if bil:
+        sections.append(section("bilan_financier", "8. Bilan financier", blocs_bilan(bil), source="auto"))
     return {"note_suivi": {
         "titre": "Note de suivi des enquêtes", "surtitre": "Baromètre Datatym", "sous_titre": fiche["theme"],
         "meta": [f"Collecte du {date_fr(j0)} au {date_fr(j1)}", f"Version du {aujourdhui()}"],
         "en_tete": f"Baromètre {fiche['theme']} — Note de suivi", "sections": sections,
     }}
+
+
+def blocs_bilan(b):
+    if not b["saisi"]:
+        return [p("Les dépenses réelles ne sont pas encore saisies : renseignez-les dans l'onglet « Bilan financier » "
+                  "de l'étape pour comparer le réalisé au budget de collecte.", "note")]
+    ecart = lambda v: "–" if v is None else ("+" if v > 0 else "") + fcfa(v)
+    lignes = [[l["poste"], fcfa(l["prevu"]), "non saisi" if l["reel"] is None else fcfa(l["reel"]), ecart(l["ecart"]),
+               "–" if l["reel"] is None or not l["prevu"] else pct(100 * l["ecart"] / l["prevu"])] for l in b["lignes"]]
+    lignes.append(["**Total des postes saisis**", f"**{fcfa(b['prevu_saisis'])}**", f"**{fcfa(b['reel'])}**", f"**{ecart(b['ecart'])}**",
+                   f"**{pct(100 * b['ecart'] / b['prevu_saisis']) if b['prevu_saisis'] else '–'}**"])
+    blocs = [
+        chiffres([{"valeur": fcfa(b["reel"]), "libelle": "dépenses réelles" + ("" if b["complet"] else " (postes saisis)")},
+                  {"valeur": ecart(b["ecart"]), "libelle": "écart au budget"},
+                  {"valeur": fcfa(b["par_questionnaire_reel"]) if b["par_questionnaire_reel"] else "–", "libelle": "coût réel par questionnaire validé"},
+                  {"valeur": fcfa(b["non_qualite"]), "libelle": "coût estimé des questionnaires écartés"}]),
+        p(f"Le budget de collecte prévoyait {fcfa(b['prevu'])}, soit {fcfa(b['par_questionnaire_prevu'])} par questionnaire validé. "
+          + (f"Le coût réel s'établit à {fcfa(b['par_questionnaire_reel'])} pour {b['valides']} questionnaires validés. " if b["par_questionnaire_reel"] else "")
+          + (f"Les {b['ecartes']} questionnaires écartés au contrôle qualité ont mobilisé environ {fcfa(b['non_qualite'])} de frais de terrain."
+             if b["ecartes"] else "")),
+        tableau(["Poste", "Prévu", "Réalisé", "Écart", "Écart (%)"], lignes, "Budget prévu et dépenses réelles", [2.4, 1.2, 1.2, 1.2, 0.9], 9),
+    ]
+    if not b["complet"]:
+        blocs.append(p("Certains postes ne sont pas encore saisis : le bilan ne porte que sur les postes renseignés.", "note"))
+    blocs.append(p("Les coûts unitaires constatés servent de référence pour estimer la prochaine édition.", "note"))
+    return blocs

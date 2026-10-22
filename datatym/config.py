@@ -36,6 +36,8 @@ PARAMS_DEFAUT = {
     # jetons des plateformes de collecte, conservés sur ce poste uniquement (parametres.json est exclu de Git)
     "kobo_jeton": "",
     "questionpro_cle": "",
+    # coûts unitaires de référence de Datatym (FCFA) ; vide : valeurs par défaut de budget.py
+    "couts_unitaires": [],
 }
 
 

@@ -26,7 +26,7 @@ pour prendre en compte une mise à jour du code, fermez d'abord la fenêtre du s
 | **Lancer une étude** | Assistant en 4 temps (sujet, cible, terrain, lancement) avec modèles Datatym, sélection des pays par espace (UEMOA, CEMAC, Guinée, RD Congo) ou pays par pays, saisie libre de tout autre pays, alerte si moins de 30 répondants par pays, aperçu vivant de la note de cadrage, marge d'erreur et nombre d'enquêteurs calculés en direct, séquence de lancement plein écran |
 | **Mes études** | Portefeuille filtrable, répartition des études par étape, cartes inclinables |
 | **Étude** (projet) | Bandeau à la couleur de l'étape, chaîne des 8 étapes, transitions directionnelles, voile animé pendant la génération, tampon « Validé », tableau de bord de collecte animé |
-| **Paramètres** | Rédaction assistée par Claude (cadre lumineux animé) et textes du cabinet |
+| **Paramètres** | Rédaction assistée par Claude (cadre lumineux animé), textes du cabinet et coûts unitaires de référence |
 
 Les animations respectent le réglage système « réduire les animations ».
 
@@ -34,13 +34,13 @@ Les animations respectent le réglage système « réduire les animations ».
 
 | Étape | Livrables produits |
 |---|---|
-| 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, coût (facultatif) |
-| 1. Note de cadrage | Note de cadrage (.docx/.pdf) avec la liste des indicateurs |
+| 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, plafond budgétaire (facultatif) |
+| 1. Note de cadrage | Note de cadrage (.docx/.pdf) avec la liste des indicateurs et l'estimation préliminaire du coût (fourchette basse, centrale, haute) |
 | 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteurs.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro |
-| 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs |
+| 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
 | 4. Méthodologie | Note méthodologique, assemblée depuis les étapes 1 à 3 |
 | 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées |
-| 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité |
+| 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité, bilan financier prévu contre réalisé |
 | 7. Rapport d'analyse | Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés |
 
 Chaque étape propose : **Aperçu** (rendu fidèle du document), **Paramètres** (indicateurs, questions, quotas…),
@@ -52,6 +52,20 @@ Règles de propagation :
 - Les sections rédigées à la main sont conservées lors des mises à jour ; les sections calculées
   (tableaux d'indicateurs, quotas, résultats) sont toujours reconstruites à partir des paramètres.
 - Un indicateur désactivé dans le cadrage disparaît du questionnaire et du dictionnaire.
+
+## Le coût d'une étude
+
+Le coût de revient est construit poste par poste (quantité tirée du plan × coût unitaire), en trois temps :
+
+| Moment | Ce qui est produit |
+|---|---|
+| Note de cadrage | Fourchette basse, centrale, haute calculée à partir de la fiche ; figée à la génération, c'est la référence annoncée |
+| Échantillonnage | Budget de collecte détaillé (document interne), à partir des quotas, enquêteurs, superviseurs, jours et zones ; coûts unitaires et hypothèses modifiables dans l'onglet Paramètres |
+| Note de suivi | Dépenses réelles saisies dans l'onglet « Bilan financier » ; écarts par poste, coût réel par questionnaire validé, coût des questionnaires écartés |
+
+Le plafond budgétaire de la fiche ne sert qu'à vérifier que l'estimation reste dans l'enveloppe. Aucun montant
+ne figure dans la note d'échantillonnage, la note de recrutement ni la formation, qui peuvent circuler hors de Datatym.
+Les coûts unitaires livrés sont indicatifs : à remplacer par les tarifs de Datatym dans **Paramètres**.
 
 ## Déployer le formulaire sur KoboToolbox
 
@@ -92,6 +106,7 @@ datatym/
   charte.py            charte Word : Times New Roman 12, interligne 1,5, justifié, logos Datatym et Agiltym
   banque.py            types d'indicateurs, questions, modalités, modes de calcul
   moteur.py            génération, validation, propagation, versions, export PDF
+  budget.py            coût de revient : fourchette du cadrage, budget de collecte, bilan financier
   formulaires.py       dictionnaire, XLSForm, import QuestionPro
   formation.py         PowerPoint de formation des enquêteurs
   llm.py               appel à Claude (facultatif)

@@ -66,6 +66,7 @@ function vueEtude(app, params) {
       <aside class="apercu-vivant" data-reveal="droite" data-delai="300">
         <div class="av-papier" id="av-papier"></div>
         <div class="av-jauges" id="av-jauges"></div>
+        <div class="av-cout" id="av-cout"></div>
         <div class="av-chaine" id="av-chaine"></div>
       </aside>
     </div>
@@ -119,7 +120,7 @@ function panneauTerrain() {
 
 function panneauLancement() {
   return `<h2 class="ass-titre">Prêt à lancer&nbsp;?</h2>
-    ${champ("e-cout", 'Estimation du coût total <span class="ex">facultatif</span>', `<div class="saisie-unite"><input class="saisie saisie-xl" id="e-cout" data-f="cout" inputmode="numeric" placeholder="12 000 000"><span>FCFA</span></div>`, "Sans montant, la répartition budgétaire est simplement omise des documents.")}
+    ${champ("e-cout", 'Plafond budgétaire <span class="ex">facultatif</span>', `<div class="saisie-unite"><input class="saisie saisie-xl" id="e-cout" data-f="cout" inputmode="numeric" placeholder="12 000 000"><span>FCFA</span></div>`, "Le coût est estimé à partir de vos paramètres ; le plafond sert seulement à vérifier qu'il reste dans l'enveloppe.")}
     <div class="recap" id="e-recap"></div>
     <button class="btn btn-lumiere btn-lancer" id="e-lancer">${ico("play")} Lancer l'étude et générer la note de cadrage</button>`;
 }
@@ -269,7 +270,7 @@ function rafraichirEtude(complet) {
     <div class="niv-col"><span class="niv ope">Opérationnel</span>${f.cible.filter((c) => !DIRECTION_JS.test(c)).map((c) => `<em>${esc(c)}</em>`).join("") || "<em class='vide-n'>—</em>"}</div>` : "";
   $("#e-recap").innerHTML = [["Thème", f.theme], ["Objectif", f.objectif], ["Cible", f.cible.join(", ")], ["Pays", f.zones.length ? `${f.zones.length} : ${f.zones.join(", ")}` : ""],
     ["Secteur", f.secteur || "Secteur formel"], ["Taille", `${n} répondants`], ["Durée", `${f.duree} jours`], ["Outil", f.outil === "kobo" ? "KoboToolbox" : "QuestionPro"],
-    ["Budget", f.cout ? `${f.cout} FCFA` : "Non renseigné"]].map(([k, v]) => `<div><span>${k}</span><b class="${v ? "" : "manque"}">${esc(v || "à compléter")}</b></div>`).join("");
+    ["Plafond", f.cout ? `${f.cout} FCFA` : "Non renseigné"]].map(([k, v]) => `<div><span>${k}</span><b class="${v ? "" : "manque"}">${esc(v || "à compléter")}</b></div>`).join("");
 
   // aperçu vivant
   $("#av-papier").innerHTML = `<div class="avp-entete"><img src="/static/logo_datatym.png" alt=""><img src="/static/logo_agiltym.png" alt=""></div>
@@ -285,9 +286,27 @@ function rafraichirEtude(complet) {
     [Math.ceil(n / jours), "questionnaires par jour"],
   ].map(([v, l]) => `<div class="avj"><b>${v}</b><span>${l}</span></div>`).join("")
     + (f.zones.length > 1 && n / f.zones.length < 30 ? `<div class="avj-alerte">${ico("alert")}<span>Environ ${Math.floor(n / f.zones.length)} répondants par pays : sous le seuil de 30, les résultats par pays ne seront pas publiables. Visez au moins ${30 * f.zones.length} répondants.</span></div>` : "");
+  estimerCout();
   const livr = ["Note de cadrage", "Questionnaire et formulaires", "Échantillonnage et formation", "Note méthodologique", "Tableau de bord", "Note de suivi", "Rapport d'analyse"];
   const remplis = [f.theme && f.objectif, f.cible.length, f.zones.length, true].filter(Boolean).length;
   $("#av-chaine").innerHTML = `<div class="avc-titre">Ce qui sera produit</div>` + livr.map((l, k) => `<div class="avc ${k < remplis + 2 ? "pret" : ""}" style="transition-delay:${k * 60}ms"><i></i>${l}</div>`).join("");
+}
+
+/** Fourchette de coût de revient, recalculée par le serveur avec les coûts unitaires de Datatym. */
+let minuterieCout;
+function estimerCout() {
+  clearTimeout(minuterieCout);
+  minuterieCout = setTimeout(async () => {
+    const f = E.f;
+    const zone = $("#av-cout");
+    if (!zone || !f.zones.length || !f.taille) { if (zone) zone.innerHTML = ""; return; }
+    try {
+      const e = await api("POST", "/api/estimation", { ...f, cible: f.cible.join(", "), zones: f.zones.join(", "), cout: String(f.cout || "").replace(/\D/g, "") });
+      const m = (x) => `${(x / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
+      zone.innerHTML = `<div class="avj avj-cout"><b>${m(e.bas)} – ${m(e.haut)} FCFA</b><span>coût de revient estimé · central ${m(e.central)}, environ ${nf(e.par_questionnaire)} FCFA par questionnaire</span></div>`
+        + (e.plafond && !e.dans_plafond ? `<div class="avj-alerte">${ico("alert")}<span>${e.plafond_court ? "Le plafond est inférieur à l'estimation basse : réduisez le nombre de pays, la taille ou allongez la durée." : "Le plafond ne couvre pas le scénario haut : le plan de collecte devra le confirmer."}</span></div>` : "");
+    } catch (err) { zone.innerHTML = ""; }
+  }, 350);
 }
 
 async function lancerEtude(ev) {

@@ -32,10 +32,10 @@ const ETAPES_INFO = {
   fiche: { court: "Fiche", desc: "Les sept paramètres du baromètre, saisis une seule fois." },
   cadrage: { court: "Cadrage", desc: "Contexte, objectifs, cible, champ, taille visée, durée et surtout la liste des indicateurs recherchés : la base de tout le reste.", produit: ["Note de cadrage (Word, PDF)"] },
   questionnaire: { court: "Questionnaire", desc: "Questions construites à partir des indicateurs validés, adaptées à chaque profil, avec message de consentement et durée estimée.", produit: ["Questionnaire terrain et digital", "Dictionnaire des variables", "XLSForm KoboToolbox", "Import QuestionPro"] },
-  echantillonnage: { court: "Échantillonnage", desc: "Quotas zone × profil, répartition par enquêteur, calendrier jour par jour, coûts, note de recrutement et formation.", produit: ["Note d'échantillonnage", "Note de recrutement", "Calendrier et quotas (Excel)", "PowerPoint de formation", "XLSForm avec enquêteurs"] },
+  echantillonnage: { court: "Échantillonnage", desc: "Quotas zone × profil, répartition par enquêteur, calendrier jour par jour, budget de collecte, note de recrutement et formation.", produit: ["Note d'échantillonnage", "Note de recrutement", "Budget de collecte (interne)", "Calendrier et quotas (Excel)", "PowerPoint de formation", "XLSForm avec enquêteurs"] },
   methodologie: { court: "Méthodologie", desc: "Assemblage automatique des étapes précédentes : méthode, échantillonnage, questionnaire, indicateurs et modes de calcul, outils, traitement.", produit: ["Note méthodologique"] },
   collecte: { court: "Collecte", desc: "Import des soumissions (fichier Kobo/QuestionPro ou API Kobo) et tableau de bord : avancement par enquêteur, zone et quota, écarts au calendrier.", produit: ["Tableau de bord", "Base des soumissions"] },
-  suivi: { court: "Note de suivi", desc: "Bilan de la collecte à partir du tableau de bord : réalisé contre prévu, taux de complétion, incidents, qualité des données.", produit: ["Note de suivi des enquêtes"] },
+  suivi: { court: "Note de suivi", desc: "Bilan de la collecte à partir du tableau de bord : réalisé contre prévu, taux de complétion, incidents, qualité des données, bilan financier.", produit: ["Note de suivi des enquêtes"] },
   rapport: { court: "Rapport", desc: "Calcul des indicateurs, graphiques, lecture par profil et par zone, messages clés et enseignements.", produit: ["Rapport d'analyse (Word, PDF)"] },
 };
 const ORDRE = ["fiche", "cadrage", "questionnaire", "echantillonnage", "methodologie", "collecte", "suivi", "rapport"];
@@ -45,7 +45,7 @@ const ONGLETS = {
   echantillonnage: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["recrutement", "Recrutement", "users"], ["redaction", "Rédaction", "edit"]],
   methodologie: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["redaction", "Rédaction", "edit"]],
   collecte: [["tableau", "Tableau de bord", "chart"], ["import", "Données", "upload"]],
-  suivi: [["apercu", "Aperçu", "eye"], ["parametres", "Observations", "edit"], ["redaction", "Rédaction", "file"]],
+  suivi: [["apercu", "Aperçu", "eye"], ["parametres", "Observations", "edit"], ["bilan", "Bilan financier", "coin"], ["redaction", "Rédaction", "file"]],
   rapport: [["apercu", "Aperçu", "eye"], ["redaction", "Rédaction", "edit"], ["parametres", "Paramètres", "settings"]],
 };
 
@@ -225,7 +225,7 @@ const CHAMPS = [
   ["secteur", "Champ d'enquête : secteur", "Commerce formel", false, "Plusieurs secteurs séparés par des virgules ajoutent une question"],
   ["taille", "Taille de population souhaitée", "400", true, "Quotas, nombre d'enquêteurs"],
   ["duree", "Durée de l'enquête (jours)", "15", true, "Calendrier de collecte"],
-  ["cout", "Estimation du coût total (FCFA)", "Facultatif", false, "Sans montant, la répartition budgétaire est omise"],
+  ["cout", "Plafond budgétaire (FCFA)", "Facultatif", false, "Sert seulement à vérifier que le coût estimé reste dans l'enveloppe"],
 ];
 
 function formFiche(f = {}) {
@@ -269,7 +269,7 @@ function vueProjet(entree = true) {
             <span class="puce verre">${ico("map")}${esc(f.zones)}${f.secteur ? " · " + esc(f.secteur) : ""}</span>
             <span class="puce verre">${ico("target")}${f.taille} répondants</span>
             <span class="puce verre">${ico("clock")}${f.duree} jours</span>
-            ${f.cout ? `<span class="puce verre">${ico("coin")}${nf(f.cout)} FCFA</span>` : ""}
+            ${f.cout ? `<span class="puce verre">${ico("coin")}plafond ${nf(f.cout)} FCFA</span>` : ""}
           </div>
         </div>
         <div class="anneau clair"><svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="30" stroke="rgba(255,255,255,.15)" stroke-width="7" fill="none"/>
@@ -498,7 +498,7 @@ function contenuOnglet(cle) {
   if (o === "redaction") return ongletRedaction(z, cle, e);
   const f = {
     cadrage: editeurIndicateurs, questionnaire: editeurQuestions, echantillonnage: o === "recrutement" ? editeurRecrutement : editeurEchantillonnage,
-    methodologie: editeurMethodo, suivi: editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : ongletTableau,
+    methodologie: editeurMethodo, suivi: o === "bilan" ? editeurBilan : editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : ongletTableau,
   }[cle];
   const div = document.createElement("div");
   z.appendChild(div);
@@ -800,11 +800,7 @@ function editeurEchantillonnage(z, e) {
     <div class="grille-tab" style="margin-bottom:18px"><table><thead><tr><th>Zone</th>${d.profils.map((p) => `<th>${esc(p.libelle)}</th>`).join("")}<th>Total</th><th>Enquêteurs</th></tr></thead><tbody>
       ${d.zones.map((z_) => `<tr><td><b>${esc(z_)}</b></td>${d.profils.map((p) => `<td>${q[`${z_}|${p.code}`]}</td>`).join("")}<td><b>${d.tot_zone[z_]}</b></td><td>${d.enqueteurs.filter((m) => m.zone === z_).map((m) => esc(m.nom)).join(", ")}</td></tr>`).join("")}
     </tbody></table></div>
-    ${S.projet.fiche.cout ? `<div class="lib" style="margin-bottom:6px">Répartition du budget (${nf(S.projet.fiche.cout)} FCFA)</div>
-      <div class="grille-tab"><table><thead><tr><th>Poste</th><th>Part (%)</th><th>Montant</th></tr></thead><tbody>
-      ${P.postes.map((x, k) => `<tr><td><input class="saisie petite" data-poste="${k}" data-k="poste" value="${esc(x.poste)}"></td><td><input class="saisie petite" style="width:90px" type="number" data-poste="${k}" data-k="part" value="${x.part}"></td><td>${nf((S.projet.fiche.cout * x.part) / P.postes.reduce((a, b) => a + Number(b.part || 0), 0) || 0)} FCFA</td></tr>`).join("")}
-      </tbody></table></div>
-      ${d.couts ? `<p class="aide">Rémunération par enquêteur : <b>${nf(d.couts.par_enqueteur)} FCFA</b> · par jour : <b>${nf(d.couts.par_enqueteur_jour)} FCFA</b> · coût par questionnaire : <b>${nf(d.couts.par_questionnaire)} FCFA</b></p>` : ""}` : `<p class="aide">Aucun coût renseigné dans la fiche : la répartition budgétaire est omise.</p>`}`;
+    ${blocBudget(d, P)}`;
   z.oninput = z.onchange = (ev) => {
     const t = ev.target;
     S.sale = true;
@@ -813,10 +809,82 @@ function editeurEchantillonnage(z, e) {
       P[k] = k === "sans_dimanche" ? t.checked : k === "noms_enqueteurs" ? t.value.split("\n").map((x) => x.trim()).filter(Boolean) : ["rendement", "marge"].includes(k) ? Number(t.value) : t.value;
     } else if (t.dataset.pz) P.poids_zones[t.dataset.pz] = Number(t.value);
     else if (t.dataset.pp) P.poids_profils[t.dataset.pp] = Number(t.value);
-    else if (t.dataset.poste) P.postes[+t.dataset.poste][t.dataset.k] = t.dataset.k === "part" ? Number(t.value) : t.value;
+    else if (t.dataset.cu !== undefined) P.couts[+t.dataset.cu].valeur = Number(t.value);
+    else if (t.dataset.hyp) P.hypotheses[t.dataset.hyp] = Number(t.value);
   };
   piedEnregistrer(z, "echantillonnage", () => ({ params: P }), "Recalculer et mettre à jour les documents");
 }
+
+const HYPOTHESES_BUDGET = [["jours_formation", "Jours de formation"], ["enq_par_superviseur", "Enquêteurs par superviseur"], ["part_rappels", "Rappels de contrôle (%)"],
+  ["jours_preparation", "Jours de conception et coordination"], ["jours_analyse", "Jours de traitement et d'analyse"], ["imprevus", "Imprévus (% du sous-total)"]];
+
+/** Coûts unitaires, hypothèses et budget calculé (document interne « Budget de collecte »). */
+function blocBudget(d, P) {
+  const b = d.budget;
+  const est = S.projet.etapes.cadrage.data.estimation;
+  const plafond = S.projet.fiche.cout;
+  // étude créée avant le budget de collecte : il apparaît à la prochaine mise à jour de l'étape
+  if (!P.couts) return `<div class="bandeau info">${ico("info")}<div>Le budget de collecte sera calculé à la prochaine mise à jour de cette étape (bouton <b>Mettre à jour</b>, ou rouvrir puis régénérer).</div></div>`;
+  return `<div class="lib" style="margin-bottom:6px">Budget de collecte <span class="ex">document interne, recalculé à partir du plan</span></div>
+    ${b ? `<div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
+      ${[["Coût de revient", `${nf(b.total)} FCFA`], ["Par questionnaire validé", `${nf(b.par_questionnaire)} FCFA`], ["Part du terrain", `${nf(b.part_terrain)} %`], ["100 questionnaires de plus", `${nf(b.marginal_100)} FCFA`]]
+        .map(([t, v]) => `<div class="carte kpi"><div class="t">${t}</div><div class="v" style="font-size:20px">${v}</div></div>`).join("")}
+    </div>
+    ${est ? `<p class="aide">Estimation du cadrage : ${nf(est.bas)} à ${nf(est.haut)} FCFA${plafond ? ` · plafond : ${nf(plafond)} FCFA${b.total > plafond ? ` <b style="color:var(--rouge)">dépassé de ${nf(b.total - plafond)} FCFA</b>` : ""}` : ""}</p>` : ""}` : ""}
+    <div class="grille-2" style="margin-bottom:18px;align-items:start">
+      <div class="grille-tab"><table><thead><tr><th>Coût unitaire</th><th>Unité</th><th>FCFA</th></tr></thead><tbody>
+        ${P.couts.map((c, k) => `<tr><td>${esc(c.libelle)}</td><td class="aide">${esc(c.unite)}</td><td><input class="saisie petite" style="width:110px" type="number" min="0" step="500" data-cu="${k}" value="${c.valeur}"></td></tr>`).join("")}
+      </tbody></table></div>
+      <div>${HYPOTHESES_BUDGET.map(([k, l]) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="flex:1">${esc(l)}</span><input class="saisie petite" style="width:90px" type="number" min="0" step="1" data-hyp="${k}" value="${P.hypotheses[k]}"></div>`).join("")}</div>
+    </div>
+    ${b ? `<div class="grille-tab"><table><thead><tr><th>Poste</th><th>Base de calcul</th><th>Montant</th></tr></thead><tbody>
+      ${b.lignes.map((l) => `<tr><td>${esc(l.poste)}</td><td class="aide">${esc(l.base)}</td><td>${nf(l.montant)} FCFA</td></tr>`).join("")}
+      <tr><td>Imprévus</td><td class="aide">${nf(b.taux_imprevus)} % du sous-total</td><td>${nf(b.imprevus)} FCFA</td></tr>
+      <tr><td><b>Total</b></td><td></td><td><b>${nf(b.total)} FCFA</b></td></tr>
+    </tbody></table></div>` : ""}`;
+}
+
+/** Dépenses réelles par poste, comparées au budget de collecte. */
+function editeurBilan(z) {
+  const b = S.projet.etapes.echantillonnage.data.budget;
+  z.className = "carte-corps";
+  if (!b) {
+    z.innerHTML = `<div class="bandeau info">${ico("info")}<div>Aucun budget de collecte : mettez à jour l'étape Échantillonnage pour le calculer.</div></div>`;
+    return;
+  }
+  if (!S.travail) S.travail = clone({ depenses: S.projet.etapes.suivi.data.depenses || {} });
+  const D = S.travail.depenses;
+  const postes = [...b.lignes, { cle: "imprevus", poste: "Imprévus", montant: b.imprevus }];
+  const saisi = (c) => D[c] !== undefined && D[c] !== "";
+  z.innerHTML = `
+    <div class="bandeau info">${ico("info")}<div>Saisissez les dépenses réellement engagées, poste par poste. Le bilan financier de la note de suivi compare le réalisé au budget de collecte ; un poste laissé vide n'entre pas dans le calcul.</div></div>
+    <div class="grille-tab"><table><thead><tr><th>Poste</th><th>Prévu</th><th>Réalisé (FCFA)</th><th>Écart</th></tr></thead><tbody>
+      ${postes.map((p) => `<tr><td>${esc(p.poste)}</td><td>${nf(p.montant)} FCFA</td>
+        <td><input class="saisie petite" style="width:130px" type="number" min="0" step="1000" data-dep="${p.cle}" value="${D[p.cle] ?? ""}" placeholder="non saisi"></td>
+        <td data-ecart="${p.cle}"></td></tr>`).join("")}
+      <tr><td><b>Total</b></td><td><b>${nf(b.total)} FCFA</b></td><td><b id="dep-total"></b></td><td></td></tr>
+    </tbody></table></div>`;
+  const peindre = () => {
+    postes.forEach((p) => {
+      const c = z.querySelector(`[data-ecart="${p.cle}"]`);
+      if (!saisi(p.cle)) { c.textContent = "–"; c.style.color = ""; return; }
+      const e = Number(D[p.cle]) - p.montant;
+      c.textContent = `${e > 0 ? "+" : ""}${nf(e)} FCFA`;
+      c.style.color = e > 0 ? "var(--rouge)" : "var(--vert)";
+    });
+    $("#dep-total").textContent = `${nf(postes.reduce((a, p) => a + (saisi(p.cle) ? Number(D[p.cle]) : 0), 0))} FCFA`;
+  };
+  z.oninput = (ev) => {
+    const t = ev.target;
+    if (!t.dataset.dep) return;
+    S.sale = true;
+    if (t.value === "") delete D[t.dataset.dep]; else D[t.dataset.dep] = Number(t.value);
+    peindre();
+  };
+  peindre();
+  piedEnregistrer(z, "suivi", () => ({ depenses: D }), "Enregistrer et mettre à jour la note de suivi");
+}
+
 
 function editeurRecrutement(z, e) {
   if (!S.travail) S.travail = clone({ params: e.data.params, recrutement: e.data.recrutement });
@@ -1041,17 +1109,25 @@ function vueParametres(app) {
       <div class="carte"><div class="carte-titre"><h3>Textes Datatym</h3></div><div class="carte-corps">
         <div class="champ" style="margin-bottom:14px"><label>Présentation de Datatym (notes de recrutement, formation)</label><textarea class="saisie" id="p-pres" rows="5">${esc(P.presentation_datatym)}</textarea></div>
         <div class="champ"><label>Lien de dépôt des candidatures par défaut</label><input class="saisie" id="p-contact" value="${esc(P.contact_recrutement)}"></div>
-        <div class="pied-form"><button class="btn btn-primaire" id="p-enr">${ico("check")} Enregistrer</button></div>
+        <div class="pied-form"><button class="btn btn-primaire" data-enr-params>${ico("check")} Enregistrer</button></div>
+      </div></div>
+      <div class="carte" style="margin-top:16px"><div class="carte-titre"><h3>${ico("coin")} Coûts unitaires de référence</h3></div><div class="carte-corps">
+        <p class="aide" style="margin-top:0">Ils servent à l'estimation du coût dans la note de cadrage et au budget de collecte de chaque nouvelle étude, où ils restent modifiables. Valeurs indicatives à remplacer par les tarifs de Datatym.</p>
+        <div class="grille-tab"><table><thead><tr><th>Poste</th><th>Unité</th><th>FCFA</th></tr></thead><tbody>
+          ${P.couts_unitaires.map((c, k) => `<tr><td>${esc(c.libelle)}</td><td class="aide">${esc(c.unite)}</td><td><input class="saisie petite" style="width:120px" type="number" min="0" step="500" data-cu-ref="${k}" value="${c.valeur}"></td></tr>`).join("")}
+        </tbody></table></div>
+        <div class="pied-form"><button class="btn btn-primaire" data-enr-params>${ico("check")} Enregistrer</button></div>
       </div></div>
     </div>`;
   A.reveler(app);
-  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value });
-  $("#p-enr").onclick = (e) => occupe(e.currentTarget, async () => {
+  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value,
+    couts_unitaires: P.couts_unitaires.map((c, k) => ({ cle: c.cle, valeur: Number(app.querySelector(`[data-cu-ref="${k}"]`).value) || 0 })) });
+  app.querySelectorAll("[data-enr-params]").forEach((b) => (b.onclick = (e) => occupe(e.currentTarget, async () => {
     await api("PUT", "/api/parametres", lire());
     await chargerParams();
     toast("Paramètres enregistrés.", "succes");
     vueParametres(app);
-  });
+  })));
   $("#p-test").onclick = (e) => occupe(e.currentTarget, async () => {
     await api("PUT", "/api/parametres", lire());
     await chargerParams();

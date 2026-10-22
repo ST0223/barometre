@@ -423,6 +423,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
 .avj { padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, .8); border: 1px solid #fff; box-shadow: 0 8px 24px rgba(8, 31, 92, .07); }
 .avj-alerte { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--ambre-50); color: #8A5A06; font-size: 12.5px; animation: entre .5s var(--ease); }
 .avj-alerte svg { flex-shrink: 0; margin-top: 1px; }
+.av-cout { display: grid; gap: 10px; margin-top: 10px; }
+.av-cout:empty { display: none; }
+.avj-cout b { font-size: 21px; }
 .avj b { display: block; font-family: var(--titre); font-size: 24px; color: var(--abysse); letter-spacing: -.03em; }
 .avj span { font-size: 12px; color: var(--texte-2); }
 .av-chaine { padding: 16px 18px; border-radius: 18px; background: var(--abysse); color: #9FB6DA; position: relative; overflow: hidden; }

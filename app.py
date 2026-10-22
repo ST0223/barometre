@@ -11,7 +11,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import llm, moteur, store
+from datatym import budget, llm, moteur, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -265,6 +265,7 @@ def lire_parametres():
     p["cle_definie"] = bool(cle)
     # les jetons de collecte ne quittent jamais le serveur : seule leur présence est signalée
     p["kobo_jeton_defini"], p["questionpro_cle_definie"] = bool(p.pop("kobo_jeton", "")), bool(p.pop("questionpro_cle", ""))
+    p["couts_unitaires"] = budget.couts_reference()
     return jsonify(p)
 
 
@@ -284,6 +285,12 @@ def ecrire_parametres():
 def tester_ia():
     reussi, message = llm.tester()
     return jsonify({"ok": reussi, "message": message})
+
+
+@app.post("/api/estimation")
+def estimation():
+    """Fourchette de coût calculée en direct pendant la saisie de la fiche."""
+    return jsonify(budget.estimer_cadrage(store.nettoyer_fiche(request.get_json(force=True))))
 
 
 @app.get("/api/types")

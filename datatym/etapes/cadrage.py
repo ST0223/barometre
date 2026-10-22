@@ -1,7 +1,7 @@
 """Étape 1 — Note de cadrage : contexte, objectifs, cible, indicateurs recherchés."""
 from datetime import timedelta
 
-from .. import llm
+from .. import budget, llm
 from ..banque import (DOMAINES, TYPES, decouper, definition_auto, indicateurs_par_defaut, profils_concernes,
                       profils_depuis_cible, resume_champ, sont_des_pays)
 from ..charte import liste, p, section, tableau, chiffres
@@ -240,7 +240,8 @@ def construire_docs(projet, data):
             tableau(["Livrable", "Contenu"], [
                 ["Note de cadrage", "Le présent document, validé avant le questionnaire"],
                 ["Questionnaire", "Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo, import QuestionPro"],
-                ["Note d'échantillonnage", "Quotas, répartition par enquêteur, calendrier, coûts, note de recrutement, formation"],
+                ["Note d'échantillonnage", "Quotas, répartition par enquêteur, calendrier, note de recrutement, formation"],
+                ["Budget de collecte", "Coût de revient détaillé poste par poste, établi avec le plan de collecte (document interne)"],
                 ["Note méthodologique", "Synthèse de la méthode, des outils et du calcul des indicateurs"],
                 ["Tableau de bord et note de suivi", "Suivi de la collecte, réalisé contre prévu, qualité des données"],
                 ["Rapport d'analyse", "Résultats par indicateur, graphiques, lecture par profil, enseignements"],
@@ -248,12 +249,25 @@ def construire_docs(projet, data):
             tableau(["Phase", "Période", "Résultat attendu"], calendrier_indicatif(fiche), "Calendrier indicatif", [1.3, 1.8, 2]),
         ], source="auto"),
     ]
-    if fiche.get("cout"):
-        c = fiche["cout"]
-        sections.append(section("budget", "8. Enveloppe budgétaire", [
-            p(f"L'enveloppe estimée s'élève à **{fcfa(c)}**, soit environ {fcfa(c / max(n, 1))} par questionnaire réalisé. "
-              "Sa répartition détaillée figure dans la note d'échantillonnage."),
-        ], source="auto"))
+    est = data.get("estimation") or budget.estimer_cadrage(fiche)
+    blocs_budget = [
+        p(f"Sur la base des paramètres de la fiche et des coûts unitaires de référence de Datatym, le coût de revient du baromètre "
+          f"est estimé **entre {fcfa(est['bas'])} et {fcfa(est['haut'])}**, pour une estimation centrale de **{fcfa(est['central'])}**, "
+          f"soit environ {fcfa(est['par_questionnaire'])} par questionnaire validé."),
+        tableau(["Scénario", "Hypothèse de terrain", "Enquêteurs", "Coût total", "Par questionnaire"],
+                [[s["nom"], s["hypothese"], str(s["nb_enqueteurs"]), fcfa(s["total"]), fcfa(s["par_questionnaire"])] for s in est["scenarios"]],
+                "Estimation préliminaire du coût de revient", [0.8, 2.6, 0.9, 1.3, 1.2], 9.5),
+    ]
+    if est.get("plafond"):
+        blocs_budget.append(p(
+            f"Le plafond budgétaire fixé ({fcfa(est['plafond'])}) "
+            + ("couvre l'ensemble de la fourchette." if est["dans_plafond"]
+               else "est inférieur à l'estimation basse : le plan devra être revu (zones, taille ou durée) avant le lancement."
+               if est["plafond_court"] else "couvre le scénario central mais pas le scénario haut : le plan de collecte devra le confirmer."),
+            "encadre"))
+    blocs_budget.append(p("Ordre de grandeur : chaque scénario repose sur les hypothèses indiquées. Le budget détaillé est établi avec le plan de collecte, "
+                          "à partir des quotas, du nombre d'enquêteurs et du calendrier retenus ; le coût réel est arrêté à la clôture.", "note"))
+    sections.append(section("budget", "8. Estimation préliminaire du coût", blocs_budget, source="auto"))
     sections.append(section("points", f"{len(sections) + 1}. Points à valider", [liste(["☐ " + x for x in data.get("points_a_valider", [])])]))
 
     modele = {

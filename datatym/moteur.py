@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import formulaires, formation, store
+from . import budget, formulaires, formation, store
 from .banque import nom_court, profils_depuis_cible
 from .charte import rendre_modele
 from .etapes import cadrage, collecte, echantillonnage, methodologie, questionnaire, rapport, suivi
@@ -206,6 +206,8 @@ def generer(projet, cle):
             e["data"] = cadrage.normaliser(prec)
         else:
             e["data"] = cadrage.generer(projet)
+        # fourchette figée à la génération : c'est la référence annoncée au dirigeant
+        e["data"]["estimation"] = budget.estimer_cadrage(projet["fiche"])
     elif cle == "questionnaire":
         e["data"] = questionnaire.generer(projet, _data(projet, "cadrage"), prec)
     elif cle == "echantillonnage":
@@ -268,7 +270,7 @@ def maj_data(projet, cle, maj):
     elif cle == "methodologie":
         d.update({k: v for k, v in maj.items() if k in ("logiciel", "limites")})
     elif cle == "suivi":
-        d.update({k: v for k, v in maj.items() if k in ("observations", "recommandations")})
+        d.update({k: v for k, v in maj.items() if k in ("observations", "recommandations", "depenses")})
     elif cle == "rapport":
         d.update({k: v for k, v in maj.items() if k in ("titre", "sous_titre")})
     _marquer_aval(projet, cle)

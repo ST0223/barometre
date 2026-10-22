@@ -2,21 +2,17 @@
 import math
 from datetime import date, timedelta
 
+from .. import budget
 from ..banque import decouper, du_barometre, nom_barometre, slug, sont_des_pays
 from ..charte import liste, p, section, tableau, chiffres
 from ..config import charger_parametres
-from ..outils import aujourdhui, date_courte, date_fr, debut_collecte, fcfa, fmt_marge, jours_collecte, nombre, repartir
+from ..outils import aujourdhui, date_courte, date_fr, debut_collecte, fcfa, fmt_marge, jours_collecte, nombre, pct, repartir
 
 DOCS = {
     "note_echantillonnage": ("NoteEchantillonnage", "Note d'échantillonnage des enquêteurs"),
     "note_recrutement": ("NoteRecrutement", "Note de recrutement des enquêteurs"),
+    "budget_collecte": ("BudgetCollecte", "Budget de collecte"),
 }
-
-POSTES_DEFAUT = [
-    ("Rémunération des enquêteurs", 40), ("Supervision et coordination du terrain", 12), ("Formation et pré-test", 5),
-    ("Transport et communication", 15), ("Matériel et licences (tablettes, outil de collecte)", 5),
-    ("Traitement, analyse et rapport", 15), ("Imprévus", 8),
-]
 
 
 def params_defaut(projet, quest):
@@ -28,7 +24,7 @@ def params_defaut(projet, quest):
         "poids_zones": {z: 1 for z in zones},
         "poids_profils": {pr["code"]: 1 for pr in quest["profils"]},
         "noms_enqueteurs": [], "nb_enqueteurs_force": None,
-        "postes": [{"poste": a, "part": b} for a, b in POSTES_DEFAUT],
+        "couts": budget.couts_reference(), "hypotheses": dict(budget.HYPOTHESES_DEFAUT),
     }
 
 
@@ -136,19 +132,16 @@ def calculer(projet, quest, params, recrutement=None):
         ligne["cumul"] = cumul
         calendrier.append(ligne)
 
-    couts = None
-    if fiche.get("cout"):
-        c = fiche["cout"]
-        tot_parts = sum(float(x["part"] or 0) for x in params["postes"]) or 100
-        postes = [{"poste": x["poste"], "part": float(x["part"] or 0), "montant": c * float(x["part"] or 0) / tot_parts} for x in params["postes"]]
-        remu = next((x["montant"] for x in postes if "numération" in x["poste"]), 0)
-        couts = {"total": c, "postes": postes, "par_enqueteur": remu / n_enq, "par_enqueteur_jour": remu / n_enq / len(jours),
-                 "par_questionnaire": c / n, "remu_par_questionnaire": remu / n}
+    # budget construit à partir du plan ; une étude ancienne reçoit la grille de référence
+    params["couts"], params["hypotheses"] = budget.completer(params.get("couts"), params.get("hypotheses"))
+    params.pop("postes", None)
+    bud = budget.calculer(n, n_enq, len(jours), len(zones), params["couts"], params["hypotheses"])
+    bud["marginal_100"] = budget.marginal(n, n_enq, len(jours), len(zones), params["couts"], params["hypotheses"])
 
     rec = recrutement or recrutement_defaut(projet, n_enq, jours)
     return {"params": params, "zones": zones, "profils": profils, "jours": [d.isoformat() for d in jours],
             "nb_enqueteurs": n_enq, "quotas": [[z, c, v] for (z, c), v in quotas.items()], "tot_zone": tot_zone,
-            "enqueteurs": enqueteurs, "calendrier": calendrier, "couts": couts, "recrutement": rec}
+            "enqueteurs": enqueteurs, "calendrier": calendrier, "budget": bud, "recrutement": rec}
 
 
 def generer(projet, quest, precedent=None):
@@ -217,15 +210,6 @@ def construire_docs(projet, data, quest):
             ], "Jalons de la collecte"),
         ], source="auto"),
     ]
-    if data.get("couts"):
-        c = data["couts"]
-        sections.append(section("couts", "5. Répartition du coût d'enquête", [
-            tableau(["Poste", "Part", "Montant"], [[x["poste"], f"{nombre(x['part'], 0)} %", fcfa(x["montant"])] for x in c["postes"]]
-                    + [["**Total**", "**100 %**", f"**{fcfa(c['total'])}**"]], "Répartition budgétaire", [3, 0.8, 1.4]),
-            chiffres([{"valeur": fcfa(c["par_enqueteur"]), "libelle": "rémunération par enquêteur"},
-                      {"valeur": fcfa(c["par_enqueteur_jour"]), "libelle": "par enquêteur et par jour"},
-                      {"valeur": fcfa(c["par_questionnaire"]), "libelle": "coût total par questionnaire"}]),
-        ], source="auto"))
     rec = data["recrutement"]
     sections.append(section("profils_enq", f"{len(sections) + 1}. Profils d'enquêteurs à rechercher", [
         liste([f"Diplôme minimum : {rec['diplome']}.", f"Expérience d'enquête : {rec['experience']} minimum."] + rec["competences"]),
@@ -251,7 +235,61 @@ def construire_docs(projet, data, quest):
                     p(f"Candidatures à déposer sur **{rec['contact']}** au plus tard le **{date_fr(rec['date_limite'])}**, en précisant « {rec['intitule']} ».")]),
         ],
     }
-    return {"note_echantillonnage": note, "note_recrutement": recrut}
+    return {"note_echantillonnage": note, "note_recrutement": recrut,
+            "budget_collecte": doc_budget(projet, data, jours)}
+
+
+def doc_budget(projet, data, jours):
+    """Budget de collecte : coût de revient poste par poste, document interne."""
+    fiche = projet["fiche"]
+    b = data["budget"]
+    n = b["n"]
+    est = projet["etapes"]["cadrage"]["data"].get("estimation") or budget.estimer_cadrage(fiche)
+    h = b["hypotheses"]
+    if est["bas"] <= b["total"] <= est["haut"]:
+        situe = "dans la fourchette annoncée"
+    elif b["total"] < est["bas"]:
+        situe = "sous la fourchette annoncée"
+    else:
+        situe = "au-dessus de la fourchette annoncée : les écarts tiennent aux choix du plan de collecte détaillés ci-dessous"
+    comparaison = (f"La note de cadrage estimait le coût entre {fcfa(est['bas'])} et {fcfa(est['haut'])}. "
+                   f"Le budget établi à partir du plan de collecte s'élève à **{fcfa(b['total'])}**, {situe}.")
+    plafond = fiche.get("cout")
+    if plafond:
+        comparaison += (f" Il respecte le plafond fixé ({fcfa(plafond)})." if b["total"] <= plafond
+                        else f" Il dépasse de {fcfa(b['total'] - plafond)} le plafond fixé ({fcfa(plafond)}).")
+    lignes = [[l["poste"], l["base"], nombre(l["quantite"], 0), fcfa(l["unitaire"]), fcfa(l["montant"])] for l in b["lignes"]]
+    lignes += [["**Sous-total**", "", "", "", f"**{fcfa(b['sous_total'])}**"],
+               ["Imprévus", f"{nombre(b['taux_imprevus'], 0)} % du sous-total", "", "", fcfa(b["imprevus"])],
+               ["**Total**", "", "", "", f"**{fcfa(b['total'])}**"]]
+    sections = [
+        section("synthese", "1. Synthèse", [
+            chiffres([{"valeur": fcfa(b["total"]), "libelle": "coût de revient total"},
+                      {"valeur": fcfa(b["par_questionnaire"]), "libelle": "par questionnaire validé"},
+                      {"valeur": pct(b["part_terrain"]), "libelle": "part du terrain"},
+                      {"valeur": fcfa(b["marginal_100"]), "libelle": "pour 100 questionnaires de plus"}]),
+            p(comparaison),
+        ], source="auto"),
+        section("detail", "2. Détail par poste", [
+            p(f"Chaque poste est calculé à partir du plan de collecte : {n} questionnaires validés, {b['nb_enqueteurs']} enquêteurs, "
+              f"{b['nb_superviseurs']} superviseur(s), {b['nb_jours']} jours de collecte et {b['nb_zones']} zone(s)."),
+            tableau(["Poste", "Base de calcul", "Quantité", "Coût unitaire", "Montant"], lignes, "Budget de collecte",
+                    [2, 2.4, 0.8, 1.1, 1.3], 9),
+        ], source="auto"),
+        section("hypotheses", "3. Hypothèses", [
+            liste(["Rémunération des enquêteurs au questionnaire validé : un questionnaire écarté au contrôle qualité n'est pas payé.",
+                   f"Un superviseur pour {nombre(h['enq_par_superviseur'], 0)} enquêteurs, au moins un par zone.",
+                   f"Formation de {nombre(h['jours_formation'], 0)} jour(s) avant le démarrage, supervision comprise.",
+                   f"Rappel de contrôle de {nombre(h['part_rappels'], 0)} % des répondants.",
+                   f"{nombre(h['jours_preparation'], 0)} jours de conception et de coordination, {nombre(h['jours_analyse'], 0)} jours de traitement et d'analyse.",
+                   f"Provision pour imprévus de {nombre(h['imprevus'], 0)} % du sous-total."]),
+            p("Le bilan prévu contre réalisé est établi à la clôture, dans la note de suivi des enquêtes.", "note"),
+        ], source="auto"),
+    ]
+    return {
+        "titre": "Budget de collecte", "surtitre": "Baromètre Datatym", "sous_titre": fiche["theme"],
+        "meta": [f"Version du {aujourdhui()}"], "en_tete": f"Baromètre {fiche['theme']} — Budget de collecte", "sections": sections,
+    }
 
 
 def calendrier_xlsx(chemin, data):
