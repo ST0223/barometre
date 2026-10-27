@@ -129,7 +129,12 @@ function appliquerTheme(t) {
 }
 document.addEventListener("DOMContentLoaded", () => {
   appliquerTheme(themeActuel());
-  $("#theme").onclick = () => appliquerTheme(THEMES[(THEMES.findIndex((x) => x[0] === themeActuel()) + 1) % THEMES.length][0]);
+  // le premier clic depuis Auto donne toujours le thème opposé à celui affiché, pour un changement visible
+  $("#theme").onclick = () => {
+    const sombreSysteme = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const ordre = sombreSysteme ? ["auto", "clair", "sombre"] : ["auto", "sombre", "clair"];
+    appliquerTheme(ordre[(ordre.indexOf(themeActuel()) + 1) % ordre.length]);
+  };
 });
 
 async function chargerParams() {
