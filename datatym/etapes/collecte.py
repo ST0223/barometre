@@ -277,6 +277,8 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                                     l[f"{var}_autre"] = "Autre réponse"
                         elif q["type"] == "text":
                             l[var] = "" if rnd.random() < 0.7 else "Remarque libre du répondant."
+                        elif q["type"] == "email":
+                            l[var] = "contact@exemple.com" if rnd.random() < 0.4 else ""
                         else:
                             l[var] = ""
                     l["enqueteur"] = m["code"]

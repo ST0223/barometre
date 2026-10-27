@@ -45,9 +45,7 @@ def questions_identification(fiche, profils, secteurs, domaine):
     qs.append(_q("id_profil", "Quelle fonction occupez-vous ?", "select_one",
                  [{"code": pr["code"], "label": pr["libelle"]} for pr in profils] + [{"code": "autre_hors", "label": "Autre fonction"}],
                  fixe=True))
-    qs.append(_q("id_anciennete", "Depuis combien de temps occupez-vous cette fonction ?", "select_one", [
-        {"code": "1", "label": "Moins d'1 an"}, {"code": "2", "label": "De 1 à 3 ans"},
-        {"code": "3", "label": "De 3 à 5 ans"}, {"code": "4", "label": "Plus de 5 ans"}], fixe=True))
+    # pas de question d'ancienneté : aucun indicateur ni aucune lecture du rapport ne s'en sert
     if domaine == "Climat des affaires":
         qs.append(_q("id_effectif", "Combien de personnes travaillent dans votre structure ?", "select_one", [
             {"code": "1", "label": "Moins de 10"}, {"code": "2", "label": "10 à 49"},
@@ -98,10 +96,9 @@ def construire_questions(projet, cadrage, precedentes=None):
         qs += [a for a in anciennes.values() if a.get("ajoutee") and a.get("bloc") == bloc]
         sections.append({"lettre": lettres[k], "titre": bloc, "ids": qs})
     sections.append({"lettre": lettres[len(blocs)], "titre": "Clôture", "ids": [
-        garder(_q("cl_resultats", "Souhaitez-vous recevoir les principaux résultats du baromètre ?", "select_one",
-                  [{"code": "oui", "label": "Oui"}, {"code": "non", "label": "Non"}], fixe=True)),
-        garder(_q("cl_email", "Adresse e-mail pour recevoir les résultats", "email", fixe=True, obligatoire=True,
-                  condition_sur=("cl_resultats", "oui"))),
+        # une seule question pour la restitution : l'adresse laissée vaut accord pour recevoir les résultats
+        garder(_q("cl_email", "Pour recevoir les principaux résultats du baromètre, indiquez votre adresse e-mail (facultatif).",
+                  "email", fixe=True, obligatoire=False)),
         garder(_q("cl_commentaire", "Avez-vous une remarque ou une suggestion à formuler ?", "text", fixe=True, obligatoire=False)),
     ]})
     return profils, sections

@@ -709,6 +709,11 @@ function editeurQuestions(z, e) {
   z.className = "carte-corps";
   z.innerHTML = `
     ${d.alerte_duree ? `<div class="bandeau alerte">${ico("alert")}<div>La version terrain dépasse le plafond de 15 minutes pour au moins un profil. Désactivez des indicateurs dans le cadrage ou rendez des questions facultatives.</div></div>` : ""}
+    ${(() => {
+      const qs = W.sections.flatMap((s) => s.ids);
+      const ind = qs.filter((q) => q.indicateur).length;
+      return `<p class="aide" style="margin:0 0 12px">${qs.length} questions : <b>${ind} alimentent un indicateur</b>, ${qs.length - ind} servent à l'identification (quotas, lecture par profil) et à la clôture. Une question qui ne nourrit ni un indicateur ni un quota allonge l'entretien sans rien apporter au rapport.</p>`;
+    })()}
     <div class="lib" style="margin-bottom:8px">Durée de remplissage estimée (plafond : 15 minutes)</div>
     <div class="jauges" style="margin-bottom:18px">${jauge("Terrain", d.duree_terrain)}${jauge("Digital", d.duree_digital)}</div>
     <div class="champ" style="margin-bottom:8px"><label>Message de consentement</label><textarea class="saisie" id="consent" rows="4">${esc(W.consentement)}</textarea></div>
