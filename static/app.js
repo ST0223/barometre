@@ -1036,7 +1036,8 @@ function ongletTableau(z, e) {
     <div class="aide" style="margin-bottom:12px;font-size:12.5px">Situation au ${dateFr(s.reference)} · jour ${s.jour_index} sur ${s.nb_jours} · dernière synchronisation ${heureFr(s.maj)}
       ${api_ ? `· <b>${esc(e.data.source)}</b>${auto ? " · resynchronisation automatique toutes les 5 minutes" : " · mémorisez le jeton pour la resynchronisation automatique"}` : ""}
       <button class="btn btn-fantome btn-petit" id="maj-tb">${ico("refresh")} ${api_ ? "Synchroniser maintenant" : "Recalculer"}</button></div>
-    <div class="kpis-tb">
+    <div class="kpis-tb kpis-5">
+      <div class="carte kpi"><div class="t">Questionnaires reçus</div><div class="v" data-compte="${s.brut}">0</div><div class="s">${[s.hors_cible && `${s.hors_cible} hors cible`, s.refus && `${s.refus} refus`, s.rapides && `${s.rapides} trop rapides`].filter(Boolean).join(" · ") || "tous exploitables"}</div></div>
       <div class="carte kpi"><div class="t">Questionnaires valides</div><div class="v"><span data-compte="${s.realise}">0</span><span style="font-size:15px;color:var(--texte-3)"> / ${s.objectif}</span></div><div class="s">${nf(s.taux, 1)} % de l'objectif</div></div>
       <div class="carte kpi"><div class="t">Écart au calendrier</div><div class="v" data-compte="${ecart}" data-prefixe="${ecart > 0 ? "+" : ""}">0</div><div class="s ${ecart >= 0 ? "pos" : "neg"}">${s.prevu_a_date} prévus à date</div></div>
       <div class="carte kpi"><div class="t">Taux de complétion</div><div class="v" data-compte="${s.taux_completion}" data-dec="1" data-suffixe=" %">0</div><div class="s">${s.brut} reçus · ${s.refus} refus · ${s.rapides} rapides</div></div>
