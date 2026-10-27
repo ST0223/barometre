@@ -37,8 +37,9 @@ const ETAPES_INFO = {
   collecte: { court: "Collecte", desc: "Import des soumissions (fichier Kobo/QuestionPro ou API Kobo) et tableau de bord : avancement par enquêteur, zone et quota, écarts au calendrier.", produit: ["Tableau de bord", "Base des soumissions"] },
   suivi: { court: "Note de suivi", desc: "Bilan de la collecte à partir du tableau de bord : réalisé contre prévu, taux de complétion, incidents, qualité des données, bilan financier.", produit: ["Note de suivi des enquêtes"] },
   rapport: { court: "Rapport", desc: "Calcul des indicateurs, graphiques, lecture par profil et par zone, messages clés et enseignements.", produit: ["Rapport d'analyse (Word, PDF)"] },
+  cloture: { court: "Clôture", desc: "Historique de l'étude et archive complète de tous ses fichiers.", produit: ["Dossier complet (ZIP)"] },
 };
-const ORDRE = ["fiche", "cadrage", "questionnaire", "echantillonnage", "methodologie", "collecte", "suivi", "rapport"];
+const ORDRE = ["fiche", "cadrage", "questionnaire", "echantillonnage", "methodologie", "collecte", "suivi", "rapport", "cloture"];
 const ONGLETS = {
   cadrage: [["apercu", "Aperçu", "eye"], ["parametres", "Indicateurs", "target"], ["redaction", "Rédaction", "edit"]],
   questionnaire: [["apercu", "Aperçu", "eye"], ["parametres", "Questions", "edit"], ["redaction", "Rédaction", "file"]],
@@ -95,7 +96,7 @@ async function occupe(btn, fn) {
 }
 
 // ------------------------------------------------------------------ navigation
-const ACCENTS = { fiche: "#7096D1", cadrage: "#0087E0", questionnaire: "#334EAC", echantillonnage: "#00A3C4", methodologie: "#5B86B6", collecte: "#0077B6", suivi: "#03045E", rapport: "#081F5C" };
+const ACCENTS = { fiche: "#7096D1", cadrage: "#0087E0", questionnaire: "#334EAC", echantillonnage: "#00A3C4", methodologie: "#5B86B6", collecte: "#0077B6", suivi: "#03045E", rapport: "#081F5C", cloture: "#0E9F6E" };
 const MESSAGES_GEN = {
   cadrage: ["Lecture de la fiche d'entrée", "Choix des indicateurs", "Rédaction du contexte et des objectifs", "Calcul de la précision statistique"],
   questionnaire: ["Traduction des indicateurs en questions", "Adaptation aux profils", "Estimation de la durée", "Écriture du XLSForm et du dictionnaire"],
@@ -199,7 +200,7 @@ function cartePro(p, k = 0) {
 // ------------------------------------------------------------------ mes études
 function vueEtudes(app) {
   document.body.dataset.page = "etudes";
-  const parEtape = ORDRE.slice(1).map((c, k) => [c, S.projets.filter((p) => p.valides < p.total && p.valides === k).length]);
+  const parEtape = ORDRE.slice(1, -1).map((c, k) => [c, S.projets.filter((p) => p.valides < p.total && p.valides === k).length]);
   app.innerHTML = `
     <section class="etudes">
       <div class="etudes-tete">
@@ -263,7 +264,7 @@ function vueProjet(entree = true) {
   const nbVal = p.ordre.filter((o) => p.etapes[o.cle].statut === "valide").length;
   const tot = p.ordre.length;
   const circ = 2 * Math.PI * 30;
-  const faits = ORDRE.filter((c, i) => i > 0 && p.etapes[c].statut === "valide").length;
+  const faits = ORDRE.filter((c, i) => i > 0 && (c === "cloture" ? !!p.cloture : p.etapes[c].statut === "valide")).length;
   $("#app").innerHTML = `
     <section class="projet-bandeau ${entree ? "entree" : ""}" style="--acc:${ACCENTS[S.etape]}">
       <div class="liquide calme" aria-hidden="true"><i class="goutte g1"></i><i class="goutte g3"></i></div>
@@ -288,16 +289,16 @@ function vueProjet(entree = true) {
     </section>
     <div id="zone-etape" class="zone-etape ${S.sens > 0 ? "de-droite" : S.sens < 0 ? "de-gauche" : "fondu"}" style="--acc:${ACCENTS[S.etape]}"></div>`;
   document.querySelectorAll(".maillon").forEach((m) => (m.onclick = () => aller(m.dataset.e)));
-  S.etape === "fiche" ? panneauFiche() : panneauEtape(S.etape);
+  S.etape === "fiche" ? panneauFiche() : S.etape === "cloture" ? panneauCloture() : panneauEtape(S.etape);
 }
 
 function maillon(cle, i) {
   const p = S.projet;
-  const st = cle === "fiche" ? "valide" : p.etapes[cle].statut;
+  const st = cle === "fiche" ? "valide" : cle === "cloture" ? (p.cloture ? "valide" : "a_generer") : p.etapes[cle].statut;
   const contenu = st === "valide" ? ico("check") : st === "verrouille" ? ico("lock") : st === "obsolete" ? "!" : i;
   return `<button class="maillon ${st} ${S.etape === cle ? "choisi" : ""}" data-e="${cle}" style="--acc:${ACCENTS[cle]};--i:${i}">
     <span class="rond">${contenu}</span><span class="nom">${esc(ETAPES_INFO[cle].court)}</span>
-    <span class="etat">${cle === "fiche" ? "Saisie" : STATUTS[st]}</span></button>`;
+    <span class="etat">${cle === "fiche" ? "Saisie" : cle === "cloture" ? (p.cloture ? "Bouclée" : "À boucler") : STATUTS[st]}</span></button>`;
 }
 
 function enteteEtape(num, titre, droite = "") {
@@ -368,6 +369,54 @@ function lierColonne() {
     toast("Baromètre supprimé.");
     location.hash = "#/";
   };
+}
+
+// ------------------------------------------------------------------ clôture : historique et archive complète
+function panneauCloture() {
+  const p = S.projet;
+  const c = p.cloture;
+  const etapes = p.ordre.map((o) => ({ ...o, e: p.etapes[o.cle] }));
+  const enCours = etapes.filter((x) => x.e.statut !== "valide");
+  const mo = (o) => (o >= 1048576 ? `${nf(o / 1048576, 1)} Mo` : `${nf(o / 1024)} Ko`);
+  const jours = {};
+  (p.journal || []).forEach((j) => { (jours[j.date.slice(0, 10)] = jours[j.date.slice(0, 10)] || []).push(j); });
+  $("#zone-etape").innerHTML = `
+    <div class="panneau large"><div class="carte carte-etape">
+      ${enteteEtape(8, "<h2>Clôture de l'étude</h2>", c ? `<span class="tag ok">Bouclée le ${dateFr(c.date)}</span>` : "")}
+      <div class="carte-corps">
+        <div class="cl-boucle">
+          <div><h3 style="margin:0 0 6px">${c ? "Archive de l'étude" : "Boucler l'étude"}</h3>
+            <p class="aide" style="margin:0">Une seule archive ZIP rassemble tous les fichiers de l'étude : les livrables en cours, toutes les versions validées,
+              la base des soumissions et l'historique complet.</p>
+            ${!c && enCours.length ? `<p class="aide" style="margin:8px 0 0;color:var(--ambre)">${ico("alert")} Étape(s) non validée(s) : ${enCours.map((x) => esc(x.libelle)).join(", ")}. Elles seront archivées dans leur état actuel.</p>` : ""}
+            ${c ? `<p style="margin:10px 0 0"><b>${esc(c.fichier)}</b> · ${c.nb} fichiers · ${mo(c.taille)} · constituée le ${heureFr(c.date)}</p>` : ""}</div>
+          <div class="cl-actions">
+            ${c ? `<a class="btn btn-succes" href="/api/projets/${p.slug}/archive">${ico("download")} Télécharger le dossier (ZIP)</a>` : ""}
+            <button class="btn ${c ? "" : "btn-primaire btn-boucle"}" id="boucler">${ico("check")} ${c ? "Reconstituer l'archive" : "BOUCLER"}</button>
+          </div>
+        </div>
+        <h3 class="cl-titre">Bilan des étapes</h3>
+        <div class="grille-tab"><table><thead><tr><th>Étape</th><th>Statut</th><th>Version</th><th>Validée le</th><th>Fichiers</th></tr></thead><tbody>
+          ${etapes.map((x) => `<tr><td><b>${esc(x.libelle)}</b></td><td><span class="tag ${x.e.statut === "valide" ? "ok" : ""}">${STATUTS[x.e.statut]}</span></td>
+            <td>${x.e.version ? `v${x.e.version}` : "–"}</td><td>${x.e.valide_le ? heureFr(x.e.valide_le) : "–"}</td><td>${(x.e.fichiers || []).length || "–"}</td></tr>`).join("")}
+        </tbody></table></div>
+        <h3 class="cl-titre">Historique</h3>
+        <div class="cl-historique">${Object.entries(jours).map(([d, l]) => `<div class="cl-jour"><h4>${dateFr(d)}</h4>
+          ${l.map((j) => `<div class="cl-ev"><time>${j.date.slice(11, 16)}</time><span>${esc(j.message)}</span></div>`).join("")}</div>`).join("") || `<span class="aide">Aucun événement.</span>`}</div>
+      </div></div></div>`;
+  $("#boucler").onclick = async (ev) => {
+    const btn = ev.currentTarget;
+    if (!(await confirmer(c ? "Reconstituer l'archive ?" : "Boucler l'étude ?",
+      `Tous les fichiers de **${p.fiche.theme}** (livrables, versions validées, données) et son historique seront rassemblés dans une archive ZIP téléchargeable.`
+      + (!c && enCours.length ? ` ${enCours.length} étape(s) ne sont pas validées : elles seront archivées dans leur état actuel.` : ""),
+      "OUI", "btn-primaire", "NON"))) return;
+    await occupe(btn, async () => {
+      const r = await api("POST", `/api/projets/${p.slug}/boucler`);
+      majProjet(r, "Étude bouclée : l'archive est prête à télécharger.");
+      window.location.href = `/api/projets/${p.slug}/archive`;
+    });
+  };
+  A.reveler($("#zone-etape"));
 }
 
 // ------------------------------------------------------------------ panneau d'étape
@@ -465,7 +514,7 @@ async function agir(btn, cle, act) {
   if (S.sale && !(await confirmer("Modifications non enregistrées", "Vos modifications en cours seront perdues. Continuer ?", "Continuer", "btn-danger"))) return;
   if (act === "regenerer" && !(await confirmer("Régénérer depuis zéro ?", "Les rédactions manuelles de cette étape seront remplacées par une nouvelle version générée.", "Régénérer"))) return;
   if (act === "rouvrir") {
-    const aval = ORDRE.slice(ORDRE.indexOf(cle) + 1).filter((c) => ["valide", "brouillon"].includes(p.etapes[c].statut));
+    const aval = ORDRE.slice(ORDRE.indexOf(cle) + 1).filter((c) => p.etapes[c] && ["valide", "brouillon"].includes(p.etapes[c].statut));
     if (!(await confirmer("Rouvrir l'étape ?", `L'étape repasse en brouillon (nouvelle version).${aval.length ? ` Les étapes suivantes déjà produites (${aval.length}) devront être mises à jour : vos rédactions manuelles y seront conservées.` : ""}`, "Rouvrir"))) return;
   }
   if (act === "valider" && cle === "questionnaire" && p.etapes.questionnaire.data.alerte_duree) {

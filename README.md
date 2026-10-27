@@ -42,6 +42,7 @@ Les animations respectent le réglage système « réduire les animations ».
 | 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées : avancement cumulé, carte des pays, suivi par pays, par secteur, par profil et par collecteur, quotas, incidents |
 | 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité, bilan financier prévu contre réalisé |
 | 7. Rapport d'analyse | Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés |
+| 8. Clôture | Bilan des étapes, historique complet ; bouton BOUCLER : une archive ZIP (livrables, versions validées, base des soumissions, historique) à télécharger |
 
 Chaque étape propose : **Aperçu** (rendu fidèle du document), **Paramètres** (indicateurs, questions, quotas…),
 **Rédaction** (édition libre des sections rédigées), téléchargement Word et export PDF (via Microsoft Word).

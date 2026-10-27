@@ -386,3 +386,16 @@ select.saisie { padding-right: 28px; }
 .pastille { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .ix-table td, .ix-table th { white-space: nowrap; }
 @media (max-width: 1200px) { .ix-tete, .ix-groupes { grid-template-columns: 1fr; } }
+
+/* clôture */
+.cl-boucle { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; padding: 18px 20px; border-radius: var(--rayon);
+  background: linear-gradient(135deg, #E7F7F0, #E8F4FD); border: 1px solid var(--bord); margin-bottom: 22px; }
+.cl-boucle > div:first-child { flex: 1 1 380px; }
+.cl-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn-boucle { font-size: 16px; letter-spacing: .08em; padding: 12px 28px; height: auto; }
+.cl-titre { font-size: 15px; margin: 22px 0 10px; color: var(--marine); }
+.cl-historique { display: flex; flex-direction: column; gap: 14px; max-height: 520px; overflow: auto; padding-right: 6px; }
+.cl-jour h4 { margin: 0 0 6px; font-size: 13px; color: var(--texte-2); text-transform: capitalize; }
+.cl-ev { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 6px 0; border-top: 1px solid var(--bord); font-size: 13px; }
+.cl-ev time { color: var(--texte-3); font-variant-numeric: tabular-nums; }
+.tag.ok { background: var(--vert-50); color: var(--vert); }

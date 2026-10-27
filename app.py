@@ -115,6 +115,19 @@ def maj_doc(slug, cle, nom):
     return ok(moteur.maj_doc(_projet(slug), cle, nom, request.get_json(force=True)))
 
 
+@app.post("/api/projets/<slug>/boucler")
+def boucler(slug):
+    return ok(moteur.boucler(_projet(slug)))
+
+
+@app.get("/api/projets/<slug>/archive")
+def archive(slug):
+    chemin = moteur.chemin_archive(_projet(slug))
+    if not chemin.exists():
+        abort(404)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
 @app.get("/api/projets/<slug>/fichiers/<path:nom>")
 def telecharger(slug, nom):
     _projet(slug)

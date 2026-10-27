@@ -413,3 +413,46 @@ def vers_pdf(chemin_docx):
     if not pdf.exists():
         raise ErreurChaine("La conversion PDF a échoué.")
     return pdf
+
+
+# ------------------------------------------------------------------ clôture
+def chemin_archive(projet):
+    return store.dossier(projet["slug"]) / "archive" / store.nom_fichier(projet, "Dossier_complet", 1, "zip").replace("_v1.zip", ".zip")
+
+
+def historique_texte(projet):
+    """Historique lisible : état de chaque étape, puis le journal du plus ancien au plus récent."""
+    f = projet["fiche"]
+    lignes = [f"Historique de l'étude « {f['theme']} »", f"Archive constituée le {store.maintenant().replace('T', ' à ')}", "",
+              "ÉTAT DES ÉTAPES"]
+    for cle in CLES:
+        e = projet["etapes"][cle]
+        lignes.append(f"- {LIBELLES[cle]} : {statut(projet, cle)}, version {e.get('version') or 0}"
+                      + (f", validée le {e['valide_le'].replace('T', ' à ')}" if e.get("valide_le") else ""))
+    lignes += ["", "JOURNAL"]
+    lignes += [f"{j['date'].replace('T', ' ')}  {j['message']}" for j in reversed(projet.get("journal", []))]
+    return "\n".join(lignes) + "\n"
+
+
+def boucler(projet):
+    """Clôt l'étude : tous les fichiers (livrables, versions validées, données) et l'historique dans une archive ZIP."""
+    import zipfile
+    racine = store.dossier(projet["slug"])
+    zf_chemin = chemin_archive(projet)
+    zf_chemin.parent.mkdir(parents=True, exist_ok=True)
+    rubriques = [("livrables", "1_Livrables"), ("versions", "2_Versions_validees"), ("donnees", "3_Donnees")]
+    nb = 0
+    with zipfile.ZipFile(zf_chemin, "w", zipfile.ZIP_DEFLATED) as z:
+        for dossier_src, dossier_zip in rubriques:
+            src = racine / dossier_src
+            for f in sorted(src.rglob("*")) if src.exists() else []:
+                # données : seule la base des soumissions ; les fichiers techniques (empreinte, réponses brutes) restent sur le poste
+                if f.is_file() and not (dossier_src == "donnees" and f.suffix != ".csv"):
+                    z.write(f, f"{dossier_zip}/{f.relative_to(src).as_posix()}")
+                    nb += 1
+        z.writestr("Historique.txt", historique_texte(projet))
+        nb += 1
+    projet["cloture"] = {"date": store.maintenant(), "fichier": zf_chemin.name, "taille": zf_chemin.stat().st_size, "nb": nb}
+    store.journaliser(projet, f"Étude bouclée : archive {zf_chemin.name} ({nb} fichiers).")
+    store.sauver(projet)
+    return projet
