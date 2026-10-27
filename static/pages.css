@@ -265,8 +265,6 @@ body[data-page="nouveau"] .nav-cta, body[data-page="etude"] .nav-cta { display: 
 .vitrine-num { font-family: var(--titre); font-weight: 700; font-size: 22px; margin-left: 10px; }
 
 /* études en cours */
-.encours { max-width: 1480px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px) 120px; }
-.encours-tete { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; }
 
 /* appel final : cadre à crochets */
 .appel { position: relative; overflow: hidden; padding: 140px 20px 120px; text-align: center; background: linear-gradient(180deg, var(--abysse), var(--nuit)); color: #fff; }

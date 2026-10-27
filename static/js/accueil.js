@@ -56,7 +56,6 @@ function miniDoc(type) {
 function vueAccueil(app) {
   document.body.dataset.page = "accueil";
   const presentation = S.params.presentation_datatym || "";
-  const enCours = S.projets.slice(0, 3);
   app.innerHTML = `
   <section class="hero2" id="hero">
     <div class="liquide" aria-hidden="true"><i class="goutte g1"></i><i class="goutte g2"></i><i class="goutte g3"></i><i class="goutte g4"></i><i class="goutte g5"></i></div>
@@ -155,12 +154,6 @@ function vueAccueil(app) {
     </div>
   </section>
 
-  ${enCours.length ? `
-  <section class="encours">
-    <div class="encours-tete"><div><span class="sur" data-reveal="haut">Vos études</span><h2 class="titre-section-l" data-reveal="haut">Reprendre là où vous en étiez</h2></div>
-      <a class="btn" href="#/etudes" data-reveal="haut">Toutes les études ${ico("back").replace("<svg", '<svg style="transform:scaleX(-1)"')}</a></div>
-    <div class="grille-projets">${enCours.map((p, k) => cartePro(p, k)).join("")}</div>
-  </section>` : ""}
 
   <section class="appel">
     <div class="liquide calme" aria-hidden="true"><i class="goutte g1"></i><i class="goutte g3"></i><i class="goutte g5"></i></div>
@@ -185,7 +178,6 @@ function vueAccueil(app) {
   A.parallaxe($("#hero"));
   A.magnetique(".magn", app);
   A.incliner(".pilier", 10, app);
-  A.incliner(".carte-projet", 7, app);
   A.halo(true);
   app.querySelectorAll("[data-defile]").forEach((b) => (b.onclick = () => document.getElementById(b.dataset.defile).scrollIntoView({ behavior: "smooth" })));
 
