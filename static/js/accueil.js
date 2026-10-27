@@ -22,7 +22,7 @@ const MODELES = [
 
 const PHASES = [
   { n: "01", mot: "CADRER", titre: "Note de cadrage", desc: "Contexte, objectifs, cible, champ et taille visée, la liste des indicateurs recherchés, base de tout le reste, et une première estimation du coût.", liv: ["Note de cadrage"], ic: "target", c: "#0087E0" },
-  { n: "02", mot: "QUESTIONNER", titre: "Questionnaire", desc: "Des questions simples tirées des indicateurs, adaptées à chaque profil, en version terrain et digitale, en 15 minutes au plus, prêtes pour Kobo et QuestionPro.", liv: ["Questionnaire terrain", "Questionnaire digital", "Dictionnaire des variables", "XLSForm Kobo", "Import QuestionPro", "Liste des enquêteurs"], ic: "edit", c: "#334EAC" },
+  { n: "02", mot: "QUESTIONNER", titre: "Questionnaire", desc: "Des questions simples tirées des indicateurs, adaptées à chaque profil, en version terrain et digitale, avec une durée de passation volontairement courte, prêtes pour Kobo et QuestionPro.", liv: ["Questionnaire terrain", "Questionnaire digital", "Dictionnaire des variables", "XLSForm Kobo", "Import QuestionPro", "Liste des enquêteurs"], ic: "edit", c: "#334EAC" },
   { n: "03", mot: "ÉCHANTILLONNER", titre: "Plan de terrain", desc: "Quotas par zone et par profil, répartition par enquêteur, calendrier jour par jour, recrutement, formation et budget de collecte calculé poste par poste.", liv: ["Note d'échantillonnage", "Note de recrutement", "Calendrier et quotas", "Formation PowerPoint", "Budget de collecte"], ic: "users", c: "#00B4D8" },
   { n: "04", mot: "DOCUMENTER", titre: "Note méthodologique", desc: "La méthode consolidée automatiquement : échantillonnage, questionnaire, mode de calcul de chaque indicateur, outils.", liv: ["Note méthodologique"], ic: "file", c: "#7096D1" },
   { n: "05", mot: "COLLECTER", titre: "Suivi de la collecte", desc: "Les réponses arrivent de Kobo ou de QuestionPro, par API ou par fichier, et alimentent un tableau de bord : avancement par enquêteur, zone et quota, écarts au calendrier.", liv: ["Tableau de bord", "Base des soumissions"], ic: "chart", c: "#0077B6" },
@@ -40,7 +40,7 @@ const PILIERS = [
 
 const PRINCIPES = [
   ["Quotas raisonnés", "Zone × profil, marges d'erreur affichées, aucun chiffre publié sous 30 répondants."],
-  ["15 minutes", "Des formulations simples, une durée estimée et plafonnée pour chaque profil."],
+  ["Questionnaire court", "Des formulations simples et une durée de passation réduite à l'essentiel, par respect du temps de chaque répondant."],
   ["Validation humaine", "Aucune étape ne démarre sans l'accord du cabinet sur la précédente."],
   ["Contrôle qualité", "Entretiens trop rapides écartés, cohérence vérifiée, rappels de contrôle."],
   ["Reconductible", "Mêmes indicateurs, mêmes échelles : chaque édition devient une tendance."],
