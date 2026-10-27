@@ -51,7 +51,17 @@ def erreur(e):
 
 @app.get("/")
 def accueil():
-    return send_from_directory(STATIC_DIR, "index.html")
+    """Page unique ; chaque script et feuille de style porte sa date de modification, pour que le navigateur
+    recharge un fichier mis à jour au lieu de garder l'ancien en cache."""
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+
+    def versionner(m):
+        chemin = STATIC_DIR / m.group(2)
+        return f'{m.group(1)}/static/{m.group(2)}?v={int(chemin.stat().st_mtime)}"' if chemin.exists() else m.group(0)
+    html = re.sub(r'((?:src|href)=")/static/([^"?]+\.(?:js|css))"', versionner, html)
+    reponse = app.response_class(html, mimetype="text/html")
+    reponse.headers["Cache-Control"] = "no-cache"
+    return reponse
 
 
 # ------------------------------------------------------------------ projets
