@@ -70,15 +70,19 @@ function toast(msg, type = "") {
   setTimeout(() => t.remove(), type === "erreur" ? 7000 : 3800);
 }
 
-function confirmer(titre, texte, bouton = "Confirmer", style = "btn-primaire") {
+function confirmer(titre, texte, bouton = "Confirmer", style = "btn-primaire", annuler = "Annuler") {
   return new Promise((ok) => {
     const m = $("#modale");
     m.innerHTML = `<div class="modale-boite"><h3>${esc(titre)}</h3><p>${md(texte)}</p>
-      <div class="actions"><button class="btn" data-r="0">Annuler</button><button class="btn ${style}" data-r="1">${esc(bouton)}</button></div></div>`;
+      <div class="actions"><button class="btn" data-r="0">${esc(annuler)}</button><button class="btn ${style}" data-r="1">${esc(bouton)}</button></div></div>`;
     m.hidden = false;
+    m.querySelector('[data-r="0"]').focus();
+    const fermer = (oui) => { m.hidden = true; document.removeEventListener("keydown", echap); ok(oui); };
+    const echap = (e) => { if (e.key === "Escape") fermer(false); };
+    document.addEventListener("keydown", echap);
     m.onclick = (e) => {
       const r = e.target.closest("[data-r]");
-      if (r || e.target === m) { m.hidden = true; ok(r && r.dataset.r === "1"); }
+      if (r || e.target === m) fermer(!!r && r.dataset.r === "1");
     };
   });
 }
@@ -359,7 +363,9 @@ function lierColonne() {
   }));
   const s = $("#suppr-projet");
   if (s) s.onclick = async () => {
-    if (!(await confirmer("Supprimer ce baromètre ?", "Tous les documents, versions et données de ce baromètre seront définitivement supprimés.", "Supprimer", "btn-danger"))) return;
+    if (!(await confirmer("Êtes-vous sûr de vouloir supprimer ce projet ?",
+      `**${S.projet.fiche.theme}** : tous ses documents, versions et données seront définitivement supprimés. Cette action est irréversible.`,
+      "OUI", "btn-danger", "NON"))) return;
     await api("DELETE", `/api/projets/${S.projet.slug}`);
     S.projet = null;
     toast("Baromètre supprimé.");
