@@ -71,7 +71,7 @@ function vueAccueil(app) {
           <button class="btn btn-verre" data-defile="cabinet">Découvrir le cabinet</button>
         </div>
         <div class="hero2-chiffres">
-          ${[[7, "paramètres à saisir"], [16, "livrables produits"], [15, "minutes au plus par questionnaire"], [100, "% des documents modifiables"]]
+          ${[[7, "paramètres à saisir"], [16, "livrables produits"], [6, "formats générés : Word, PDF, Excel, PowerPoint…"], [100, "% des documents modifiables"]]
             .map(([v, l], k) => `<div data-reveal="haut" data-delai="${800 + k * 90}"><b data-compte="${v}">0</b><span>${l}</span></div>`).join("")}
         </div>
       </div>
