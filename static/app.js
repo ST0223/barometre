@@ -960,8 +960,9 @@ function ongletImport(z, e) {
           <small class="aide">Jeton : sur Kobo, menu du compte › <b>Paramètres du compte › Sécurité › Clé API</b>.</small>
           <button class="btn btn-petit" id="k-sync">${ico("refresh")} Synchroniser</button></div>`;
         const qp = `<div class="source" data-outil-source="questionpro"><div class="source-tete"><span class="source-logo qp">QP</span><div><b>QuestionPro</b><small>Synchronisation par l'API v2</small></div></div>
-          <div style="display:flex;gap:8px"><input class="saisie petite" id="q-enquete" value="${esc((d.questionpro || {}).enquete || "")}" placeholder="Identifiant de l'enquête (survey ID)">
+          <div style="display:flex;gap:8px"><input class="saisie petite" id="q-enquete" value="${esc((d.questionpro || {}).enquete || "")}" placeholder="Identifiant de l'enquête, ex. 13825453">
             <input class="saisie petite" id="q-env" list="dl-env" style="width:76px" value="${esc((d.questionpro || {}).env || "com")}" title="Centre de données : com, eu, ca…"></div>
+          <small class="aide">Le numéro de l'enquête, pas le lien de réponse (…/t/…) : il apparaît dans QuestionPro, dans l'adresse de l'enquête ouverte en édition (<code>surveyID=…</code>).</small>
           <datalist id="dl-env"><option value="com"><option value="eu"><option value="ca"></datalist>
           <input class="saisie petite" id="q-cle" type="password" placeholder="${S.params.questionpro_cle_definie ? "Clé mémorisée sur ce poste (laisser vide)" : "Clé API"}">
           <label class="bascule" style="font-size:12.5px"><input type="checkbox" id="q-memo" checked> Mémoriser la clé sur ce poste</label>

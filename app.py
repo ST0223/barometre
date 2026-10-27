@@ -3,6 +3,7 @@
 Lancement : python app.py  puis ouvrir http://127.0.0.1:8765
 """
 import logging
+import re
 import tempfile
 import urllib.error
 import webbrowser
@@ -219,6 +220,13 @@ def questionpro(slug):
     _etat_collecte(p)
     c = request.get_json(force=True)
     env, enquete = (c.get("env") or "com").strip(), str(c.get("enquete") or "").strip()
+    if not enquete.isdigit():
+        # adresse de l'éditeur (…surveyID=13825453) : on en tire le numéro ; un lien de réponse (…/t/…) ne le contient pas
+        trouve = re.search(r"(?:survey_?id=|/surveys/)(\d+)", enquete, re.I)
+        if not trouve:
+            return jsonify({"erreur": "Saisissez le numéro de l'enquête QuestionPro (ex. 13825453), pas le lien de réponse : "
+                                      "il apparaît dans l'adresse de l'enquête ouverte en édition (surveyID=…)."}), 400
+        enquete = trouve.group(1)
     cle = (c.get("cle") or "").strip() or charger_parametres().get("questionpro_cle", "")
     if not (cle and enquete):
         return jsonify({"erreur": "Clé API et identifiant de l'enquête QuestionPro sont requis."}), 400
