@@ -378,8 +378,8 @@ function panneauCloture() {
   const etapes = p.ordre.map((o) => ({ ...o, e: p.etapes[o.cle] }));
   const enCours = etapes.filter((x) => x.e.statut !== "valide");
   const mo = (o) => (o >= 1048576 ? `${nf(o / 1048576, 1)} Mo` : `${nf(o / 1024)} Ko`);
-  const jours = {};
-  (p.journal || []).forEach((j) => { (jours[j.date.slice(0, 10)] = jours[j.date.slice(0, 10)] || []).push(j); });
+  const produits = etapes.filter((x) => (x.e.fichiers || []).length);
+  const nbFichiers = produits.reduce((a, x) => a + x.e.fichiers.length, 0);
   $("#zone-etape").innerHTML = `
     <div class="panneau large"><div class="carte carte-etape">
       ${enteteEtape(8, "<h2>Clôture de l'étude</h2>", c ? `<span class="tag ok">Bouclée le ${dateFr(c.date)}</span>` : "")}
@@ -400,9 +400,12 @@ function panneauCloture() {
           ${etapes.map((x) => `<tr><td><b>${esc(x.libelle)}</b></td><td><span class="tag ${x.e.statut === "valide" ? "ok" : ""}">${STATUTS[x.e.statut]}</span></td>
             <td>${x.e.version ? `v${x.e.version}` : "–"}</td><td>${x.e.valide_le ? heureFr(x.e.valide_le) : "–"}</td><td>${(x.e.fichiers || []).length || "–"}</td></tr>`).join("")}
         </tbody></table></div>
-        <h3 class="cl-titre">Historique</h3>
-        <div class="cl-historique">${Object.entries(jours).map(([d, l]) => `<div class="cl-jour"><h4>${dateFr(d)}</h4>
-          ${l.map((j) => `<div class="cl-ev"><time>${j.date.slice(11, 16)}</time><span>${esc(j.message)}</span></div>`).join("")}</div>`).join("") || `<span class="aide">Aucun événement.</span>`}</div>
+        <h3 class="cl-titre">Historique des fichiers générés <span class="aide" style="font-weight:400">${nbFichiers} fichier(s)</span></h3>
+        <div class="cl-historique">${produits.map((x) => `<div class="cl-jour"><h4>${esc(x.libelle)} <span class="aide">· v${x.e.version || 1}${x.e.maj ? ` · ${heureFr(x.e.maj)}` : ""}</span></h4>
+          ${x.e.fichiers.map((f) => `<div class="livrable"><div class="ico-fichier ${f.type}">${esc(f.type.toUpperCase())}</div>
+            <div style="min-width:0"><div class="nom">${esc(f.nom)}</div><div class="fic">${esc(f.fichier)}</div></div>
+            <div class="acts"><a class="btn btn-fantome btn-petit" title="Télécharger" href="/api/projets/${p.slug}/fichiers/${encodeURIComponent(f.fichier)}">${ico("download")}</a></div></div>`).join("")}</div>`).join("")
+          || `<span class="aide">Aucun fichier généré pour l'instant.</span>`}</div>
       </div></div></div>`;
   $("#boucler").onclick = async (ev) => {
     const btn = ev.currentTarget;

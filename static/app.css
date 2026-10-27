@@ -395,7 +395,5 @@ select.saisie { padding-right: 28px; }
 .btn-boucle { font-size: 16px; letter-spacing: .08em; padding: 12px 28px; height: auto; }
 .cl-titre { font-size: 15px; margin: 22px 0 10px; color: var(--marine); }
 .cl-historique { display: flex; flex-direction: column; gap: 14px; max-height: 520px; overflow: auto; padding-right: 6px; }
-.cl-jour h4 { margin: 0 0 6px; font-size: 13px; color: var(--texte-2); text-transform: capitalize; }
-.cl-ev { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 6px 0; border-top: 1px solid var(--bord); font-size: 13px; }
-.cl-ev time { color: var(--texte-3); font-variant-numeric: tabular-nums; }
+.cl-jour h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--marine); }
 .tag.ok { background: var(--vert-50); color: var(--vert); }

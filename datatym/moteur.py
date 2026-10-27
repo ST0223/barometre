@@ -420,17 +420,21 @@ def chemin_archive(projet):
     return store.dossier(projet["slug"]) / "archive" / store.nom_fichier(projet, "Dossier_complet", 1, "zip").replace("_v1.zip", ".zip")
 
 
-def historique_texte(projet):
-    """Historique lisible : état de chaque étape, puis le journal du plus ancien au plus récent."""
+def historique_texte(projet, archives=()):
+    """Historique de l'archive : la liste des fichiers générés, étape par étape, puis les versions validées archivées."""
     f = projet["fiche"]
-    lignes = [f"Historique de l'étude « {f['theme']} »", f"Archive constituée le {store.maintenant().replace('T', ' à ')}", "",
-              "ÉTAT DES ÉTAPES"]
+    lignes = [f"Historique des fichiers générés — {f['theme']}", f"Archive constituée le {store.maintenant().replace('T', ' à ')}", ""]
     for cle in CLES:
         e = projet["etapes"][cle]
-        lignes.append(f"- {LIBELLES[cle]} : {statut(projet, cle)}, version {e.get('version') or 0}"
-                      + (f", validée le {e['valide_le'].replace('T', ' à ')}" if e.get("valide_le") else ""))
-    lignes += ["", "JOURNAL"]
-    lignes += [f"{j['date'].replace('T', ' ')}  {j['message']}" for j in reversed(projet.get("journal", []))]
+        if not e.get("fichiers"):
+            continue
+        lignes.append(f"{LIBELLES[cle].upper()} (version {e.get('version') or 1}"
+                      + (f", validée le {e['valide_le'].replace('T', ' à ')}" if e.get("valide_le") else "") + ")")
+        lignes += [f"  - {x['fichier']}  ({x['nom']})" for x in e["fichiers"]]
+        lignes.append("")
+    if archives:
+        lignes.append("VERSIONS VALIDÉES ARCHIVÉES")
+        lignes += [f"  - {a}" for a in archives]
     return "\n".join(lignes) + "\n"
 
 
@@ -450,7 +454,8 @@ def boucler(projet):
                 if f.is_file() and not (dossier_src == "donnees" and f.suffix != ".csv"):
                     z.write(f, f"{dossier_zip}/{f.relative_to(src).as_posix()}")
                     nb += 1
-        z.writestr("Historique.txt", historique_texte(projet))
+        archives = sorted(n for n in z.namelist() if n.startswith("2_Versions_validees/"))
+        z.writestr("Historique.txt", historique_texte(projet, archives))
         nb += 1
     projet["cloture"] = {"date": store.maintenant(), "fichier": zf_chemin.name, "taille": zf_chemin.stat().st_size, "nb": nb}
     store.journaliser(projet, f"Étude bouclée : archive {zf_chemin.name} ({nb} fichiers).")
