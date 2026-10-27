@@ -87,7 +87,7 @@ function vueAccueil(app) {
     <button class="defiler-indice" data-defile="cabinet" aria-label="Défiler"><span></span></button>
   </section>
 
-  <div class="defilant" aria-hidden="true"><div class="piste-def">${Array(2).fill(["Études quantitatives", "Baromètres", "Data science", "IA appliquée", "KoboToolbox", "QuestionPro", "Tableaux de bord", "Python · R · Stata", "Afrique de l'Ouest et centrale"].map((x) => `<span>${x}</span><i>✦</i>`).join("")).join("")}</div></div>
+  <div class="defilant" aria-hidden="true"><div class="piste-def">${Array(2).fill([...PILIERS.map((p) => p.nom), "Études quantitatives", "Baromètres", "Data science", "IA appliquée", "KoboToolbox", "QuestionPro", "Tableaux de bord", "Python · R · Stata", "Afrique de l'Ouest et centrale"].map((x) => `<span>${x}</span><i>✦</i>`).join("")).join("")}</div></div>
 
   <section class="cabinet" id="cabinet">
     <div class="cabinet-gauche">
