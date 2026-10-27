@@ -23,6 +23,8 @@ const I = {
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>', chart: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
   sparkle: '<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>', back: '<path d="m15 18-6-6 6-6"/>', unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.9-1"/>',
   base: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>', signal: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  soleil: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  lune: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', ecran: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
 };
 const ico = (n) => `<svg viewBox="0 0 24 24">${I[n] || ""}</svg>`;
@@ -115,6 +117,20 @@ async function chargerListe() {
 
 // Rédaction assistée par Claude (clé API Anthropic) : masquée de l'interface ; passer à true pour la réafficher
 const IA_VISIBLE = false;
+
+// Thème : Auto (suit Windows), Clair ou Sombre ; le choix reste sur ce poste
+const THEMES = [["auto", "ecran", "Thème automatique (suit le système)"], ["clair", "soleil", "Thème clair"], ["sombre", "lune", "Thème sombre"]];
+function themeActuel() { try { return localStorage.getItem("theme") || "auto"; } catch (e) { return "auto"; } }
+function appliquerTheme(t) {
+  if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  try { if (t === "auto") localStorage.removeItem("theme"); else localStorage.setItem("theme", t); } catch (e) { /* stockage indisponible */ }
+  const b = $("#theme");
+  if (b) { const [, i, l] = THEMES.find((x) => x[0] === t); b.innerHTML = ico(i); b.title = `${l} — cliquer pour changer`; b.setAttribute("aria-label", l); }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  appliquerTheme(themeActuel());
+  $("#theme").onclick = () => appliquerTheme(THEMES[(THEMES.findIndex((x) => x[0] === themeActuel()) + 1) % THEMES.length][0]);
+});
 
 async function chargerParams() {
   S.params = await api("GET", "/api/parametres");
@@ -629,7 +645,7 @@ function ongletRedaction(z, cle, e) {
         <div class="champ"><label>Sous-titre</label><input class="saisie" data-ent="sous_titre" value="${esc(m.sous_titre)}"></div>
       </div>
       ${m.sections.map((s, si) => s.source === "auto" ? `
-        <div class="editeur-sec auto"><header><span style="flex:1;font-weight:700;color:var(--marine)">${esc(s.titre || "(sans titre)")}</span><span class="tag auto">Calculée</span></header></div>` : `
+        <div class="editeur-sec auto"><header><span style="flex:1;font-weight:700;color:var(--encre)">${esc(s.titre || "(sans titre)")}</span><span class="tag auto">Calculée</span></header></div>` : `
         <div class="editeur-sec"><header><input class="saisie petite" data-s="${si}" data-titre="1" value="${esc(s.titre)}" placeholder="(sans titre)">
           ${s.manuel ? '<span class="tag manuel">Modifiée</span>' : '<span class="tag">Rédigée</span>'}
           <button class="btn btn-fantome btn-petit" data-ajout-p="${si}" title="Ajouter un paragraphe">${ico("plus")}</button></header>
@@ -1109,7 +1125,7 @@ function ongletTableau(z, e) {
       <div class="carte kpi"><div class="t">Durée médiane</div><div class="v" ${s.duree_mediane != null ? `data-compte="${s.duree_mediane}" data-dec="1" data-suffixe=" min"` : ""}>–</div><div class="s">plafond 15 min</div></div>
     </div>
     <div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>Avancement cumulé</h3>
-      <div class="legende-graph"><span><i style="background:var(--marine)"></i>Prévu</span><span><i style="background:var(--bleu)"></i>Réalisé</span></div></div>
+      <div class="legende-graph"><span><i style="background:var(--encre)"></i>Prévu</span><span><i style="background:var(--bleu)"></i>Réalisé</span></div></div>
       <div class="carte-corps">${graphCumul(s)}</div></div>
     ${(s.par_zone || []).some((x) => typeof CARTE_AFRIQUE !== "undefined" && CARTE_AFRIQUE.pays[x.code]) ? `
     <div class="grille-tb grille-carte">
@@ -1135,7 +1151,7 @@ function ongletTableau(z, e) {
       ${croix.length ? `<div class="carte"><div class="carte-titre"><h3>Croisement pays × secteur</h3><span class="aide" style="font-size:11.5px">réalisé / objectif</span></div>
         <div class="carte-corps"><div class="grille-tab"><table class="carte-chaleur"><thead><tr><th></th>${sects.map((p) => `<th title="${esc(p)}">${esc(court(p))}</th>`).join("")}<th>Total</th></tr></thead><tbody>
           ${zones.map((zn) => { const l = croix.filter((x) => x.zone === zn); const r = l.reduce((a, x) => a + x.realise, 0), o = l.reduce((a, x) => a + x.objectif, 0);
-            return `<tr><th>${esc(zn)}</th>${sects.map((p) => { const q = l.find((x) => x.secteur === p); return `<td style="background:${coul(q.taux)}22;color:${q.taux >= 100 ? "#0A6B4B" : "#1B2333"}" title="${esc(zn)} · ${esc(p)} : ${q.realise} / ${q.objectif}">${q.realise}/${q.objectif}</td>`; }).join("")}<td><b>${r}/${o}</b></td></tr>`; }).join("")}
+            return `<tr><th>${esc(zn)}</th>${sects.map((p) => { const q = l.find((x) => x.secteur === p); return `<td style="background:${coul(q.taux)}22;color:${q.taux >= 100 ? "var(--vert)" : "var(--texte)"}" title="${esc(zn)} · ${esc(p)} : ${q.realise} / ${q.objectif}">${q.realise}/${q.objectif}</td>`; }).join("")}<td><b>${r}/${o}</b></td></tr>`; }).join("")}
         </tbody></table></div></div></div>` : ""}
     </div>
     ${qc ? `<div class="carte"><div class="carte-titre"><h3>Incidents et qualité des données</h3></div>
@@ -1169,7 +1185,7 @@ function ongletTableau(z, e) {
 }
 
 // Carte de suivi : part de l'objectif atteinte par pays, une seule teinte du clair au foncé
-const PALIERS_CARTE = [[25, "#DCEBFA"], [50, "#A6CFF3"], [75, "#5FA9E8"], [100, "#1F7FD1"], [Infinity, "#0B4F8A"]];
+const PALIERS_CARTE = [[25, "var(--pal1)"], [50, "var(--pal2)"], [75, "var(--pal3)"], [100, "var(--pal4)"], [Infinity, "var(--pal5)"]];
 function carteSuivi(parZone) {
   const C = CARTE_AFRIQUE;
   const etude = Object.fromEntries(parZone.filter((x) => C.pays[x.code]).map((x) => [x.code, x]));
@@ -1284,10 +1300,10 @@ function graphCumul(s) {
   const reel = j.filter((d) => d.passe).map((d, i) => [x(i), y(d.cumul_realise)]);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(s.objectif * t));
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;stroke-width:1">
-    ${ticks.map((t) => `<line x1="${g}" x2="${W - 10}" y1="${y(t)}" y2="${y(t)}" stroke="#E3E8EF"/><text x="${g - 6}" y="${y(t) + 4}" text-anchor="end" font-size="10" fill="#8A93A5" stroke="none">${t}</text>`).join("")}
+    ${ticks.map((t) => `<line x1="${g}" x2="${W - 10}" y1="${y(t)}" y2="${y(t)}" style="stroke:var(--bord)"/><text x="${g - 6}" y="${y(t) + 4}" text-anchor="end" font-size="10" fill="#8A93A5" stroke="none">${t}</text>`).join("")}
     ${j.map((d, i) => (i % Math.ceil(j.length / 8) === 0 || i === j.length - 1 ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#8A93A5" stroke="none">${jourCourt(d.date)}</text>` : "")).join("")}
     ${reel.length ? `<path d="${ligne(reel)}L${reel[reel.length - 1][0]},${y(0)}L${reel[0][0]},${y(0)}Z" fill="rgba(0,135,224,.10)" stroke="none"/>` : ""}
-    <path class="trace-prevu" d="${ligne(prev)}" fill="none" stroke="#19243E" stroke-width="2" stroke-dasharray="5 4"/>
+    <path class="trace-prevu" d="${ligne(prev)}" fill="none" style="stroke:var(--encre)" stroke-width="2" stroke-dasharray="5 4"/>
     ${reel.length ? `<path class="trace" pathLength="1" d="${ligne(reel)}" fill="none" stroke="#0087E0" stroke-width="2.5"/>${reel.map((p, k) => `<circle class="point" style="animation-delay:${600 + k * 60}ms" cx="${p[0]}" cy="${p[1]}" r="3" fill="#0087E0" stroke="#fff" stroke-width="1.5"/>`).join("")}` : ""}
   </svg>`;
 }
