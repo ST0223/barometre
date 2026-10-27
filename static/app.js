@@ -1147,7 +1147,7 @@ async function ongletIndicateurs(z, e, cle, filtre = S.filtreInd || "") {
   const select = `<select class="saisie petite" id="ind-filtre" style="width:auto;min-width:220px"><option value="">Ensemble des répondants</option>
     ${Object.entries(d.options).map(([k, l]) => `<optgroup label="${noms[k]}">${l.map((m) => `<option value="${k}:${esc(m.code)}" ${filtre === `${k}:${m.code}` ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</optgroup>`).join("")}</select>`;
   const inds = d.indicateurs.filter((i) => i.type !== "indice");
-  const avec = inds.filter((i) => i.n), sans = inds.filter((i) => !i.n);
+  const avec = inds.filter((i) => i.n);
   const blocs = [...new Set(avec.map((i) => i.bloc))];
   const carte = (i) => {
     const mods = i.type === "multiple" ? [...i.modalites].sort((a, b) => b.pct - a.pct) : i.modalites;
@@ -1164,12 +1164,9 @@ async function ongletIndicateurs(z, e, cle, filtre = S.filtreInd || "") {
   const indice = d.indicateurs.find((i) => i.type === "indice");
   z.innerHTML = `
     <div class="ind-entete">${select}
-      <span class="aide">${d.n} répondant(s) ${d.controle_qualite ? "valides" : "renseignés"} · <b>${avec.length} indicateurs calculés</b>${sans.length ? ` · ${sans.length} sans données` : ""} · calcul à la date de la dernière synchronisation</span></div>
+      <span class="aide">${d.n} répondant(s) ${d.controle_qualite ? "valides" : "renseignés"} · <b>${avec.length} indicateurs calculés</b> · calcul à la date de la dernière synchronisation</span></div>
     ${d.indice ? blocIndice(d.indice) : indice ? `<div class="bandeau info">${ico("info")}<div><b>${esc(indice.libelle)}</b> : pas encore calculé ; il se calcule dès la synchronisation des réponses QuestionPro.</div></div>` : ""}
-    ${blocs.map((b) => `<h3 class="ind-bloc">${esc(b)}</h3><div class="ind-grille">${avec.filter((i) => i.bloc === b).map(carte).join("")}</div>`).join("")}
-    ${sans.length ? `<h3 class="ind-bloc">Pas encore de données</h3>
-      <p class="aide" style="margin-top:0">Ces questions n'apparaissent pas dans les réponses reçues : elles sont absentes de l'enquête en ligne, posées sous une autre forme, ou soumises à une condition qu'aucun répondant n'a remplie.</p>
-      <div class="ind-sans">${sans.map((i) => `<span title="${esc(i.question)}"><b>${esc(i.num)}</b> ${esc(i.libelle)}</span>`).join("")}</div>` : ""}`;
+    ${blocs.map((b) => `<h3 class="ind-bloc">${esc(b)}</h3><div class="ind-grille">${avec.filter((i) => i.bloc === b).map(carte).join("")}</div>`).join("")}`;
   $("#ind-filtre").onchange = (ev) => { S.filtreInd = ev.target.value; ongletIndicateurs(z, e, cle, ev.target.value); };
   if (d.indice) lierIndice(z, d.indice);
 }
