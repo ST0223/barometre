@@ -10,7 +10,7 @@ from ..banque import NSP_CODE, TYPES, code_zone, du_barometre, slug, sont_des_pa
 from ..charte import chiffres, image, liste, p, section, tableau  # noqa: E402
 from ..outils import aujourdhui, fmt_marge, nombre, pct, solde_txt  # noqa: E402
 from ..store import dossier  # noqa: E402
-from .collecte import lire, valides, variables_cles  # noqa: E402
+from .collecte import _norm, indice_entreprises, lire, valides, variables_cles  # noqa: E402
 
 DOCS = {"rapport_analyse": ("RapportAnalyse", "Rapport d'analyse")}
 SEUIL = 30
@@ -75,11 +75,20 @@ def analyser(projet, cadrage, quest, ech):
     brut = lire(projet)
     if brut is None or brut.empty:
         return None
-    df = valides(brut, quest)
+    # même base que le suivi : réponses valides si le contrôle qualité est activé, sinon toutes les réponses renseignées
+    controle = projet["etapes"]["collecte"]["data"].get("controle_qualite", True)
+    cons = brut.get("consentement", pd.Series(["oui"] * len(brut), index=brut.index)).str.lower().isin(["oui", "1", "yes"])
+    df = valides(brut, quest) if controle else brut[cons]
     _, v_zone, v_prof = variables_cles(quest)
     lib_prof = {pr["code"]: pr["libelle"] for pr in quest["profils"]}
+    if not controle and v_prof in df and (df[v_prof] == "autre_hors").any():
+        lib_prof["autre_hors"] = "Autre fonction"
     lib_zone = {code_zone(z): z for z in ech["zones"]}
+    q_sect = next((q for q in quest["questions_plates"] if q["id"] == "id_secteur"), None)
+    lib_sect = {m["code"]: m["label"] for m in q_sect["modalites"]} if q_sect else {}
     groupes = {"par_profil": (v_prof, list(lib_prof)), "par_zone": (v_zone, list(lib_zone))}
+    if q_sect:
+        groupes["par_secteur"] = (q_sect["var"], list(lib_sect))
     q_de = {q["indicateur"]: q for q in quest["questions_plates"] if q.get("indicateur")}
     resultats = []
     for ind in cadrage["indicateurs"]:
@@ -87,7 +96,10 @@ def analyser(projet, cadrage, quest, ech):
             continue
         q = q_de[ind["id"]]
         r = calculer(df, ind, q, groupes)
+        if not r["global"].get("n"):
+            continue  # question absente des réponses : pas de section vide dans le rapport
         resultats.append({"id": ind["id"], "libelle": ind["libelle"], "type": ind["type"], "bloc": ind["bloc"], "var": q["var"],
+                          "identification": bool(ind.get("identification")) or ind["bloc"].lower().startswith("profil"),
                           "question": q["texte"], "modalites": q["modalites"], **r})
     par_id = {r["id"]: r for r in resultats}
     for ind in cadrage["indicateurs"]:
@@ -103,11 +115,13 @@ def analyser(projet, cadrage, quest, ech):
             for g in groupes:
                 r[g] = {code: {"n": max([c[g].get(code, {}).get("n", 0) for c in comps] or [0]),
                                "valeur": val(lambda c, code=code: c[g].get(code, {}).get("solde"))} for code in groupes[g][1]}
-            resultats.insert(0, r)
-    return {"n": len(df), "n_brut": len(brut), "lib_profil": lib_prof, "lib_zone": lib_zone,
+            if r["global"]["valeur"] is not None:
+                resultats.insert(0, r)
+    return {"n": len(df), "n_brut": len(brut), "controle": controle, "lib_profil": lib_prof, "lib_zone": lib_zone, "lib_secteur": lib_sect,
             "effectifs_profil": {c: int((df.get(v_prof, "") == c).sum()) for c in lib_prof},
             "effectifs_zone": {c: int((df.get(v_zone, "") == c).sum()) for c in lib_zone},
-            "resultats": resultats}
+            "effectifs_secteur": {c: int((df.get(q_sect["var"], "") == c).sum()) for c in lib_sect} if q_sect else {},
+            "indice_hc": indice_entreprises(projet, df, quest), "resultats": resultats}
 
 
 # ------------------------------------------------------------------ graphiques
@@ -171,6 +185,62 @@ def graphique(r, an, dossier_g):
     return _sauver(fig, chemin)
 
 
+NIV_COUL = ["#DCEBFA", "#A6CFF3", "#5FA9E8", "#1F7FD1", "#0B4F8A"]
+
+
+def graphiques_indice(x, dossier_g):
+    """Deux figures : score des piliers (0–100) et répartition des entreprises par niveau."""
+    piliers = sorted(x["piliers"], key=lambda p: p["moyenne"] or 0)
+    fig, ax = plt.subplots(figsize=(6.4, 0.5 * len(piliers) + 0.9))
+    ax.barh([p["nom"] for p in piliers], [p["moyenne"] or 0 for p in piliers], color=BLEU, height=0.58)
+    ax.axvline(x["moyenne"], color=ENCRE, lw=1, ls="--")
+    ax.text(x["moyenne"] + 1, len(piliers) - 0.45, f"indice {nombre(x['moyenne'], 1)}", color=ENCRE, fontsize=8)
+    for y, p in enumerate(piliers):
+        ax.text((p["moyenne"] or 0) + 1.2, y, nombre(p["moyenne"], 1), va="center", color=ENCRE, fontsize=9, fontweight="bold",
+                bbox={"facecolor": "white", "edgecolor": "none", "pad": 1.5}, zorder=3)
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("Score moyen sur 100")
+    ax.grid(axis="x", color=GRILLE, lw=0.6)
+    ax.set_axisbelow(True)
+    g1 = _sauver(fig, dossier_g / "indice_hc_piliers.png")
+    niv = x["niveaux"]
+    fig, ax = plt.subplots(figsize=(6.4, 2.6))
+    # noms longs sur deux lignes pour que les étiquettes ne se touchent pas
+    noms = [f"{v['niveau']}. " + (v["nom"].replace(" ", "\n", 1) if len(v["nom"]) > 12 else v["nom"]) for v in niv]
+    parts = [100 * v["n"] / x["n"] for v in niv]
+    ax.bar(noms, parts, color=NIV_COUL, edgecolor="white", width=0.68)
+    for k, (v, part) in enumerate(zip(niv, parts)):
+        ax.text(k, part + 1, f"{pct(part)}\n({v['n']})", ha="center", va="bottom", fontsize=8, color=ENCRE)
+    ax.set_ylim(0, max(parts + [10]) * 1.3)
+    ax.yaxis.set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.tick_params(axis="x", labelsize=8)
+    g2 = _sauver(fig, dossier_g / "indice_hc_niveaux.png")
+    return g1, g2
+
+
+def lecture_indice_hc(x):
+    n = x["n"]
+    bas = sum(v["n"] for v in x["niveaux"][:2])
+    haut = sum(v["n"] for v in x["niveaux"][3:])
+    niv = x["niveaux"][x["niveau_moyen"] - 1]["nom"]
+    piliers = sorted((p for p in x["piliers"] if p["moyenne"] is not None), key=lambda p: -p["moyenne"])
+    txt = (f"L'indice moyen s'établit à **{nombre(x['moyenne'], 1)} sur 100** (médiane {nombre(x['mediane'], 1)}) : les entreprises "
+           f"interrogées se situent en moyenne au **niveau {x['niveau_moyen']} « {niv} »**. {pct(100 * bas / n)} d'entre elles restent aux deux "
+           f"premiers niveaux (« {x['niveaux'][0]['nom']} » et « {x['niveaux'][1]['nom']} »), tandis que {pct(100 * haut / n)} atteignent les "
+           f"niveaux « {x['niveaux'][3]['nom']} » ou « {x['niveaux'][4]['nom']} ».")
+    if len(piliers) >= 2:
+        hi, lo = piliers[0], piliers[-1]
+        txt += (f" Le pilier le plus avancé est « {hi['nom']} » ({nombre(hi['moyenne'], 1)}), le plus en retrait « {lo['nom']} » "
+                f"({nombre(lo['moyenne'], 1)}) : l'écart de {nombre(hi['moyenne'] - lo['moyenne'], 0)} points indique où porter l'effort en priorité.")
+    groupes = [(nom, g) for nom, cle in (("fonction", "par_fonction"), ("pays", "par_pays"), ("secteur", "par_secteur"))
+               for g in x[cle] if g["n"] >= SEUIL]
+    if groupes:
+        txt += " Parmi les groupes d'au moins 30 entreprises : " + " ; ".join(
+            f"{g['nom']} ({nom}) {nombre(g['moyenne'], 1)}" for nom, g in groupes) + "."
+    return txt
+
+
 # ------------------------------------------------------------------ rédaction
 def lecture(r, an):
     g = r["global"]
@@ -188,15 +258,7 @@ def lecture(r, an):
             txt += f" Par profil, l'indice varie de {nombre(lo[1], 1)} ({lo[0]}) à {nombre(hi[1], 1)} ({hi[0]})."
         return txt
     if r["type"] in ("multiple", "unique"):
-        cle = "citations" if r["type"] == "multiple" else "dist"
-        items = sorted(((m["label"], g[cle].get(m["code"], 0)) for m in r["modalites"]), key=lambda x: -x[1])
-        verbe = "citent" if r["type"] == "multiple" else "choisissent"
-        txt = f"**{pct(items[0][1])}** des répondants {verbe} « {items[0][0]} »"
-        if len(items) > 1:
-            txt += f", devant « {items[1][0]} » ({pct(items[1][1])})"
-        if len(items) > 2:
-            txt += f" et « {items[2][0]} » ({pct(items[2][1])})"
-        return txt + f". Base : {g['n']} répondants concernés."
+        return lecture_choix(r, an)
     txt = (f"Le solde d'opinion s'établit à **{solde_txt(g['solde'])} points** : {pct(g['positif'])} de réponses favorables "
            f"contre {pct(g['negatif'])} de réponses défavorables (base : {g['n']} répondants).")
     if r["type"] == "satisfaction" and g.get("moyenne") == g.get("moyenne"):
@@ -211,16 +273,62 @@ def lecture(r, an):
     return txt
 
 
+def _classement(st, r):
+    cle = "citations" if r["type"] == "multiple" else "dist"
+    return sorted(((m["label"], m["code"], st.get(cle, {}).get(m["code"], 0)) for m in r["modalites"] if m["code"] != "autre_hors"),
+                  key=lambda x: -x[2])
+
+
+def _est_nsp(label, code):
+    return code in (NSP_CODE, "nsp") or _norm(label).startswith("ne sait")
+
+
+def lecture_choix(r, an):
+    """Commentaire d'une question à choix : réponses dominantes, concentration, « Ne sait pas », écarts entre groupes."""
+    g = r["global"]
+    items = _classement(g, r)
+    multiple = r["type"] == "multiple"
+    verbe = "citent" if multiple else "répondent"
+    txt = f"**{pct(items[0][2])}** des répondants {verbe} « {items[0][0]} »"
+    if len(items) > 1:
+        txt += f", devant « {items[1][0]} » ({pct(items[1][2])})"
+    if len(items) > 2 and items[2][2] >= 5:
+        txt += f" et « {items[2][0]} » ({pct(items[2][2])})"
+    txt += "."
+    if not multiple and len(items) > 2:
+        deux = items[0][2] + items[1][2]
+        if deux >= 65:
+            txt += f" À elles deux, ces réponses rassemblent {pct(deux)} des répondants : les réponses sont concentrées."
+        elif items[0][2] < 35:
+            txt += " Aucune réponse ne domine nettement : les situations sont variées."
+    if multiple and len(items) > 3:
+        txt += f" En moyenne, chaque répondant cite {nombre(sum(v for _, _, v in items) / 100, 1)} réponse(s)."
+    nsp = sum(v for l, c, v in items if _est_nsp(l, c))
+    if nsp >= 15:
+        txt += f" {pct(nsp)} ne savent pas répondre, signe d'une visibilité limitée sur ce sujet."
+    code, label = items[0][1], items[0][0]
+    cle = "citations" if multiple else "dist"
+    for grp, libs, nom in (("par_profil", an["lib_profil"], "fonction"), ("par_zone", an["lib_zone"], "pays"),
+                           ("par_secteur", an.get("lib_secteur", {}), "secteur")):
+        vals = [(libs.get(c, c), st.get(cle, {}).get(code, 0)) for c, st in (r.get(grp) or {}).items() if st.get("n", 0) >= SEUIL]
+        if len(vals) >= 2:
+            hi, lo = max(vals, key=lambda x: x[1]), min(vals, key=lambda x: x[1])
+            if hi[1] - lo[1] >= 10:
+                txt += f" Par {nom}, la part de « {label} » va de {pct(lo[1])} ({lo[0]}) à {pct(hi[1])} ({hi[0]})."
+    if g["n"] < SEUIL:
+        return txt + f" Base limitée ({g['n']} répondants concernés) : résultat à lire comme une tendance."
+    return txt + f" Base : {g['n']} répondants concernés."
+
+
 def chiffre_cle(r):
     g = r["global"]
     if not g.get("n"):
         return None
     if r["type"] == "indice":
-        return [f"{nombre(g['valeur'], 1)}/100", f"{r['libelle']}"]
+        return [f"{nombre(g['valeur'], 1)}/100", f"{r['libelle']}"] if g.get("valeur") is not None else None
     if r["type"] in ("multiple", "unique"):
-        cle = "citations" if r["type"] == "multiple" else "dist"
-        m, v = max(((m["label"], g[cle].get(m["code"], 0)) for m in r["modalites"]), key=lambda x: x[1])
-        return [pct(v), f"{r['libelle']} : « {m} » arrive en tête"]
+        label, code, v = _classement(g, r)[0]
+        return [pct(v), f"{r['libelle']} : « {label} »"]
     if r["type"] == "intention":
         return [pct(g["positif"]), f"{r['libelle']} (taux d'intention)"]
     if r["type"] == "satisfaction":
@@ -231,6 +339,25 @@ def chiffre_cle(r):
 def messages_regles(an):
     res = an["resultats"]
     msgs = []
+    x = an.get("indice_hc")
+    if x:
+        bas = sum(v["n"] for v in x["niveaux"][:2])
+        piliers = sorted((p for p in x["piliers"] if p["moyenne"] is not None), key=lambda p: -p["moyenne"])
+        msgs.append(f"Indice H&C de Maturité IA : {nombre(x['moyenne'], 1)}/100 en moyenne, soit le niveau {x['niveau_moyen']} "
+                    f"« {x['niveaux'][x['niveau_moyen'] - 1]['nom']} » ({x['n']} entreprises).")
+        msgs.append(f"{pct(100 * bas / x['n'])} des entreprises restent aux niveaux « {x['niveaux'][0]['nom']} » ou « {x['niveaux'][1]['nom']} ».")
+        if len(piliers) >= 2:
+            msgs.append(f"Pilier le plus avancé : {piliers[0]['nom'].lower()} ({nombre(piliers[0]['moyenne'], 1)}) ; "
+                        f"le plus en retrait : {piliers[-1]['nom'].lower()} ({nombre(piliers[-1]['moyenne'], 1)}).")
+    # réponses les plus nettes des questions à choix (au moins 30 répondants)
+    nets = []
+    for r in res:
+        if r["type"] in ("unique", "multiple") and r["global"].get("n", 0) >= SEUIL and not r.get("identification"):
+            label, code, v = _classement(r["global"], r)[0]
+            if not _est_nsp(label, code):
+                nets.append((v, r, label))
+    # placés après les messages sur l'indice et les soldes d'opinion
+    choix = [f"{r['libelle']} : « {label} » pour {pct(v)} des répondants." for v, r, label in sorted(nets, key=lambda t: -t[0])[:4]]
     indice = next((r for r in res if r["type"] == "indice" and r["global"].get("valeur") is not None), None)
     if indice:
         msgs.append(f"{indice['libelle']} : {nombre(indice['global']['valeur'], 1)}/100, "
@@ -241,10 +368,6 @@ def messages_regles(an):
         lo = min(soldes, key=lambda r: r["global"]["solde"])
         msgs.append(f"Point le plus favorable : {hi['libelle'].lower()} ({solde_txt(hi['global']['solde'])} pts).")
         msgs.append(f"Point le plus fragile : {lo['libelle'].lower()} ({solde_txt(lo['global']['solde'])} pts).")
-    for r in res:
-        if r["type"] == "multiple" and r["global"].get("n"):
-            m, v = max(((m["label"], r["global"]["citations"].get(m["code"], 0)) for m in r["modalites"]), key=lambda x: x[1])
-            msgs.append(f"{r['libelle']} : « {m} » est citée par {pct(v)} des répondants.")
     ecarts = []
     for r in soldes:
         prof = [(an["lib_profil"][c], x["solde"]) for c, x in r["par_profil"].items() if x.get("n", 0) >= SEUIL]
@@ -254,7 +377,7 @@ def messages_regles(an):
     if ecarts:
         e, r, hi, lo = max(ecarts, key=lambda x: x[0])
         msgs.append(f"Plus fort écart entre profils sur {r['libelle'].lower()} : {solde_txt(hi[1])} profil « {hi[0]} », {solde_txt(lo[1])} profil « {lo[0]} ».")
-    return msgs
+    return msgs + choix
 
 
 def enseignements_regles(an):
@@ -266,9 +389,36 @@ def enseignements_regles(an):
         ens.append("Des points d'appui nets : " + ", ".join(r["libelle"].lower() for r in pos[:3]) + ".")
     if neg:
         ens.append("Des signaux de vigilance à suivre de près lors de la prochaine édition : " + ", ".join(r["libelle"].lower() for r in neg[:3]) + ".")
-    ens.append("Les écarts entre profils invitent à des réponses différenciées selon le niveau de responsabilité des répondants.")
+    x = an.get("indice_hc")
+    if x:
+        piliers = sorted((p for p in x["piliers"] if p["moyenne"] is not None), key=lambda p: p["moyenne"])
+        if piliers:
+            ens.append(f"Le pilier « {piliers[0]['nom']} » ({nombre(piliers[0]['moyenne'], 1)}/100) est le premier levier de progression : "
+                       f"c'est là que l'écart avec les entreprises les plus matures est le plus grand.")
+        bas = sum(v["n"] for v in x["niveaux"][:2])
+        if bas:
+            ens.append(f"{pct(100 * bas / x['n'])} des entreprises en sont encore aux premiers niveaux de maturité : un accompagnement "
+                       "par étapes (former, outiller, puis automatiser) leur correspond mieux qu'un programme global.")
+        petits = [g["nom"] for cle in ("par_pays", "par_secteur") for g in x[cle] if g["n"] < SEUIL]
+        if petits:
+            ens.append("Les résultats par pays et par secteur restent des tendances : la plupart des groupes comptent encore moins de "
+                       "30 entreprises et gagneront en robustesse avec la suite de la collecte.")
+    if any("solde" in r["global"] for r in res):
+        ens.append("Les écarts entre profils invitent à des réponses différenciées selon le niveau de responsabilité des répondants.")
     ens.append("La reconduction du baromètre avec les mêmes indicateurs permettra de transformer ces constats en tendances.")
     return ens
+
+
+def conclusion_regles(an):
+    x = an.get("indice_hc")
+    if not x:
+        return ("Ce baromètre fournit une photographie de référence. Sa valeur tiendra à sa répétition : les mêmes indicateurs, "
+                "mesurés selon la même méthode, permettront de suivre les évolutions et d'évaluer l'effet des décisions prises.")
+    piliers = sorted((p for p in x["piliers"] if p["moyenne"] is not None), key=lambda p: p["moyenne"])
+    return (f"Avec un indice moyen de {nombre(x['moyenne'], 1)} sur 100, les grandes entreprises interrogées se situent au niveau "
+            f"« {x['niveaux'][x['niveau_moyen'] - 1]['nom']} » : l'IA et l'automatisation y progressent, sans être encore intégrées "
+            f"aux processus. Le pilier « {piliers[0]['nom']} » concentre la marge de progression la plus forte. Cette première mesure "
+            "sert de référence : sa reconduction permettra de suivre la progression de chaque pays, secteur et fonction.")
 
 
 def _redaction_ia(projet, an):
@@ -308,9 +458,7 @@ def generer(projet, cadrage, quest, ech, precedent=None):
         ia = _redaction_ia(projet, an) if llm.disponible() else None
         data["messages"] = (ia or {}).get("messages_cles") or messages_regles(an)
         data["enseignements"] = (ia or {}).get("enseignements") or enseignements_regles(an)
-        data["conclusion"] = (ia or {}).get("conclusion") or (
-            "Ce baromètre fournit une photographie de référence. Sa valeur tiendra à sa répétition : les mêmes indicateurs, "
-            "mesurés selon la même méthode, permettront de suivre les évolutions et d'évaluer l'effet des décisions prises.")
+        data["conclusion"] = (ia or {}).get("conclusion") or conclusion_regles(an)
         data["redaction"] = "ia" if ia else "regles"
     return data
 
@@ -327,11 +475,16 @@ def construire_docs(projet, data, ech):
     Z = "Pays" if sont_des_pays(list(lz.values())) else "Zone"
     res = an["resultats"]
     n = an["n"]
-    chif = [c for c in (chiffre_cle(r) for r in res) if c][:10]
+    x = an.get("indice_hc")
+    base = "questionnaires valides" if an.get("controle", True) else "questionnaires renseignés"
+    chif = []
+    if x:
+        chif.append([f"{nombre(x['moyenne'], 1)}/100", f"Indice H&C de Maturité IA moyen (niveau {x['niveau_moyen']} « {x['niveaux'][x['niveau_moyen'] - 1]['nom']} »)"])
+    chif += [c for c in (chiffre_cle(r) for r in res) if c][:10 - len(chif)]
 
     sections = [
         section("guide", "Comment lire ce rapport", [
-            p(f"Ce rapport présente les résultats {du_barometre(fiche['theme'])}, établis à partir de **{n} questionnaires valides**. "
+            p(f"Ce rapport présente les résultats {du_barometre(fiche['theme'])}, établis à partir de **{n} {base}**. "
               "Il se lit d'un bout à l'autre pour disposer du diagnostic complet ; le lecteur pressé trouvera l'essentiel dans les messages clés "
               "et les chiffres à retenir."),
             p("Un **solde d'opinion** est la différence entre la part de réponses favorables et la part de réponses défavorables. Il varie de −100 "
@@ -343,14 +496,43 @@ def construire_docs(projet, data, ech):
         section("messages", "Les messages clés", [liste(data.get("messages", []))]),
         section("chiffres", "Les chiffres à retenir", [tableau(["Chiffre", "Ce qu'il mesure"], chif, "Chiffres à retenir", [1, 3.5])], source="auto"),
         section("repondants", "I. Qui sont les répondants", [
-            p(f"L'analyse porte sur {n} questionnaires valides, sur {an['n_brut']} formulaires reçus (refus, hors-cible et entretiens trop rapides exclus)."),
-            tableau(["Profil", "Effectif", "Part", "Marge d'erreur"],
-                    [[lp[c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in an["effectifs_profil"].items()], "Répartition par profil"),
+            p(f"L'analyse porte sur {n} {base}, sur {an['n_brut']} formulaires reçus"
+              + (" (refus, hors-cible et entretiens trop rapides exclus)." if an.get("controle", True) else " (seuls les refus de participer sont exclus).")),
+            tableau(["Fonction", "Effectif", "Part", "Marge d'erreur"],
+                    [[lp[c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in an["effectifs_profil"].items()], "Répartition par fonction"),
             tableau([Z, "Effectif", "Part", "Marge d'erreur"],
-                    [[lz[c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in an["effectifs_zone"].items()], f"Répartition par {Z.lower()}"),
-        ], source="auto"),
+                    [[lz[c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in sorted(an["effectifs_zone"].items(), key=lambda t: -t[1])],
+                    f"Répartition par {Z.lower()}"),
+        ] + ([tableau(["Secteur", "Effectif", "Part", "Marge d'erreur"],
+                      [[an["lib_secteur"][c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in sorted(an["effectifs_secteur"].items(), key=lambda t: -t[1])],
+                      "Répartition par secteur")] if an.get("effectifs_secteur") else []), source="auto"),
     ]
     chap = 1
+    if x:
+        chap += 1
+        g1, g2 = graphiques_indice(x, dg)
+        groupe = lambda cle, titre: tableau([titre, "Entreprises", "Indice moyen"],
+                                            [[g["nom"], g["n"], nombre(g["moyenne"], 1) if g["n"] >= SEUIL else "effectif insuffisant"] for g in x[cle]],
+                                            f"Indice H&C par {titre.lower()}", [2.2, 1, 1.2], 9)
+        sections.append(section("ch_indice_hc", f"{ROMAINS[chap - 1]}. Indice H&C de Maturité IA & Automatisation", [
+            chiffres([{"valeur": nombre(x["moyenne"], 1), "libelle": "indice moyen sur 100"},
+                      {"valeur": f"{x['niveau_moyen']}", "libelle": f"niveau moyen « {x['niveaux'][x['niveau_moyen'] - 1]['nom']} »"},
+                      {"valeur": pct(100 * sum(v["n"] for v in x["niveaux"][:2]) / x["n"]), "libelle": "aux niveaux 1 et 2"},
+                      {"valeur": pct(100 * sum(v["n"] for v in x["niveaux"][3:]) / x["n"]), "libelle": "aux niveaux 4 et 5"}]),
+            p(lecture_indice_hc(x)),
+            image(rel(g2), "Répartition des entreprises par niveau de maturité", 14.5),
+            tableau(["Niveau", "Ce qui le caractérise", "Entreprises", "Part"],
+                    [[f"{v['niveau']}. {v['nom']}", v["description"], v["n"], pct(100 * v["n"] / x["n"])] for v in x["niveaux"]],
+                    "Les cinq niveaux de maturité", [1.3, 3.2, 0.9, 0.7], 9),
+            image(rel(g1), "Score moyen des cinq piliers de l'indice", 14.5),
+            tableau(["Pilier", "Poids", "Score moyen", "Ce qu'il mesure"],
+                    [[pi["nom"], pct(100 * pi["poids"]), nombre(pi["moyenne"], 1), pi["description"]] for pi in x["piliers"]],
+                    "Les cinq piliers", [1.4, 0.6, 0.8, 3.4], 9),
+            groupe("par_fonction", "Fonction"), groupe("par_pays", "Pays"), groupe("par_secteur", "Secteur"),
+            p("Méthode : chaque réponse est notée de 0 à 100 selon le barème validé ; un pilier est la moyenne de ses questions (au moins la "
+              "moitié renseignées) ; l'indice est la moyenne pondérée des piliers. Niveaux de 20 points ; les noms des niveaux 2 à 4 sont une "
+              "proposition à valider. Aucun score n'est publié pour un groupe de moins de 30 entreprises.", "note"),
+        ], source="auto"))
     indice = next((r for r in res if r["type"] == "indice"), None)
     if indice and indice["global"].get("valeur") is not None:
         chap += 1
@@ -388,7 +570,7 @@ def construire_docs(projet, data, ech):
     sections += [
         section("enseignements", f"{ROMAINS[chap]}. Enseignements", [liste(data.get("enseignements", []))]),
         section("methode", "Annexe : méthode et limites", [
-            p(f"Enquête quantitative par questionnaire, échantillonnage non probabiliste par quotas (zone × profil), {n} questionnaires valides "
+            p(f"Enquête quantitative par questionnaire, échantillonnage non probabiliste par quotas (zone × profil), {n} {base} "
               f"collectés auprès de {fiche['cible']}. Marge d'erreur indicative sur l'ensemble : {fmt_marge(n)} (intervalle de confiance à 95 %, cas le plus défavorable)."),
         ], source="auto"),
         section("conclusion", "Conclusion", [p(data.get("conclusion", ""))]),
