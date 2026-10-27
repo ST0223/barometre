@@ -1165,12 +1165,60 @@ async function ongletIndicateurs(z, e, cle, filtre = S.filtreInd || "") {
   z.innerHTML = `
     <div class="ind-entete">${select}
       <span class="aide">${d.n} répondant(s) ${d.controle_qualite ? "valides" : "renseignés"} · <b>${avec.length} indicateurs calculés</b>${sans.length ? ` · ${sans.length} sans données` : ""} · calcul à la date de la dernière synchronisation</span></div>
-    ${indice ? `<div class="bandeau info">${ico("info")}<div><b>${esc(indice.libelle)}</b> : ${indice.valeur != null ? `<b>${nf(indice.valeur)} / 100</b>` : "pas encore calculé, ses poids et son codage restent à valider après le pré-test."}</div></div>` : ""}
+    ${d.indice ? blocIndice(d.indice) : indice ? `<div class="bandeau info">${ico("info")}<div><b>${esc(indice.libelle)}</b> : pas encore calculé ; il se calcule dès la synchronisation des réponses QuestionPro.</div></div>` : ""}
     ${blocs.map((b) => `<h3 class="ind-bloc">${esc(b)}</h3><div class="ind-grille">${avec.filter((i) => i.bloc === b).map(carte).join("")}</div>`).join("")}
     ${sans.length ? `<h3 class="ind-bloc">Pas encore de données</h3>
       <p class="aide" style="margin-top:0">Ces questions n'apparaissent pas dans les réponses reçues : elles sont absentes de l'enquête en ligne, posées sous une autre forme, ou soumises à une condition qu'aucun répondant n'a remplie.</p>
       <div class="ind-sans">${sans.map((i) => `<span title="${esc(i.question)}"><b>${esc(i.num)}</b> ${esc(i.libelle)}</span>`).join("")}</div>` : ""}`;
   $("#ind-filtre").onchange = (ev) => { S.filtreInd = ev.target.value; ongletIndicateurs(z, e, cle, ev.target.value); };
+  if (d.indice) lierIndice(z, d.indice);
+}
+
+// Indice H&C de Maturité IA : score de chaque entreprise, niveaux, piliers, moyennes par groupe
+const NIV_COUL = ["#DCEBFA", "#A6CFF3", "#5FA9E8", "#1F7FD1", "#0B4F8A"];
+function blocIndice(x) {
+  const barre = (nom, v, n, sous = "") => `<div class="ix-l" title="${esc(nom)} : ${nf(v, 1)} / 100${n != null ? ` (${n} entreprise(s))` : ""}"><span class="lbl">${esc(nom)}${sous}</span>
+    <span class="piste"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></span><span class="v">${nf(v)}</span>${n != null ? `<span class="n ${n < 30 ? "faible" : ""}">${n}</span>` : ""}</div>`;
+  const groupe = (titre, l) => `<div class="ix-carte"><h4>${titre}</h4>${l.map((g) => barre(g.nom, g.moyenne, g.n)).join("")}<small class="aide">score moyen / 100 · nombre d'entreprises</small></div>`;
+  const maxNiv = Math.max(...x.niveaux.map((v) => v.n), 1);
+  return `<section class="ix">
+    <div class="ix-tete">
+      <div class="ix-score"><span>Indice H&amp;C de Maturité IA &amp; Automatisation</span><b>${nf(x.moyenne, 1)}<small> / 100</small></b>
+        <em>niveau ${x.niveau_moyen} · ${esc(x.niveaux[x.niveau_moyen - 1].nom)}</em><small>moyenne de ${x.n} entreprise(s) · médiane ${nf(x.mediane, 1)}</small></div>
+      <div class="ix-carte"><h4>Répartition par niveau</h4>
+        ${x.niveaux.map((v, k) => `<div class="ix-niv" title="${esc(v.description)}"><span class="pastille" style="background:${NIV_COUL[k]}"></span><span class="lbl">${v.niveau}. ${esc(v.nom)}</span>
+          <span class="piste"><i style="width:${(100 * v.n) / maxNiv}%;background:${NIV_COUL[k]}"></i></span><span class="v">${v.n}</span><span class="n">${nf((100 * v.n) / x.n)} %</span></div>`).join("")}
+        <small class="aide">Niveaux de 20 points (0–20, 20–40…). Les noms des niveaux 2 à 4 sont une proposition, à valider.</small></div>
+      <div class="ix-carte"><h4>Piliers</h4>${x.piliers.map((p) => barre(p.nom, p.moyenne, null, ` <small>${nf(100 * p.poids)} %</small>`)).join("")}<small class="aide">score moyen / 100 · poids dans l'indice</small></div>
+    </div>
+    <div class="ix-groupes">${groupe("Par pays", x.par_pays)}${groupe("Par secteur", x.par_secteur)}${groupe("Par fonction", x.par_fonction)}</div>
+    <div class="ix-carte"><div class="ix-titre"><h4>Score des entreprises</h4><span class="aide">une réponse = une entreprise, de la plus mature à la moins mature</span>
+      <button class="btn btn-petit" id="ix-csv">${ico("download")} Exporter (CSV)</button></div>
+      <div class="grille-tab"><table class="ix-table"><thead><tr><th>#</th><th>Pays</th><th>Secteur</th><th>Fonction</th><th>Collecteur</th><th style="text-align:right">Indice</th><th>Niveau</th>
+        ${x.piliers.map((p) => `<th style="text-align:right" title="${esc(p.description)}">${esc(p.nom.split(" ")[0])}</th>`).join("")}</tr></thead>
+        <tbody id="ix-lignes"></tbody></table></div>
+      ${x.entreprises.length > 20 ? `<button class="btn btn-fantome btn-petit" id="ix-tout" style="margin-top:8px">Afficher les ${x.entreprises.length} entreprises</button>` : ""}</div>
+  </section>`;
+}
+
+function lierIndice(z, x) {
+  const ligne = (e, k) => `<tr><td>${k + 1}</td><td>${esc(e.pays || "")}</td><td>${esc(e.secteur || "")}</td><td>${esc(e.fonction || "")}</td><td>${esc(e.collecteur || "")}</td>
+    <td style="text-align:right"><b>${nf(e.indice, 1)}</b></td><td><span class="pastille" style="background:${NIV_COUL[e.niveau - 1]}"></span>${e.niveau} · ${esc(x.niveaux[e.niveau - 1].nom)}</td>
+    ${x.piliers.map((p) => `<td style="text-align:right">${e.piliers[p.k] == null ? "–" : nf(e.piliers[p.k])}</td>`).join("")}</tr>`;
+  const peindre = (tout) => { z.querySelector("#ix-lignes").innerHTML = (tout ? x.entreprises : x.entreprises.slice(0, 20)).map(ligne).join(""); };
+  peindre(false);
+  const t = z.querySelector("#ix-tout");
+  if (t) t.onclick = () => { peindre(true); t.remove(); };
+  z.querySelector("#ix-csv").onclick = () => {
+    const cel = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const nb = (v) => (v == null ? "" : String(Math.round(v * 10) / 10).replace(".", ","));
+    const lignes = [["Réponse", "Pays", "Secteur", "Fonction", "Collecteur", "Indice", "Niveau", ...x.piliers.map((p) => p.nom)].map(cel).join(";"),
+      ...x.entreprises.map((e) => [e.id, e.pays, e.secteur, e.fonction, e.collecteur, nb(e.indice), `${e.niveau} ${x.niveaux[e.niveau - 1].nom}`, ...x.piliers.map((p) => nb(e.piliers[p.k]))].map(cel).join(";"))];
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["﻿" + lignes.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = `Indice_HC_${S.projet.slug}.csv`;
+    a.click();
+  };
 }
 
 function graphCumul(s) {

@@ -360,3 +360,31 @@ select.saisie { padding-right: 28px; }
 .ind-l .v { text-align: right; font-variant-numeric: tabular-nums; color: var(--texte); }
 .ind-sans { display: flex; flex-wrap: wrap; gap: 6px; }
 .ind-sans span { font-size: 12px; padding: 4px 9px; border-radius: 14px; background: var(--fond); color: var(--texte-2); }
+
+/* Indice H&C de Maturité IA */
+.ix { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+.ix-tete { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr) minmax(0, 1.2fr); gap: 14px; }
+.ix-groupes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.ix-carte { border: 1px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; background: var(--carte); display: flex; flex-direction: column; gap: 7px; }
+.ix-carte h4 { margin: 0 0 4px; font-size: 13.5px; color: var(--marine); }
+.ix-titre { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+.ix-titre .btn { margin-left: auto; }
+.ix-score { border-radius: var(--rayon); padding: 18px; background: linear-gradient(140deg, #081F5C, #0087E0); color: #fff; display: flex; flex-direction: column; gap: 4px; }
+.ix-score span { font-size: 12.5px; opacity: .85; }
+.ix-score b { font-size: 46px; line-height: 1.05; letter-spacing: -.02em; }
+.ix-score b small { font-size: 18px; opacity: .75; }
+.ix-score em { font-style: normal; font-weight: 600; font-size: 15px; }
+.ix-score > small { font-size: 12px; opacity: .8; }
+.ix-l { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 34px 30px; gap: 8px; align-items: center; font-size: 12.5px; }
+.ix-niv { display: grid; grid-template-columns: 12px minmax(0, 1.3fr) minmax(0, 1fr) 30px 40px; gap: 8px; align-items: center; font-size: 12.5px; }
+.ix-l .lbl, .ix-niv .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ix-l .lbl small { color: var(--texte-3); }
+.ix-l .piste, .ix-niv .piste { height: 8px; border-radius: 4px; background: var(--fond); }
+.ix-l .piste i, .ix-niv .piste i { display: block; height: 100%; border-radius: 4px; background: var(--bleu); min-width: 2px; }
+.ix-l .v, .ix-niv .v { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ix-l .n, .ix-niv .n { text-align: right; font-size: 11.5px; color: var(--texte-3); font-variant-numeric: tabular-nums; }
+.ix-l .n.faible { color: var(--ambre); }
+.ix-niv .pastille { margin: 0; }
+.pastille { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.ix-table td, .ix-table th { white-space: nowrap; }
+@media (max-width: 1200px) { .ix-tete, .ix-groupes { grid-template-columns: 1fr; } }

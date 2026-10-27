@@ -268,10 +268,24 @@ def convertir_questionpro(reponses, quest):
     return df, ecartees, sorted(ignorees)
 
 
+def _questions_questionpro(env, cle_api, enquete):
+    """Structure de l'enquête (codes, réponses dans l'ordre, lignes des grilles)."""
+    url = f"https://api.questionpro.{env.strip('. ') or 'com'}/a/api/v2/surveys/{enquete}/questions?page=1&perPage=500"
+    req = urllib.request.Request(url, headers={"api-key": cle_api, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode("utf-8")).get("response") or []
+
+
 def importer_questionpro(projet, quest, env, cle_api, enquete):
+    from .. import indice_hc
     reponses = _lire_questionpro(env, cle_api, enquete)
     df, ecartees, ignorees = convertir_questionpro(reponses, quest)
     enregistrer(projet, df)
+    try:
+        # réponses brutes (positions) pour l'Indice H&C, calculé sur la structure réelle de l'enquête en ligne
+        indice_hc.enregistrer_reponses(projet, reponses, _questions_questionpro(env, cle_api, enquete))
+    except Exception:  # l'indice reste sur la synchronisation précédente ; le suivi n'en dépend pas
+        pass
     return len(df), ecartees, ignorees
 
 
@@ -568,4 +582,52 @@ def indicateurs(projet, filtre=""):
         if r["type"] == "indice" and r["composantes"]:
             vals = [soldes[c] for c in r["composantes"] if soldes.get(c) is not None]
             r["valeur"] = (sum(vals) / len(vals) + 100) / 2 if vals else None
-    return {"n": len(base), "options": options, "filtre": filtre, "controle_qualite": controle, "indicateurs": res}
+    return {"n": len(base), "options": options, "filtre": filtre, "controle_qualite": controle, "indicateurs": res,
+            "indice": indice_entreprises(projet, base, quest)}
+
+
+def indice_entreprises(projet, base, quest):
+    """Indice H&C de chaque entreprise de la base (une réponse = une entreprise), et moyennes par groupe."""
+    from .. import indice_hc
+    brut = indice_hc.lire_reponses(projet)
+    if not brut or base.empty or "_id" not in base:
+        return None
+    codes_de = {r["id"]: r["codes"] for r in brut["reponses"]}
+    par_id = {q["id"]: q for q in quest["questions_plates"]}
+    libs = {k: {m["code"]: m["label"] for m in par_id[qid]["modalites"]} for k, qid in
+            (("pays", "id_zone"), ("secteur", "id_secteur"), ("fonction", "id_profil")) if qid in par_id}
+    libs.setdefault("fonction", {})["autre_hors"] = "Autre fonction"
+    var = {k: par_id[qid]["var"] for k, qid in (("pays", "id_zone"), ("secteur", "id_secteur"), ("fonction", "id_profil")) if qid in par_id}
+    entreprises = []
+    for _, ligne in base.iterrows():
+        codes = codes_de.get(str(ligne["_id"]))
+        if codes is None:
+            continue
+        sc = indice_hc.score(codes, brut.get("options_d1", []))
+        if sc["indice"] is None:
+            continue
+        e = {"id": str(ligne["_id"]), "collecteur": str(ligne.get("enqueteur", "")), **sc}
+        for k, v in var.items():
+            code = str(ligne.get(v, ""))
+            e[k] = libs.get(k, {}).get(code, code)
+        entreprises.append(e)
+    if not entreprises:
+        return None
+    moyenne = lambda xs: sum(xs) / len(xs) if xs else None
+
+    def groupes(cle):
+        res = {}
+        for e in entreprises:
+            res.setdefault(e.get(cle) or "Non renseigné", []).append(e["indice"])
+        return sorted(({"nom": k, "n": len(v), "moyenne": moyenne(v)} for k, v in res.items()), key=lambda x: -x["moyenne"])
+    scores = sorted(e["indice"] for e in entreprises)
+    return {
+        "n": len(entreprises), "moyenne": moyenne(scores), "mediane": scores[len(scores) // 2] if len(scores) % 2 else (scores[len(scores) // 2 - 1] + scores[len(scores) // 2]) / 2,
+        "niveau_moyen": indice_hc.niveau(moyenne(scores)),
+        "niveaux": [{"niveau": k + 1, "nom": indice_hc.NIVEAUX[k], "description": indice_hc.NIV_DESC[k],
+                     "n": sum(1 for e in entreprises if e["niveau"] == k + 1)} for k in range(5)],
+        "piliers": [{"k": p["k"], "nom": p["nom"], "poids": p["w"], "description": p["d"],
+                     "moyenne": moyenne([e["piliers"][p["k"]] for e in entreprises if e["piliers"][p["k"]] is not None])} for p in indice_hc.PILIERS],
+        "par_pays": groupes("pays"), "par_secteur": groupes("secteur"), "par_fonction": groupes("fonction"),
+        "entreprises": sorted(entreprises, key=lambda e: -e["indice"]),
+    }

@@ -108,6 +108,7 @@ datatym/
   banque.py            types d'indicateurs, questions, modalités, modes de calcul
   moteur.py            génération, validation, propagation, versions, export PDF
   budget.py            coût de revient : fourchette du cadrage, budget de collecte, bilan financier
+  indice_hc.py         Indice H&C de Maturité IA : barème validé, 5 piliers, 5 niveaux, score par entreprise
   formulaires.py       dictionnaire, XLSForm, import QuestionPro
   formation.py         PowerPoint de formation des enquêteurs
   llm.py               appel à Claude (facultatif)
