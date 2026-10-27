@@ -154,7 +154,7 @@ TYPES = {
         "secondes": 12,
     },
     "multiple": {
-        "libelle": "Choix multiple (3 réponses maximum)",
+        "libelle": "Choix multiple",
         "calcul": "Taux de citation de chaque modalité = nombre de répondants l'ayant cochée / répondants concernés. Le total dépasse 100 %.",
         "secondes": 25,
     },

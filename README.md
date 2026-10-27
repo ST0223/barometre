@@ -36,7 +36,7 @@ Les animations respectent le réglage système « réduire les animations ».
 |---|---|
 | 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, plafond budgétaire (facultatif) |
 | 1. Note de cadrage | Note de cadrage (.docx/.pdf) avec la liste des indicateurs et l'estimation préliminaire du coût (fourchette basse, centrale, haute) |
-| 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteurs.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro |
+| 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteurs.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro ; conditions d'affichage entre questions, questions de profil avec exclusion (ex. chiffre d'affaires sous le seuil) |
 | 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
 | 4. Méthodologie | Note méthodologique, assemblée depuis les étapes 1 à 3 |
 | 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées |

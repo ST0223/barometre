@@ -229,6 +229,19 @@ def importer_questionpro(projet, quest, env, cle_api, enquete):
     return len(df), ecartees, ignorees
 
 
+def condition_remplie(q, ligne, par_id):
+    """Conditions d'affichage entre questions (clauses reliées par « ou »), évaluées sur les réponses déjà simulées."""
+    for cible_id, valeurs, sauf in q.get("conditions") or []:
+        cible = par_id.get(cible_id)
+        if not cible:
+            return True
+        reponse = str(ligne.get(cible["var"], ""))
+        choisi = any(c in reponse.split() for c in valeurs) if cible["type"] == "select_multiple" else reponse in valeurs
+        if reponse and choisi != bool(sauf):
+            return True
+    return False
+
+
 def simuler(projet, quest, ech, taux=1.0, graine=7):
     """Génère des soumissions de test cohérentes avec les quotas et le questionnaire."""
     rnd = random.Random(graine)
@@ -237,6 +250,7 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
     n_jours = max(1, round(len(jours) * taux))
     # biais propres à chaque question pour produire des résultats contrastés
     biais = {q["var"]: [(0.04 if m["code"] == NSP_CODE else rnd.random() ** 1.6 + 0.05) for m in q.get("modalites", [])] for q in quest["questions_plates"]}
+    par_id = {q["id"]: q for q in quest["questions_plates"]}
     ecart_profil = {pr["code"]: rnd.uniform(-0.25, 0.25) for pr in quest["profils"]}
     lignes = []
     for m in ech["enqueteurs"]:
@@ -260,10 +274,12 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                             l[var] = code_prof
                         elif q.get("profils") and code_prof not in q["profils"]:
                             l[var] = ""
+                        elif q.get("conditions") and not condition_remplie(q, l, par_id):
+                            l[var] = ""
                         elif q.get("condition_sur"):
                             l[var] = "contact@exemple.com" if l.get(next((x["var"] for x in quest["questions_plates"] if x["id"] == q["condition_sur"][0]), ""), "") == q["condition_sur"][1] else ""
                         elif q["type"] in ("select_one", "select_multiple"):
-                            mods = [mm for mm in q["modalites"] if mm["code"] != "autre_hors"]
+                            mods = [mm for mm in q["modalites"] if mm["code"] != "autre_hors" and mm["code"] not in (q.get("exclut") or [])]
                             poids = biais[var][:len(mods)]
                             # décalage de la distribution selon le profil
                             dec = ecart_profil[code_prof]
@@ -311,6 +327,9 @@ def valides(df, quest):
         d = d[d["consentement"].str.lower().isin(["oui", "1", "yes"])]
     if v_prof in d:
         d = d[d[v_prof] != "autre_hors"]
+    for x in quest["questions_plates"]:
+        if x.get("exclut") and x["var"] in d:
+            d = d[~d[x["var"]].isin(x["exclut"])]
     duree = pd.to_numeric(d.get("duree_minutes", pd.Series(dtype=float)), errors="coerce")
     if duree.notna().any():
         seuil = 0.4 * duree.median()
@@ -327,7 +346,11 @@ def tableau_de_bord(projet, quest, ech):
     jours = [date.fromisoformat(j) for j in ech["jours"]]
     total_brut = len(df)
     refus = int((df.get("consentement", pd.Series(dtype=str)).str.lower() == "non").sum())
-    hors = int((df.get(v_prof, pd.Series(dtype=str)) == "autre_hors").sum())
+    hors_masque = df.get(v_prof, pd.Series([""] * len(df), index=df.index)) == "autre_hors"
+    for x in quest["questions_plates"]:
+        if x.get("exclut") and x["var"] in df:
+            hors_masque |= df[x["var"]].isin(x["exclut"])
+    hors = int(hors_masque.sum())
     duree = pd.to_numeric(df.get("duree_minutes", pd.Series(dtype=float)), errors="coerce")
     ok_cons = df.get("consentement", pd.Series(["oui"] * len(df))).str.lower().isin(["oui", "1", "yes"])
     med = float(duree[ok_cons].median()) if duree[ok_cons].notna().any() else None

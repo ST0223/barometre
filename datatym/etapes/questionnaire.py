@@ -59,11 +59,20 @@ def question_indicateur(ind, profils):
     concernes = profils_concernes(ind, profils)
     q = _q(f"q_{ind['id']}", texte_question(ind), type_q, modalites(ind), indicateur=ind["id"],
            profils=None if len(concernes) == len(profils) else concernes)
+    if ind.get("condition"):
+        # [{"si": "I03", "valeurs": [codes], "sauf": False}, …] : clauses reliées par « ou »
+        q["conditions"] = [(f"q_{c['si']}", list(c["valeurs"]), bool(c.get("sauf"))) for c in ind["condition"]]
+    if ind.get("exclut"):
+        q["exclut"] = list(ind["exclut"])  # réponses qui mettent fin au questionnaire (hors cible)
     if t == "multiple":
-        q["max_choix"] = 3
+        if ind.get("max_choix", 3):
+            q["max_choix"] = ind.get("max_choix", 3)
         q["consigne"] = "Lire les modalités."
     elif t in ("jugement", "satisfaction", "intention", "evolution", "perspective"):
         q["consigne"] = "Lire les modalités sauf « Ne sait pas »."
+    if q.get("exclut"):
+        libs = {m["code"]: m["label"] for m in q["modalites"]}
+        q["consigne"] = (q["consigne"] + " " if q["consigne"] else "") + "Fin du questionnaire si : " + " ou ".join(libs.get(c, c) for c in q["exclut"]) + " (hors cible)."
     return q
 
 
@@ -86,6 +95,9 @@ def construire_questions(projet, cadrage, precedentes=None):
     sections = [{"lettre": "A", "titre": "Identification du répondant", "ids": []}]
     for q in questions_identification(fiche, profils, secteurs, cadrage.get("domaine", "")):
         sections[0]["ids"].append(garder(q))
+    # indicateurs de profil (taille, statut, chiffre d'affaires…) : posés avec l'identification, avant le filtre d'éligibilité
+    sections[0]["ids"] += [garder(question_indicateur(i, profils)) for i in inds if i.get("identification")]
+    inds = [i for i in inds if not i.get("identification")]
     blocs = []
     for i in inds:
         if i["bloc"] not in blocs:
@@ -120,6 +132,7 @@ def numeroter(sections, profils):
     var_profil = var_de.get("id_profil", "a3")
     lib_profil = {pr["code"]: pr["libelle"] for pr in profils}
     num_de = {q["id"]: q["num"] for q in toutes}
+    par_id = {q["id"]: q for q in toutes}
     for q in toutes:
         conds, rel = [], []
         if q.get("profils"):
@@ -130,6 +143,22 @@ def numeroter(sections, profils):
             if cible_id in var_de:
                 conds.append(f"Si {num_de[cible_id]} = {valeur}")
                 rel.append(f"${{{var_de[cible_id]}}} = '{valeur}'")
+        clauses = [c for c in q.get("conditions") or [] if c[0] in par_id]
+        if clauses:
+            textes, exprs = [], []
+            for cible_id, valeurs, sauf in clauses:
+                cible = par_id[cible_id]
+                libs = {m["code"]: m["label"] for m in cible.get("modalites") or []}
+                v = var_de[cible_id]
+                if cible["type"] == "select_multiple":
+                    e = " or ".join(f"selected(${{{v}}}, '{c}')" for c in valeurs)
+                    textes.append(f"{num_de[cible_id]} {'ne contient pas' if sauf else 'contient'} " + " ou ".join(libs.get(c, c) for c in valeurs))
+                else:
+                    e = " or ".join(f"${{{v}}} = '{c}'" for c in valeurs)
+                    textes.append(f"{num_de[cible_id]} {'≠' if sauf else '='} " + " ou ".join(libs.get(c, c) for c in valeurs))
+                exprs.append(f"not({e})" if sauf else f"({e})")
+            conds.append("Si " + " ou ".join(textes))
+            rel.append("(" + " or ".join(exprs) + ")" if len(exprs) > 1 else exprs[0])
         q["condition"] = " et ".join(conds)
         q["relevant"] = " and ".join(rel)
     return toutes

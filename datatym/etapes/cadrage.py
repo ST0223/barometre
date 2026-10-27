@@ -239,8 +239,9 @@ def construire_docs(projet, data):
               "à des variables du dictionnaire et à un mode de calcul. Retirer un indicateur le retire du questionnaire et du dictionnaire."),
             tableau(["Code", "Indicateur", "Définition", "Type de mesure", "Profils interrogés"], lignes_ind,
                     "Liste des indicateurs recherchés", [0.6, 2, 3, 1.6, 1.4], 9),
-        ] + ([p(f"**{indice['libelle']}** : " + TYPES['indice']['calcul'] + " Composantes : "
-                + "; ".join(noms.get(c, c) for c in indice.get("composantes", [])) + ".", "encadre")] if indice else []),
+        ] + ([p(f"**{indice['libelle']}** : " + (TYPES['indice']['calcul'] + " Composantes : "
+                + "; ".join(noms.get(c, c) for c in indice["composantes"]) + "." if indice.get("composantes")
+                else indice.get("definition", "")), "encadre")] if indice else []),
             source="auto"),
         section("architecture", "5. Architecture du questionnaire", [
             p("Le questionnaire est organisé en blocs thématiques, précédés d'un bloc d'identification (zone, profil) et suivis d'une clôture. "

@@ -13,7 +13,7 @@ ENTETE_FILL = PatternFill("solid", fgColor=MARINE)
 ENTETE_FONT = Font(bold=True, color="FFFFFF", name="Calibri")
 OBLIGATOIRE = "Réponse obligatoire."
 FICHIER_ENQUETEURS = "liste_enqueteurs.csv"
-EXCLUSIVES = (NSP_CODE, "aucun", "aucune", "non")
+EXCLUSIVES = (NSP_CODE, "nsp", "aucun", "aucune", "non")
 
 
 def _feuille(ws, colonnes, lignes, largeurs=None):
@@ -211,6 +211,9 @@ def xlsform(chemin, projet, quest, cadrage=None, enqueteurs=None):
         if q["id"] == "id_profil":
             ligne(type="note", name="hors_cible", label="**Merci.** Ce baromètre ne concerne pas votre fonction.",
                   relevant=f"${{{var}}} = 'autre_hors'")
+        if q.get("exclut"):
+            ligne(type="note", name=f"{var}_fin", label="**Merci.** Votre entreprise n'entre pas dans le champ de ce baromètre.",
+                  relevant=" or ".join(f"${{{var}}} = '{c}'" for c in q["exclut"]))
 
     ligne(type="start", name="start")
     ligne(type="end", name="end")
@@ -226,7 +229,10 @@ def xlsform(chemin, projet, quest, cadrage=None, enqueteurs=None):
     eligibilite_ouverte = False
     for s in quest["sections"]:
         if s["lettre"] != "A" and q_profil and not eligibilite_ouverte:
-            ligne(type="begin_group", name="grp_eligible", relevant=f"${{{q_profil['var']}}} != 'autre_hors'")
+            # éligibilité : fonction dans la cible et aucune réponse d'exclusion (ex. chiffre d'affaires sous le seuil)
+            regles = [f"${{{q_profil['var']}}} != 'autre_hors'"] + [f"${{{x['var']}}} != '{c}'" for x in quest["questions_plates"]
+                                                                      if x.get("section") == "A" for c in x.get("exclut") or []]
+            ligne(type="begin_group", name="grp_eligible", relevant=" and ".join(regles))
             eligibilite_ouverte = True
         ligne(type="begin_group", name=f"sec_{s['lettre'].lower()}", label=f"**Section {s['lettre']} : {s['titre']}**")
         for q in s["ids"]:
