@@ -432,7 +432,12 @@ function panneauEtape(cle) {
   if (st === "a_generer") actions = `<button class="btn btn-primaire" data-act="generer">${ico("play")} Générer</button>`;
   if (st === "obsolete") actions = `<button class="btn btn-primaire" data-act="generer">${ico("refresh")} Mettre à jour</button>`;
   if (st === "brouillon") actions = `<button class="btn" data-act="regenerer" title="Repartir de zéro">${ico("refresh")} Régénérer</button><button class="btn btn-succes" data-act="valider">${ico("check")} Valider</button>`;
-  if (st === "valide") actions = `<button class="btn" data-act="rouvrir">${ico("unlock")} Rouvrir pour corriger</button>`;
+  if (st === "valide") {
+    // étape validée : on peut toujours passer à la suivante (la clôture après le rapport)
+    const suiv = ORDRE[ORDRE.indexOf(cle) + 1];
+    actions = `<button class="btn" data-act="rouvrir">${ico("unlock")} Rouvrir pour corriger</button>`
+      + (suiv ? `<button class="btn btn-primaire" data-suivant="${suiv}">${suiv === "cloture" ? "Passer à la clôture" : `Étape suivante : ${esc(ETAPES_INFO[suiv].court)}`} ${ico("back").replace("<svg", '<svg style="transform:scaleX(-1)"')}</button>` : "");
+  }
   const prec = ORDRE[num - 1];
   const redac = e.data && e.data.redaction;
   const large = genere && ["parametres", "redaction", "recrutement", "tableau"].includes(S.onglet);
@@ -446,6 +451,7 @@ function panneauEtape(cle) {
       <div id="contenu-etape" class="contenu-etape">${genere ? "" : introEtape(cle, st, prec)}</div>
     </div>${colonneDroite(genere ? e : null)}</div>`;
   document.querySelectorAll("[data-act]").forEach((b) => (b.onclick = () => agir(b, cle, b.dataset.act)));
+  document.querySelectorAll("[data-suivant]").forEach((b) => (b.onclick = () => aller(b.dataset.suivant)));
   document.querySelectorAll("[data-o]").forEach((b) => (b.onclick = async () => {
     if (S.sale && !(await confirmer("Modifications non enregistrées", "Changer d'onglet sans enregistrer ?", "Continuer", "btn-danger"))) return;
     S.sale = false; S.travail = null; S.docTravail = null;
