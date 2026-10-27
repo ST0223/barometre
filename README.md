@@ -29,7 +29,7 @@ pour prendre en compte une mise à jour du code, fermez d'abord la fenêtre du s
 | **Paramètres** | Textes du cabinet et coûts unitaires de référence |
 
 Les animations respectent le réglage système « réduire les animations ».
-Thème clair ou sombre : bouton dans le menu (Auto suit le réglage de Windows, puis Clair, puis Sombre) ; les aperçus de documents restent sur fond blanc.
+Thème clair ou sombre : Paramètres › Apparence, ou bouton dans le menu (Auto suit le réglage de Windows) ; les aperçus de documents restent sur fond blanc.
 
 ## La chaîne de production
 

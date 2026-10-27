@@ -126,6 +126,8 @@ function appliquerTheme(t) {
   try { if (t === "auto") localStorage.removeItem("theme"); else localStorage.setItem("theme", t); } catch (e) { /* stockage indisponible */ }
   const b = $("#theme");
   if (b) { const [, i, l] = THEMES.find((x) => x[0] === t); b.innerHTML = ico(i); b.title = `${l} — cliquer pour changer`; b.setAttribute("aria-label", l); }
+  // choix de la page Paramètres, s'il est affiché
+  document.querySelectorAll("[data-theme-choix]").forEach((x) => x.classList.toggle("actif", x.dataset.themeChoix === t));
 }
 document.addEventListener("DOMContentLoaded", () => {
   appliquerTheme(themeActuel());
@@ -1322,7 +1324,12 @@ function vueParametres(app) {
       <div class="engrenages" aria-hidden="true"><i></i><i></i><i></i></div>
       <span class="sur" data-reveal="haut">Configuration</span><h1 class="titre-section-l" data-reveal="haut" data-delai="60">Paramètres</h1>
       <p class="aide-l" data-reveal="haut" data-delai="120" style="margin-bottom:22px">${IA_VISIBLE ? "Rédaction assistée, textes de présentation du cabinet et coûts unitaires de référence." : "Textes de présentation du cabinet et coûts unitaires de référence."}</p>
-      <div class="carte neon" style="margin-bottom:16px" ${IA_VISIBLE ? "" : "hidden"}><div class="carte-titre"><h3>${ico("sparkle")} Rédaction assistée par Claude</h3><span class="badge-ia ${P.ia_active && P.cle_definie ? "on" : ""}">${P.ia_active && P.cle_definie ? "Active" : "Inactive"}</span></div>
+      <div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>${ico("lune")} Apparence</h3></div><div class="carte-corps">
+        <p class="aide" style="margin-top:0">Thème de la plateforme sur ce poste. Les aperçus des documents restent sur fond blanc.</p>
+        <div class="choix-theme">${[["auto", "ecran", "Automatique", "suit le réglage de Windows"], ["clair", "soleil", "Clair", "fond blanc"], ["sombre", "lune", "Sombre", "fond bleu nuit"]]
+          .map(([t, i, l, d]) => `<button type="button" class="${themeActuel() === t ? "actif" : ""}" data-theme-choix="${t}">${ico(i)}<b>${l}</b><small>${d}</small></button>`).join("")}</div>
+      </div></div>
+      <div class="carte neon" style="margin-bottom:16px" ${IA_VISIBLE ? "": "hidden"}><div class="carte-titre"><h3>${ico("sparkle")} Rédaction assistée par Claude</h3><span class="badge-ia ${P.ia_active && P.cle_definie ? "on" : ""}">${P.ia_active && P.cle_definie ? "Active" : "Inactive"}</span></div>
         <div class="carte-corps">
           <p class="aide" style="margin-top:0">Sans IA, la plateforme rédige à partir de règles et d'une banque d'indicateurs Datatym. Avec une clé API Anthropic, Claude propose des indicateurs et des textes adaptés au thème, puis rédige les messages clés du rapport. Tout reste relu et validé par le cabinet.</p>
           <div class="grille-2">
@@ -1346,6 +1353,7 @@ function vueParametres(app) {
       </div></div>
     </div>`;
   A.reveler(app);
+  app.querySelectorAll("[data-theme-choix]").forEach((x) => (x.onclick = () => appliquerTheme(x.dataset.themeChoix)));
   const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value,
     couts_unitaires: P.couts_unitaires.map((c, k) => ({ cle: c.cle, valeur: Number(app.querySelector(`[data-cu-ref="${k}"]`).value) || 0 })) });
   app.querySelectorAll("[data-enr-params]").forEach((b) => (b.onclick = (e) => occupe(e.currentTarget, async () => {

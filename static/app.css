@@ -403,3 +403,13 @@ select.saisie { padding-right: 28px; }
 .cl-historique { display: flex; flex-direction: column; gap: 14px; max-height: 520px; overflow: auto; padding-right: 6px; }
 .cl-jour h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--encre); }
 .tag.ok { background: var(--vert-50); color: var(--vert); }
+
+/* choix du thème (Paramètres) */
+.choix-theme { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.choix-theme button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 16px; border-radius: var(--rayon);
+  border: 1.5px solid var(--bord-2); background: var(--carte); color: var(--texte); cursor: pointer; text-align: left; transition: border-color .2s, box-shadow .2s; }
+.choix-theme button:hover { border-color: var(--bleu); }
+.choix-theme button.actif { border-color: var(--bleu); box-shadow: 0 0 0 3px var(--bleu-50); }
+.choix-theme button svg { width: 20px; height: 20px; color: var(--bleu); margin-bottom: 4px; }
+.choix-theme button small { color: var(--texte-3); font-size: 12px; }
+@media (max-width: 760px) { .choix-theme { grid-template-columns: 1fr; } }
