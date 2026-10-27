@@ -324,3 +324,15 @@ select.saisie { padding-right: 28px; }
   .grille-2, .grille-3, .kpis-tb, .grille-tb { grid-template-columns: 1fr; }
   .page { padding: 28px 22px; }
 }
+
+/* carte de suivi par pays */
+.carte-suivi { display: block; width: 100%; height: auto; max-height: 420px; }
+.carte-suivi .cs-fond { fill: #EEF1F5; stroke: #fff; stroke-width: 1.2; }
+.carte-suivi .cs-pays { stroke: #fff; stroke-width: 1.5; transition: opacity .2s; }
+.carte-suivi .cs-pays:hover { opacity: .8; }
+.carte-suivi .cs-etiq { font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; fill: var(--texte); pointer-events: none; paint-order: stroke; stroke: rgba(255, 255, 255, .85); stroke-width: 3px; }
+.carte-suivi .cs-etiq.clair { fill: #fff; stroke: rgba(8, 31, 92, .55); }
+.legende-carte { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; color: var(--texte-2); }
+.legende-carte i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; }
+.grille-tb.grille-carte { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 1100px) { .grille-tb.grille-carte { grid-template-columns: 1fr; } }

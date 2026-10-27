@@ -39,7 +39,7 @@ Les animations respectent le réglage système « réduire les animations ».
 | 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteurs.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro ; conditions d'affichage entre questions, questions de profil avec exclusion (ex. chiffre d'affaires sous le seuil) |
 | 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
 | 4. Méthodologie | Note méthodologique, assemblée depuis les étapes 1 à 3 |
-| 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées |
+| 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées : avancement cumulé, carte des pays, suivi par pays, par secteur, par profil et par collecteur, quotas, incidents |
 | 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité, bilan financier prévu contre réalisé |
 | 7. Rapport d'analyse | Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés |
 

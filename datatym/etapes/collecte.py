@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 
 from ..banque import NSP_CODE, code_zone, slug
+from ..outils import repartir
 from ..store import dossier
 
 COLONNES_SYSTEME = {"start", "end", "today", "_submission_time", "duree_minutes", "enqueteur", "consentement", "_id", "_uuid"}
@@ -125,6 +126,35 @@ def _norm(texte):
     return re.sub(r"[^a-z0-9]+", " ", slug(str(texte or ""), " ", 400)).strip()
 
 
+MOTS_VIDES = {"et", "de", "des", "du", "la", "le", "les", "l", "d", "a", "au", "aux", "en", "ou", "pour", "par", "sur", "preciser"}
+
+
+def _mots(texte):
+    return [w for w in _norm(texte).split() if w not in MOTS_VIDES]
+
+
+def correspondance(texte, modalites):
+    """Code de la modalité qui correspond à un libellé reçu, malgré les écarts de rédaction :
+    ponctuation (« Côte dIvoire »), séparateurs (« Banque et microfinance » / « Banque – microfinance »),
+    précision ajoutée (« Directeur général / DGA »), sigle (« Directeur des ressources humaines » / « DRH »)."""
+    compact = _norm(texte).replace(" ", "")
+    if not compact:
+        return None
+    mots = set(_mots(texte))
+    for m in modalites:
+        if _norm(m["label"]).replace(" ", "") == compact:
+            return m["code"]
+    egaux = [m for m in modalites if set(_mots(m["label"])) == mots]
+    if len(egaux) == 1:
+        return egaux[0]["code"]
+    inclus = [m for m in modalites if _mots(m["label"]) and (set(_mots(m["label"])) <= mots or (mots and mots <= set(_mots(m["label"]))))]
+    if len(inclus) == 1:
+        return inclus[0]["code"]
+    sigle = "".join(w[0] for w in _mots(texte))
+    sigles = [m for m in modalites if _norm(m["label"]).replace(" ", "") == sigle or "".join(w[0] for w in _mots(m["label"])) == compact]
+    return sigles[0]["code"] if len(sigles) == 1 else None
+
+
 def _lire_questionpro(env, cle_api, enquete):
     """Toutes les réponses d'une enquête QuestionPro (API v2, pagination comprise)."""
     reponses, page = [], 1
@@ -194,13 +224,19 @@ def convertir_questionpro(reponses, quest):
                 ignorees.add(item.get("questionText") or item.get("questionCode") or str(item.get("questionID")))
                 continue
             codes, autre = [], ""
-            par_label = {_norm(m["label"]): m["code"] for m in q.get("modalites", [])}
+            mods = q.get("modalites", [])
             for v in valeurs:
                 val = v.get("value") or {}
+                if q["id"] == "id_enqueteur" and q["type"] == "select_one":
+                    # collecteur : son code s'il figure au plan, sinon son nom tel que saisi dans l'outil
+                    nom = " ".join(re.sub(r"\s*\(.*?\)\s*", " ", str(v.get("answerText") or "")).split())
+                    codes.append(correspondance(nom, mods) or nom)
+                    continue
                 if q["type"] in ("select_one", "select_multiple"):
-                    code = par_label.get(_norm(v.get("answerText")))
+                    code = correspondance(v.get("answerText"), mods)
                     if code is None and _norm(v.get("answerText")).startswith("autre"):
-                        code = "autre"
+                        codes_q = {m["code"] for m in mods}
+                        code = "autre_hors" if "autre_hors" in codes_q and "autre" not in codes_q else "autre"
                     if code:
                         codes.append(code)
                     if val.get("other"):
@@ -337,6 +373,26 @@ def valides(df, quest):
     return d
 
 
+def collecteurs(df, v, quest, ech):
+    """Activité de chaque collecteur tel qu'enregistré dans les réponses (code du plan ou nom saisi dans l'outil)."""
+    v_enq, v_zone, _ = variables_cles(quest)
+    col = "enqueteur" if "enqueteur" in df else v_enq
+    if col not in df:
+        return []
+    noms = {m["code"]: m["nom"] for m in ech["enqueteurs"]}
+    q_zone = next((x for x in quest["questions_plates"] if x["id"] == "id_zone"), {})
+    lib_zone = {m["code"]: m["label"] for m in q_zone.get("modalites", [])}
+    res = []
+    for cle, recus in df.groupby(df[col].fillna("").astype(str).str.strip()):
+        bons = v[v[col].fillna("").astype(str).str.strip() == cle] if col in v else v.iloc[0:0]
+        pays = bons[v_zone].map(lambda c: lib_zone.get(c, c)).value_counts() if v_zone in bons else pd.Series(dtype=int)
+        dates = [d for d in (bons["end"] if "end" in bons else pd.Series(dtype=str)).map(_date) if d]
+        res.append({"nom": noms.get(cle, cle) or "Non renseigné", "recus": len(recus), "valides": len(bons),
+                    "ecartes": len(recus) - len(bons), "pays": [f"{p} ({n})" for p, n in pays.head(3).items() if p],
+                    "dernier": max(dates).isoformat() if dates else None})
+    return sorted(res, key=lambda x: (-x["valides"], x["nom"]))
+
+
 def tableau_de_bord(projet, quest, ech):
     df = lire(projet)
     if df is None or df.empty:
@@ -373,11 +429,21 @@ def tableau_de_bord(projet, quest, ech):
     for z, c, obj in ech["quotas"]:
         r = int(((v.get(v_zone, "") == code_zone(z)) & (v.get(v_prof, "") == c)).sum()) if v_zone in v and v_prof in v else 0
         quotas.append({"zone": z, "profil": lib.get(c, c), "code": c, "objectif": obj, "realise": r, "taux": round(100 * r / obj, 1) if obj else 0})
-    par_zone = [{"zone": z, "objectif": ech["tot_zone"][z], "realise": sum(q["realise"] for q in quotas if q["zone"] == z)} for z in ech["zones"]]
+    par_zone = [{"zone": z, "code": code_zone(z), "objectif": ech["tot_zone"][z], "realise": sum(q["realise"] for q in quotas if q["zone"] == z)}
+                for z in ech["zones"]]
     par_profil = [{"profil": lib[c], "code": c, "objectif": sum(q["objectif"] for q in quotas if q["code"] == c),
                    "realise": sum(q["realise"] for q in quotas if q["code"] == c)} for c in lib]
-    for x in par_zone + par_profil:
+    # secteurs : pas de quota par secteur dans le plan, objectif réparti à parts égales
+    q_sect = next((x for x in quest["questions_plates"] if x["id"] == "id_secteur"), None)
+    par_secteur = []
+    if q_sect:
+        objectifs = repartir(projet["fiche"]["taille"], [1] * len(q_sect["modalites"]))
+        for m, obj in zip(q_sect["modalites"], objectifs):
+            par_secteur.append({"secteur": m["label"], "code": m["code"], "objectif": obj,
+                                "realise": int((v.get(q_sect["var"], pd.Series(dtype=str)) == m["code"]).sum())})
+    for x in par_zone + par_profil + par_secteur:
         x["taux"] = round(100 * x["realise"] / x["objectif"], 1) if x["objectif"] else 0
+    par_collecteur = collecteurs(df, v, quest, ech)
     par_jour, cr, cp = [], 0, 0
     for i, j in enumerate(jours):
         r = int(sum(1 for d in dates if d == j))
@@ -387,7 +453,9 @@ def tableau_de_bord(projet, quest, ech):
         par_jour.append({"date": j.isoformat(), "realise": r, "prevu": prev, "cumul_realise": cr, "cumul_prevu": cp, "passe": i <= idx_ref})
 
     incidents = []
-    for e in par_enq:
+    # le plan ne sert de référence que si les collecteurs saisis sont ceux du plan (Enq1, Enq2… ou noms définitifs)
+    plan_suivi = any(e["realise"] for e in par_enq)
+    for e in (par_enq if plan_suivi else []):
         if e["prevu"] and e["realise"] < 0.8 * e["prevu"]:
             incidents.append(f"{e['nom']} ({e['zone']}) : {e['realise']} réalisés pour {e['prevu']} prévus à date ({e['ecart']:+d}).")
     for q in quotas:
@@ -405,7 +473,8 @@ def tableau_de_bord(projet, quest, ech):
         "brut": total_brut, "refus": refus, "hors_cible": hors, "rapides": rapides,
         "taux_completion": round(100 * n / total_brut, 1) if total_brut else 0,
         "duree_mediane": round(med, 1) if med else None,
-        "par_enqueteur": par_enq, "par_zone": par_zone, "par_profil": par_profil, "quotas": quotas, "par_jour": par_jour,
+        "par_enqueteur": par_enq if plan_suivi else [], "par_zone": par_zone, "par_profil": par_profil, "par_secteur": par_secteur,
+        "par_collecteur": par_collecteur, "quotas": quotas, "par_jour": par_jour,
         "incidents": incidents,
         # questions du questionnaire actuel sans colonne dans les données (données importées avant une modification)
         "variables_absentes": [q["var"] for q in quest["questions_plates"] if q["var"] not in df.columns],
@@ -416,5 +485,8 @@ def tableau_de_bord(projet, quest, ech):
 
 def generer(projet, precedent=None):
     prec = precedent or {}
-    return {"source": prec.get("source", ""), "kobo": prec.get("kobo", {"serveur": "https://kf.kobotoolbox.org", "asset": ""}),
+    data = {"source": prec.get("source", ""), "kobo": prec.get("kobo", {"serveur": "https://kf.kobotoolbox.org", "asset": ""}),
             "stats": prec.get("stats")}
+    if prec.get("questionpro"):
+        data["questionpro"] = prec["questionpro"]  # enquête et centre de données : la resynchronisation en dépend
+    return data

@@ -1045,14 +1045,32 @@ function ongletTableau(z, e) {
     <div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>Avancement cumulé</h3>
       <div class="legende-graph"><span><i style="background:var(--marine)"></i>Prévu</span><span><i style="background:var(--bleu)"></i>Réalisé</span></div></div>
       <div class="carte-corps">${graphCumul(s)}</div></div>
+    ${(s.par_zone || []).some((x) => typeof CARTE_AFRIQUE !== "undefined" && CARTE_AFRIQUE.pays[x.code]) ? `
+    <div class="grille-tb grille-carte">
+      <div class="carte"><div class="carte-titre"><h3>Carte des pays</h3><span class="aide" style="font-size:11.5px">part de l'objectif atteinte</span></div>
+        <div class="carte-corps">${carteSuivi(s.par_zone)}</div></div>
+      <div class="carte"><div class="carte-titre"><h3>Par pays</h3></div>
+        <div class="carte-corps barres">${[...s.par_zone].sort((a, b) => b.taux - a.taux).map((x) => barre(x.zone, x.realise, x.objectif)).join("")}</div></div>
+    </div>` : ""}
     <div class="grille-tb">
-      <div class="carte"><div class="carte-titre"><h3>Par enquêteur</h3><span class="aide" style="font-size:11.5px">trait = prévu à date</span></div>
-        <div class="carte-corps barres">${s.par_enqueteur.map((x) => barre(`${x.nom} · ${x.zone}`, x.realise, x.objectif, x.prevu)).join("")}</div></div>
+      ${(s.par_secteur || []).length ? `<div class="carte"><div class="carte-titre"><h3>Par secteur</h3><span class="aide" style="font-size:11.5px">objectif réparti à parts égales</span></div>
+        <div class="carte-corps barres">${[...s.par_secteur].sort((a, b) => b.realise - a.realise).map((x) => barre(x.secteur, x.realise, x.objectif)).join("")}</div></div>` : ""}
+      <div class="carte"><div class="carte-titre"><h3>Par profil de dirigeant</h3></div>
+        <div class="carte-corps barres">${s.par_profil.map((x) => barre(x.profil, x.realise, x.objectif)).join("")}
+          ${s.hors_cible ? `<p class="aide" style="margin:6px 0 0;font-size:12px">${s.hors_cible} réponse(s) hors cible (autre fonction ou entreprise sous le seuil), non comptées.</p>` : ""}</div></div>
+    </div>
+    ${(s.par_collecteur || []).length ? `<div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>Collecteurs</h3><span class="aide" style="font-size:11.5px">tels qu'enregistrés dans les réponses</span></div>
+      <div class="carte-corps"><div class="grille-tab"><table><thead><tr><th>Collecteur</th><th style="text-align:right">Valides</th><th style="text-align:right">Reçus</th><th style="text-align:right">Écartés</th><th>Pays principaux</th><th>Dernier envoi</th></tr></thead><tbody>
+        ${s.par_collecteur.map((c) => `<tr><td><b>${esc(c.nom)}</b></td><td style="text-align:right">${c.valides}</td><td style="text-align:right">${c.recus}</td><td style="text-align:right">${c.ecartes || "–"}</td><td>${esc(c.pays.join(", ")) || "–"}</td><td>${c.dernier ? dateFr(c.dernier) : "–"}</td></tr>`).join("")}
+      </tbody></table></div></div></div>` : ""}
+    <div class="grille-tb">
+      ${s.par_enqueteur.length ? `<div class="carte"><div class="carte-titre"><h3>Par enquêteur du plan</h3><span class="aide" style="font-size:11.5px">trait = prévu à date</span></div>
+        <div class="carte-corps barres">${s.par_enqueteur.map((x) => barre(`${x.nom} · ${x.zone}`, x.realise, x.objectif, x.prevu)).join("")}</div></div>` : ""}
       <div class="carte"><div class="carte-titre"><h3>Quotas zone × profil</h3></div>
         <div class="carte-corps"><table class="carte-chaleur"><thead><tr><th></th>${profs.map((p) => `<th>${esc(p)}</th>`).join("")}</tr></thead><tbody>
           ${zones.map((zn) => `<tr><th>${esc(zn)}</th>${profs.map((p) => { const q = s.quotas.find((x) => x.zone === zn && x.profil === p); return `<td style="background:${coul(q.taux)}22;color:${q.taux >= 100 ? "#0A6B4B" : "#1B2333"}" title="${q.taux} %">${q.realise}/${q.objectif}</td>`; }).join("")}</tr>`).join("")}
         </tbody></table>
-        <div class="barres" style="margin-top:16px">${s.par_zone.map((x) => barre(x.zone, x.realise, x.objectif)).join("")}${s.par_profil.map((x) => barre(x.profil, x.realise, x.objectif)).join("")}</div></div></div>
+        </div></div>
     </div>
     <div class="carte"><div class="carte-titre"><h3>Incidents et qualité des données</h3></div>
       <div class="carte-corps">${s.incidents.length ? `<ul class="incidents" style="margin:0;padding-left:18px">${s.incidents.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>` : `<span class="aide">Aucun incident relevé.</span>`}</div></div>`;
@@ -1078,6 +1096,25 @@ function ongletTableau(z, e) {
       if (nouveaux > 0) majProjet(r, `${nouveaux} nouvelle(s) soumission(s) reçue(s).`);
     } catch (err) { /* nouvel essai au prochain passage */ }
   }, 5 * 60 * 1000);
+}
+
+// Carte de suivi : part de l'objectif atteinte par pays, une seule teinte du clair au foncé
+const PALIERS_CARTE = [[25, "#DCEBFA"], [50, "#A6CFF3"], [75, "#5FA9E8"], [100, "#1F7FD1"], [Infinity, "#0B4F8A"]];
+function carteSuivi(parZone) {
+  const C = CARTE_AFRIQUE;
+  const etude = Object.fromEntries(parZone.filter((x) => C.pays[x.code]).map((x) => [x.code, x]));
+  const teinte = (t) => PALIERS_CARTE.find(([max]) => t < max)[1];
+  // cadrage sur les pays de l'étude, avec une marge
+  const boites = Object.keys(etude).map((c) => C.pays[c].match(/-?\d+(\.\d+)?,-?\d+(\.\d+)?/g).map((p) => p.split(",").map(Number)));
+  const xs = boites.flat().map((p) => p[0]), ys = boites.flat().map((p) => p[1]);
+  const m = 30, x0 = Math.max(0, Math.min(...xs) - m), y0 = Math.max(0, Math.min(...ys) - m);
+  const w = Math.min(C.largeur, Math.max(...xs) + m) - x0, h = Math.min(C.hauteur, Math.max(...ys) + m) - y0;
+  const fond = Object.entries(C.pays).filter(([c]) => !etude[c]).map(([c, d]) => `<path d="${d}" class="cs-fond"><title>${esc(C.noms[c])}</title></path>`).join("");
+  const pays = Object.entries(etude).map(([c, x]) => `<path d="${C.pays[c]}" class="cs-pays" style="fill:${teinte(x.taux)}"><title>${esc(x.zone)} : ${x.realise} / ${x.objectif} (${nf(x.taux)} %)</title></path>`).join("");
+  const etiq = Object.entries(etude).map(([c, x]) => { const [cx, cy] = C.centres[c]; return `<text x="${cx}" y="${cy}" class="cs-etiq${x.taux >= 75 ? " clair" : ""}">${nf(x.taux)} %</text>`; }).join("");
+  const legende = PALIERS_CARTE.map(([max, coul], k) => `<span><i style="background:${coul}"></i>${k === 0 ? "< 25 %" : max === Infinity ? "≥ 100 %" : `${PALIERS_CARTE[k - 1][0]}–${max} %`}</span>`).join("");
+  return `<svg class="carte-suivi" viewBox="${x0} ${y0} ${w} ${h}" role="img" aria-label="Carte de l'avancement par pays">${fond}${pays}${etiq}</svg>
+    <div class="legende-carte">${legende}</div>`;
 }
 
 function graphCumul(s) {
