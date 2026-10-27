@@ -47,8 +47,8 @@ body[data-page="accueil"] .principal { padding-bottom: 0; }
 .nav-marque img { height: 30px; display: block; }
 .logo-sombre { display: none !important; }
 .nav-liens { display: flex; gap: 4px; margin: 0 auto; }
-.nav-liens a { position: relative; padding: 8px 14px; border-radius: 10px; color: var(--texte-2); font-weight: 600; font-size: 13.5px; transition: color .2s; }
-.nav-liens a::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--bleu); transform: scaleX(0); transition: transform .35s var(--ease); }
+.nav-liens a { position: relative; padding: 8px 16px; border-radius: 10px; color: var(--texte-2); font-weight: 600; font-size: 15.5px; white-space: nowrap; transition: color .2s; }
+.nav-liens a::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--bleu); transform: scaleX(0); transition: transform .35s var(--ease); }
 .nav-liens a:hover { color: var(--texte); }
 .nav-liens a.actif { color: var(--abysse); }
 .nav-liens a.actif::after, .nav-liens a:hover::after { transform: scaleX(1); }
@@ -604,6 +604,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
    Adaptation et mouvement réduit
    ========================================================================== */
 @media (max-width: 1100px) {
+  .nav-liens a { font-size: 14px; padding: 8px 10px; }
+  .nav-liens a::after { left: 10px; right: 10px; }
   .hero2-contenu, .cabinet, .methode, .etude-corps { grid-template-columns: 1fr; }
   .pile3d { height: 440px; }
   .piliers { grid-template-columns: repeat(3, 1fr); }
@@ -616,6 +618,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
   .chaine2 { grid-template-columns: repeat(4, 1fr); row-gap: 16px; }
   .chaine2-rail { display: none; }
   .num-geant { display: none; }
+}
+@media (max-width: 880px) {
+  .nav { gap: 16px; }
+  .nav-liens a { font-size: 13px; padding: 8px 8px; }
+  .nav-liens a::after { left: 8px; right: 8px; }
 }
 @media (max-width: 760px) {
   .nav-liens { display: none; }
