@@ -23,7 +23,7 @@ const MODELES = [
 const PHASES = [
   { n: "01", mot: "CADRER", titre: "Note de cadrage", desc: "Contexte, objectifs, cible, champ et taille visée. Surtout : la liste des indicateurs recherchés, base de tout le reste.", liv: ["Note de cadrage", "Indicateurs", "Précision statistique"], ic: "target", c: "#0087E0" },
   { n: "02", mot: "QUESTIONNER", titre: "Questionnaire", desc: "Des questions simples tirées des indicateurs, adaptées à chaque profil, en version terrain et digitale, en 15 minutes au plus.", liv: ["Terrain et digital", "Dictionnaire", "XLSForm Kobo", "QuestionPro"], ic: "edit", c: "#334EAC" },
-  { n: "03", mot: "ÉCHANTILLONNER", titre: "Plan de terrain", desc: "Quotas par zone et par profil, répartition par enquêteur, calendrier jour par jour, budget, recrutement et formation.", liv: ["Quotas", "Calendrier", "Recrutement", "Formation PowerPoint"], ic: "users", c: "#00B4D8" },
+  { n: "03", mot: "ÉCHANTILLONNER", titre: "Plan de terrain", desc: "Quotas par zone et par profil, répartition par enquêteur, calendrier jour par jour, budget, recrutement et formation.", liv: ["Quotas", "Calendrier", "Budget de collecte", "Recrutement", "Formation PowerPoint"], ic: "users", c: "#00B4D8" },
   { n: "04", mot: "DOCUMENTER", titre: "Note méthodologique", desc: "La méthode consolidée automatiquement : échantillonnage, questionnaire, mode de calcul de chaque indicateur, outils.", liv: ["Note méthodologique"], ic: "file", c: "#7096D1" },
   { n: "05", mot: "COLLECTER", titre: "Suivi de la collecte", desc: "Les soumissions alimentent un tableau de bord : avancement par enquêteur, par zone et par quota, écarts au calendrier.", liv: ["Tableau de bord", "Base des soumissions"], ic: "chart", c: "#0077B6" },
   { n: "06", mot: "CONTRÔLER", titre: "Note de suivi", desc: "Réalisé contre prévu, taux de complétion, refus, entretiens trop rapides, incidents : la qualité des données, documentée.", liv: ["Note de suivi des enquêtes"], ic: "check", c: "#081F5C" },
@@ -71,7 +71,7 @@ function vueAccueil(app) {
           <button class="btn btn-verre" data-defile="cabinet">Découvrir le cabinet</button>
         </div>
         <div class="hero2-chiffres">
-          ${[[7, "paramètres à saisir"], [8, "livrables produits"], [15, "minutes au plus par questionnaire"], [100, "% des documents modifiables"]]
+          ${[[7, "paramètres à saisir"], [16, "livrables produits"], [15, "minutes au plus par questionnaire"], [100, "% des documents modifiables"]]
             .map(([v, l], k) => `<div data-reveal="haut" data-delai="${800 + k * 90}"><b data-compte="${v}">0</b><span>${l}</span></div>`).join("")}
         </div>
       </div>
@@ -169,7 +169,7 @@ function vueAccueil(app) {
       <i class="cr hg"></i><i class="cr hd"></i><i class="cr bg"></i><i class="cr bd"></i>
       <span class="cc-gauche">(LANCER)</span><span class="cc-centre">${ico("play")}</span><span class="cc-droite">UNE ÉTUDE</span>
     </a>
-    <p data-reveal="haut">Sept paramètres. Huit livrables. Zéro ressaisie.</p>
+    <p data-reveal="haut">Sept paramètres. Seize livrables. Zéro ressaisie.</p>
   </section>
 
   <footer class="pied">
