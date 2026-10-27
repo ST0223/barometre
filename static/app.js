@@ -44,7 +44,7 @@ const ONGLETS = {
   questionnaire: [["apercu", "Aperçu", "eye"], ["parametres", "Questions", "edit"], ["redaction", "Rédaction", "file"]],
   echantillonnage: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["recrutement", "Recrutement", "users"], ["redaction", "Rédaction", "edit"]],
   methodologie: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["redaction", "Rédaction", "edit"]],
-  collecte: [["tableau", "Tableau de bord", "chart"], ["import", "Données", "upload"]],
+  collecte: [["tableau", "Tableau de bord", "chart"], ["indicateurs", "Indicateurs", "target"], ["import", "Données", "upload"]],
   suivi: [["apercu", "Aperçu", "eye"], ["parametres", "Observations", "edit"], ["bilan", "Bilan financier", "coin"], ["redaction", "Rédaction", "file"]],
   rapport: [["apercu", "Aperçu", "eye"], ["redaction", "Rédaction", "edit"], ["parametres", "Paramètres", "settings"]],
 };
@@ -508,7 +508,7 @@ function contenuOnglet(cle) {
   if (o === "redaction") return ongletRedaction(z, cle, e);
   const f = {
     cadrage: editeurIndicateurs, questionnaire: editeurQuestions, echantillonnage: o === "recrutement" ? editeurRecrutement : editeurEchantillonnage,
-    methodologie: editeurMethodo, suivi: o === "bilan" ? editeurBilan : editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : ongletTableau,
+    methodologie: editeurMethodo, suivi: o === "bilan" ? editeurBilan : editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : o === "indicateurs" ? ongletIndicateurs : ongletTableau,
   }[cle];
   const div = document.createElement("div");
   z.appendChild(div);
@@ -1130,6 +1130,47 @@ function carteSuivi(parZone) {
   const legende = PALIERS_CARTE.map(([max, coul], k) => `<span><i style="background:${coul}"></i>${k === 0 ? "< 25 %" : max === Infinity ? "≥ 100 %" : `${PALIERS_CARTE[k - 1][0]}–${max} %`}</span>`).join("");
   return `<svg class="carte-suivi" viewBox="${x0} ${y0} ${w} ${h}" role="img" aria-label="Carte de l'avancement par pays">${fond}${pays}${etiq}</svg>
     <div class="legende-carte">${legende}</div>`;
+}
+
+// Indicateurs de la note de cadrage calculés en direct sur les réponses renseignées
+async function ongletIndicateurs(z, e, cle, filtre = S.filtreInd || "") {
+  z.className = "carte-corps";
+  z.innerHTML = `<div class="chargement"></div>`;
+  let d;
+  try { d = await api("GET", `/api/projets/${S.projet.slug}/collecte/indicateurs?filtre=${encodeURIComponent(filtre)}`); }
+  catch (err) { z.innerHTML = `<div class="bandeau alerte">${ico("alert")}<div>${esc(err.message)}</div></div>`; return; }
+  if (!d.n && !filtre) {
+    z.innerHTML = `<div class="vide">${ico("target")}<div>Aucune réponse importée : les indicateurs se calculeront dès la première synchronisation.</div></div>`;
+    return;
+  }
+  const noms = { zone: "Pays", profil: "Fonction", secteur: "Secteur" };
+  const select = `<select class="saisie petite" id="ind-filtre" style="width:auto;min-width:220px"><option value="">Ensemble des répondants</option>
+    ${Object.entries(d.options).map(([k, l]) => `<optgroup label="${noms[k]}">${l.map((m) => `<option value="${k}:${esc(m.code)}" ${filtre === `${k}:${m.code}` ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</optgroup>`).join("")}</select>`;
+  const inds = d.indicateurs.filter((i) => i.type !== "indice");
+  const avec = inds.filter((i) => i.n), sans = inds.filter((i) => !i.n);
+  const blocs = [...new Set(avec.map((i) => i.bloc))];
+  const carte = (i) => {
+    const mods = i.type === "multiple" ? [...i.modalites].sort((a, b) => b.pct - a.pct) : i.modalites;
+    const max = Math.max(...mods.map((m) => m.pct), 1);
+    return `<div class="ind-carte">
+      <div class="ind-tete"><span class="ind-num">${esc(i.num)}</span><div><b>${esc(i.libelle)}</b><small>${esc(i.question)}</small></div>
+        <span class="ind-n ${i.n < 30 ? "faible" : ""}" title="${i.n < 30 ? "Moins de 30 réponses : à lire comme une tendance" : ""}">n = ${i.n}</span></div>
+      ${i.solde != null ? `<div class="ind-solde">Solde d'opinion <b>${i.solde > 0 ? "+" : ""}${nf(i.solde)}</b></div>` : ""}
+      <div class="ind-barres">${mods.map((m) => `<div class="ind-l" title="${esc(m.label)} : ${nf(m.pct, 1)} %"><span class="lbl">${esc(m.label)}</span>
+        <span class="piste"><i style="width:${(100 * m.pct) / max}%"></i></span><span class="v">${nf(m.pct)} %</span></div>`).join("")}</div>
+      ${i.type === "multiple" ? `<small class="aide">Plusieurs réponses possibles : le total dépasse 100 %.</small>` : ""}
+    </div>`;
+  };
+  const indice = d.indicateurs.find((i) => i.type === "indice");
+  z.innerHTML = `
+    <div class="ind-entete">${select}
+      <span class="aide">${d.n} répondant(s) ${d.controle_qualite ? "valides" : "renseignés"} · <b>${avec.length} indicateurs calculés</b>${sans.length ? ` · ${sans.length} sans données` : ""} · calcul à la date de la dernière synchronisation</span></div>
+    ${indice ? `<div class="bandeau info">${ico("info")}<div><b>${esc(indice.libelle)}</b> : ${indice.valeur != null ? `<b>${nf(indice.valeur)} / 100</b>` : "pas encore calculé, ses poids et son codage restent à valider après le pré-test."}</div></div>` : ""}
+    ${blocs.map((b) => `<h3 class="ind-bloc">${esc(b)}</h3><div class="ind-grille">${avec.filter((i) => i.bloc === b).map(carte).join("")}</div>`).join("")}
+    ${sans.length ? `<h3 class="ind-bloc">Pas encore de données</h3>
+      <p class="aide" style="margin-top:0">Ces questions n'apparaissent pas dans les réponses reçues : elles sont absentes de l'enquête en ligne, posées sous une autre forme, ou soumises à une condition qu'aucun répondant n'a remplie.</p>
+      <div class="ind-sans">${sans.map((i) => `<span title="${esc(i.question)}"><b>${esc(i.num)}</b> ${esc(i.libelle)}</span>`).join("")}</div>` : ""}`;
+  $("#ind-filtre").onchange = (ev) => { S.filtreInd = ev.target.value; ongletIndicateurs(z, e, cle, ev.target.value); };
 }
 
 function graphCumul(s) {

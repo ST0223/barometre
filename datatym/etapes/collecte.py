@@ -195,6 +195,7 @@ def convertir_questionpro(reponses, quest):
         return par_texte.get(_norm(sans_num)) or ("consentement" if "accept" in _norm(sans_num) and "particip" in _norm(sans_num) else None)
 
     lignes, ecartees = [], 0
+    reconnues = {}  # variable → [réponses reçues, réponses reconnues parmi les modalités]
     for rep in reponses:
         statut = str(rep.get("responseStatus") or "").lower()
         if statut and statut not in ("completed", "complete", "terminé", "complété"):
@@ -234,6 +235,9 @@ def convertir_questionpro(reponses, quest):
                     continue
                 if q["type"] in ("select_one", "select_multiple"):
                     code = correspondance(v.get("answerText"), mods)
+                    compte = reconnues.setdefault(q["var"], [0, 0])
+                    compte[0] += 1
+                    compte[1] += code is not None
                     if code is None and _norm(v.get("answerText")).startswith("autre"):
                         codes_q = {m["code"] for m in mods}
                         code = "autre_hors" if "autre_hors" in codes_q and "autre" not in codes_q else "autre"
@@ -255,7 +259,13 @@ def convertir_questionpro(reponses, quest):
                 ligne[v_enq] = code_enq
         ligne.setdefault("consentement", "oui")  # une réponse complétée vaut consentement
         lignes.append(ligne)
-    return pd.DataFrame(lignes).fillna(""), ecartees, sorted(ignorees)
+    df = pd.DataFrame(lignes).fillna("")
+    # même code, autre question : si la plupart des réponses ne correspondent à aucune modalité, la question est écartée
+    for var, (recues, ok) in reconnues.items():
+        if recues >= 5 and ok < 0.6 * recues and var in df:
+            df[var] = ""
+            ignorees.add(f"{par_var[var]['num']} (réponses ne correspondant pas aux modalités)")
+    return df, ecartees, sorted(ignorees)
 
 
 def importer_questionpro(projet, quest, env, cle_api, enquete):
@@ -507,3 +517,55 @@ def generer(projet, precedent=None):
     if "controle_qualite" in prec:
         data["controle_qualite"] = prec["controle_qualite"]  # enquête et centre de données : la resynchronisation en dépend
     return data
+
+
+def indicateurs(projet, filtre=""):
+    """Indicateurs de la note de cadrage calculés sur les réponses du moment, sans rien enregistrer.
+
+    Base : réponses renseignées (consentement oui), ou valides si le contrôle qualité est activé.
+    filtre : « zone:ne », « profil:dsi » ou « secteur:assurance » pour restreindre la base."""
+    from .rapport import calculer  # import tardif : rapport dépend déjà de ce module
+    quest = projet["etapes"]["questionnaire"]["data"]
+    cadrage = projet["etapes"]["cadrage"]["data"]
+    df = lire(projet)
+    q_de = {q["indicateur"]: q for q in quest["questions_plates"] if q.get("indicateur")}
+    par_id = {q["id"]: q for q in quest["questions_plates"]}
+    options = {}
+    for cle, qid in (("zone", "id_zone"), ("profil", "id_profil"), ("secteur", "id_secteur")):
+        if qid in par_id:
+            options[cle] = [{"code": m["code"], "label": m["label"]} for m in par_id[qid]["modalites"]]
+    if df is None or df.empty:
+        return {"n": 0, "options": options, "filtre": filtre, "indicateurs": []}
+    controle = projet["etapes"]["collecte"]["data"].get("controle_qualite", True)
+    cons = df.get("consentement", pd.Series(["oui"] * len(df), index=df.index)).str.lower().isin(["oui", "1", "yes"])
+    base = valides(df, quest) if controle else df[cons]
+    if ":" in filtre:
+        cle, code = filtre.split(":", 1)
+        qid = {"zone": "id_zone", "profil": "id_profil", "secteur": "id_secteur"}.get(cle)
+        if qid in par_id and par_id[qid]["var"] in base:
+            base = base[base[par_id[qid]["var"]] == code]
+    res = []
+    for ind in cadrage.get("indicateurs", []):
+        if not ind.get("actif", True):
+            continue
+        if ind["type"] == "indice":
+            res.append({"id": ind["id"], "libelle": ind["libelle"], "type": "indice", "bloc": ind.get("bloc", "Synthèse"),
+                        "definition": ind.get("definition", ""), "composantes": ind.get("composantes", [])})
+            continue
+        q = q_de.get(ind["id"])
+        if not q:
+            continue
+        g = calculer(base, ind, q, {})["global"]
+        pct = g.get("citations") or g.get("dist") or {}
+        res.append({"id": ind["id"], "libelle": ind["libelle"], "type": ind["type"], "bloc": ind.get("bloc", ""),
+                    "num": q["num"], "question": q["texte"], "condition": q.get("condition", ""), "n": g.get("n", 0),
+                    "solde": g.get("solde"), "moyenne": g.get("moyenne"),
+                    "modalites": [{"code": m["code"], "label": m["label"], "pct": pct.get(m["code"], 0)} for m in q["modalites"]
+                                  if m["code"] != "autre_hors"]})
+    # indice composite : moyenne des soldes de ses composantes ramenée sur 0–100 (comme le rapport)
+    soldes = {r["id"]: r.get("solde") for r in res}
+    for r in res:
+        if r["type"] == "indice" and r["composantes"]:
+            vals = [soldes[c] for c in r["composantes"] if soldes.get(c) is not None]
+            r["valeur"] = (sum(vals) / len(vals) + 100) / 2 if vals else None
+    return {"n": len(base), "options": options, "filtre": filtre, "controle_qualite": controle, "indicateurs": res}

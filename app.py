@@ -16,6 +16,7 @@ from datatym import budget, llm, moteur, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
+from datatym.outils import propre
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
@@ -212,6 +213,12 @@ def kobo(slug):
         enregistrer_parametres({"kobo_jeton": jeton})
     moteur.rafraichir_collecte(p)
     return ok(p)
+
+
+@app.get("/api/projets/<slug>/collecte/indicateurs")
+def indicateurs_collecte(slug):
+    """Indicateurs de la note de cadrage calculés en direct sur les réponses (filtre facultatif)."""
+    return jsonify(propre(collecte.indicateurs(_projet(slug), request.args.get("filtre", ""))))
 
 
 @app.post("/api/projets/<slug>/collecte/questionpro")
