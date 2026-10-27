@@ -1024,7 +1024,9 @@ function ongletTableau(z, e) {
   };
   const zones = [...new Set(s.quotas.map((q) => q.zone))];
   const profs = [...new Set(s.quotas.map((q) => q.profil))];
+  const absentes = s.variables_absentes || [];
   z.innerHTML = `
+    ${s.donnees_perimees || (s.donnees_perimees == null && absentes.length >= Math.max(3, 0.1 * (s.nb_variables || 0))) ? `<div class="bandeau alerte">${ico("alert")}<div><b>Ces données ont été collectées avec une version antérieure du questionnaire</b> (avant un changement de thème ou d'indicateurs) : les réponses ne correspondent plus aux questions actuelles. Réimportez les données du formulaire à jour, ou régénérez les données de test, avant la note de suivi et le rapport.</div></div>` : ""}
     <div class="aide" style="margin-bottom:12px;font-size:12.5px">Situation au ${dateFr(s.reference)} · jour ${s.jour_index} sur ${s.nb_jours} · dernière synchronisation ${heureFr(s.maj)}
       ${api_ ? `· <b>${esc(e.data.source)}</b>${auto ? " · resynchronisation automatique toutes les 5 minutes" : " · mémorisez le jeton pour la resynchronisation automatique"}` : ""}
       <button class="btn btn-fantome btn-petit" id="maj-tb">${ico("refresh")} ${api_ ? "Synchroniser maintenant" : "Recalculer"}</button></div>

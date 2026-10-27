@@ -62,6 +62,28 @@ def recrutement_defaut(projet, n_enq, jours):
     }
 
 
+# champs tirés de la fiche et du plan (thème, cible, zones, dates, nombre d'enquêteurs)
+CHAMPS_CALCULES = ("intitule", "mission", "date_limite")
+
+
+def actualiser_recrutement(prec, defaut):
+    """Un champ resté à sa valeur par défaut suit la fiche ; un champ retouché à la main est conservé."""
+    if not prec:
+        return {**defaut, "_defaut": dict(defaut)}
+    ancien_defaut = prec.get("_defaut")
+    rec = {}
+    for k, v in defaut.items():
+        if k not in prec:
+            rec[k] = v
+        elif ancien_defaut is None:
+            # note créée avant ce suivi : les champs calculés sont repris de la fiche, les autres conservés
+            rec[k] = v if k in CHAMPS_CALCULES else prec[k]
+        else:
+            rec[k] = v if prec[k] == ancien_defaut.get(k) else prec[k]
+    rec["_defaut"] = dict(defaut)
+    return rec
+
+
 def calculer(projet, quest, params, recrutement=None):
     fiche = projet["fiche"]
     n = fiche["taille"]
@@ -138,7 +160,7 @@ def calculer(projet, quest, params, recrutement=None):
     bud = budget.calculer(n, n_enq, len(jours), len(zones), params["couts"], params["hypotheses"])
     bud["marginal_100"] = budget.marginal(n, n_enq, len(jours), len(zones), params["couts"], params["hypotheses"])
 
-    rec = recrutement or recrutement_defaut(projet, n_enq, jours)
+    rec = actualiser_recrutement(recrutement, recrutement_defaut(projet, n_enq, jours))
     return {"params": params, "zones": zones, "profils": profils, "jours": [d.isoformat() for d in jours],
             "nb_enqueteurs": n_enq, "quotas": [[z, c, v] for (z, c), v in quotas.items()], "tot_zone": tot_zone,
             "enqueteurs": enqueteurs, "calendrier": calendrier, "budget": bud, "recrutement": rec}

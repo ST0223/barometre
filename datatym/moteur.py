@@ -178,7 +178,23 @@ def exporter(projet, cle):
         shutil.copy(collecte.chemin_donnees(projet), out / f)
         ajout("Base des soumissions (CSV)", f)
     e["fichiers"] = fichiers
+    nettoyer_livrables(projet)
     return fichiers
+
+
+def nettoyer_livrables(projet):
+    """Retire de livrables/ les fichiers générés qui ne sont plus d'actualité (ancien thème, ancienne version).
+    Les versions validées restent archivées dans versions/ ; seuls les fichiers produits par la plateforme sont visés."""
+    out = store.dossier(projet["slug"]) / "livrables"
+    courants = {f["fichier"] for c in CLES for f in projet["etapes"][c].get("fichiers") or []}
+    for f in out.glob("*"):
+        genere = f.name.startswith("Barometre_") or (f.name.startswith("baro_") and f.suffix == ".xlsx") or f.name == formulaires.FICHIER_ENQUETEURS
+        actuel = f.name in courants or (f.suffix == ".pdf" and f.with_suffix(".docx").name in courants)
+        if f.is_file() and genere and not actuel:
+            try:
+                f.unlink()
+            except OSError:
+                pass  # fichier ouvert dans Word : il partira au prochain export
 
 
 def _apres_maj(projet, cle, nouveaux_docs=True):
@@ -203,6 +219,10 @@ def generer(projet, cle):
             # la cible a pu changer dans la fiche : on garde le niveau déjà choisi pour chaque profil
             niveaux = {pr["code"]: pr["niveau"] for pr in prec.get("profils", [])}
             prec["profils"] = [{**pr, "niveau": niveaux.get(pr["code"], pr["niveau"])} for pr in profils_depuis_cible(projet["fiche"]["cible"])]
+            prec, nouveau_domaine = cadrage.actualiser(projet, prec)
+            if nouveau_domaine:
+                store.journaliser(projet, f"Nouveau thème : indicateurs du domaine « {prec['domaine']} » proposés à la place des précédents.")
+            prec["points_a_valider"] = cadrage.generer_points(projet["fiche"])
             e["data"] = cadrage.normaliser(prec)
         else:
             e["data"] = cadrage.generer(projet)

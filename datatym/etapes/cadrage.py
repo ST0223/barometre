@@ -120,14 +120,37 @@ def generer(projet):
         data = {"contexte": contexte_regles(fiche, dom), "objectifs_specifiques": objectifs_regles(fiche, indicateurs),
                 "indicateurs": indicateurs, "redaction": "regles"}
     data["domaine"] = dom["libelle"]
+    data["theme_ref"] = [fiche["theme"], fiche["objectif"]]
     data["profils"] = profils_depuis_cible(fiche["cible"])
-    data["points_a_valider"] = [
+    data["points_a_valider"] = generer_points(fiche)
+    return data
+
+
+def generer_points(fiche):
+    return [
         "Liste définitive des indicateurs et composition de l'indice synthétique.",
         "Répartition de l'échantillon entre zones et profils.",
         "Outil de collecte retenu (" + ("KoboToolbox" if fiche.get("outil") == "kobo" else "QuestionPro") + ") et mode de passation dominant.",
         "Calendrier de restitution et diffusion des résultats.",
     ]
-    return data
+
+
+def actualiser(projet, data):
+    """Mise à jour après une modification de la fiche : les textes tirés du thème suivent toujours ;
+    les indicateurs ne sont remplacés que si le domaine du baromètre a changé (sinon les retouches restent)."""
+    fiche = projet["fiche"]
+    ref = (fiche["theme"], fiche["objectif"])
+    if tuple(data.get("theme_ref") or ()) == ref:
+        return data, False
+    inds, dom = indicateurs_par_defaut(fiche)
+    change_domaine = dom["libelle"] != data.get("domaine")
+    if change_domaine:
+        data["indicateurs"], data["domaine"] = inds, dom["libelle"]
+    data["contexte"] = contexte_regles(fiche, dom)
+    data["objectifs_specifiques"] = objectifs_regles(fiche, data["indicateurs"])
+    data["redaction"] = "regles"
+    data["theme_ref"] = list(ref)
+    return data, change_domaine
 
 
 def normaliser(data):

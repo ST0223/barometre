@@ -299,7 +299,10 @@ def _redaction_ia(projet, an):
 def generer(projet, cadrage, quest, ech, precedent=None):
     prec = precedent or {}
     an = analyser(projet, cadrage, quest, ech)
-    data = {"analyse": an, "titre": prec.get("titre") or projet["fiche"]["theme"],
+    theme = projet["fiche"]["theme"]
+    # le titre suit le thème tant qu'il n'a pas été retouché (rapport créé avant ce suivi : il suit aussi)
+    retouche = prec.get("titre") and "titre_defaut" in prec and prec["titre"] != prec["titre_defaut"]
+    data = {"analyse": an, "titre": prec["titre"] if retouche else theme, "titre_defaut": theme,
             "sous_titre": prec.get("sous_titre") or "Rapport d'analyse"}
     if an:
         ia = _redaction_ia(projet, an) if llm.disponible() else None

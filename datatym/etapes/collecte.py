@@ -1,4 +1,5 @@
 """Étape 5 — Collecte : import des soumissions et tableau de bord de suivi."""
+import hashlib
 import json
 import random
 import re
@@ -15,6 +16,27 @@ COLONNES_SYSTEME = {"start", "end", "today", "_submission_time", "duree_minutes"
 
 def chemin_donnees(projet):
     return dossier(projet["slug"]) / "donnees" / "collecte.csv"
+
+
+def signature(quest):
+    """Empreinte du questionnaire : variables, libellés et modalités. Les variables étant numérotées (c1, c2…),
+    leur nom seul ne suffit pas à reconnaître des données collectées avec une version antérieure."""
+    contenu = [[q["var"], q.get("texte", ""), [m.get("code") for m in q.get("modalites") or []]] for q in (quest or {}).get("questions_plates", [])]
+    return hashlib.sha1(json.dumps(contenu, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+
+
+def enregistrer(projet, df):
+    """Écrit la base des soumissions et l'empreinte du questionnaire avec lequel elle a été collectée."""
+    f = chemin_donnees(projet)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(f, index=False)
+    f.with_suffix(".signature").write_text(signature(projet["etapes"]["questionnaire"]["data"]), encoding="utf-8")
+
+
+def donnees_perimees(projet, quest):
+    """Vrai si les données ont été collectées avec un autre questionnaire ; None si on ne le sait pas (import ancien)."""
+    f = chemin_donnees(projet).with_suffix(".signature")
+    return f.read_text(encoding="utf-8").strip() != signature(quest) if f.exists() else None
 
 
 def variables_cles(quest):
@@ -41,8 +63,7 @@ def importer_fichier(projet, chemin):
     else:
         df = pd.read_csv(chemin, dtype=str, sep=None, engine="python", keep_default_na=False)
     df = _nettoyer_colonnes(df)
-    chemin_donnees(projet).parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(chemin_donnees(projet), index=False)
+    enregistrer(projet, df)
     return len(df)
 
 
@@ -91,8 +112,7 @@ def importer_kobo(projet, serveur, jeton, asset):
     res = _kobo_json(f"{serveur.rstrip('/')}/api/v2/assets/{asset}/data.json?limit=30000", jeton)
     df = pd.DataFrame(res.get("results", [])).fillna("").astype(str)  # sans fillna, les champs absents deviendraient « nan »
     df = _nettoyer_colonnes(df)
-    chemin_donnees(projet).parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(chemin_donnees(projet), index=False)
+    enregistrer(projet, df)
     return len(df), serveur, asset
 
 
@@ -205,8 +225,7 @@ def convertir_questionpro(reponses, quest):
 def importer_questionpro(projet, quest, env, cle_api, enquete):
     reponses = _lire_questionpro(env, cle_api, enquete)
     df, ecartees, ignorees = convertir_questionpro(reponses, quest)
-    chemin_donnees(projet).parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(chemin_donnees(projet), index=False)
+    enregistrer(projet, df)
     return len(df), ecartees, ignorees
 
 
@@ -271,8 +290,7 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                        "_submission_time": t.isoformat(timespec="seconds"), "duree_minutes": "1.0", "consentement": "non",
                        v_enq: m["code"], "enqueteur": m["code"]})
     df = pd.DataFrame(lignes).fillna("")
-    chemin_donnees(projet).parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(chemin_donnees(projet), index=False)
+    enregistrer(projet, df)
     return len(df)
 
 
@@ -364,6 +382,10 @@ def tableau_de_bord(projet, quest, ech):
         "duree_mediane": round(med, 1) if med else None,
         "par_enqueteur": par_enq, "par_zone": par_zone, "par_profil": par_profil, "quotas": quotas, "par_jour": par_jour,
         "incidents": incidents,
+        # questions du questionnaire actuel sans colonne dans les données (données importées avant une modification)
+        "variables_absentes": [q["var"] for q in quest["questions_plates"] if q["var"] not in df.columns],
+        "donnees_perimees": donnees_perimees(projet, quest),
+        "nb_variables": len(quest["questions_plates"]),
     }
 
 
