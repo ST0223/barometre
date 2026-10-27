@@ -273,11 +273,8 @@ function vueProjet(entree = true) {
           <a class="fil" href="#/etudes">${ico("back")} Mes études</a>
           <h1>${esc(f.theme)}</h1>
           <div class="puces">
-            <span class="puce verre">${ico("users")}${esc(f.cible)}</span>
-            <span class="puce verre">${ico("map")}${esc(f.zones)}${f.secteur ? " · " + esc(f.secteur) : ""}</span>
             <span class="puce verre">${ico("target")}${f.taille} répondants</span>
             <span class="puce verre">${ico("clock")}${f.duree} jours</span>
-            ${f.cout ? `<span class="puce verre">${ico("coin")}plafond ${nf(f.cout)} FCFA</span>` : ""}
           </div>
         </div>
         <div class="anneau clair"><svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="30" stroke="rgba(255,255,255,.15)" stroke-width="7" fill="none"/>
