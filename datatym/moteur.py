@@ -289,6 +289,10 @@ def maj_data(projet, cle, maj):
         e["data"] = echantillonnage.normaliser(projet, _data(projet, "questionnaire"), d)
     elif cle == "methodologie":
         d.update({k: v for k, v in maj.items() if k in ("logiciel", "limites")})
+    elif cle == "collecte":
+        if "controle_qualite" in maj:
+            d["controle_qualite"] = bool(maj["controle_qualite"])
+            d["stats"] = collecte.tableau_de_bord(projet, _data(projet, "questionnaire"), _data(projet, "echantillonnage"))
     elif cle == "suivi":
         d.update({k: v for k, v in maj.items() if k in ("observations", "recommandations", "depenses")})
     elif cle == "rapport":

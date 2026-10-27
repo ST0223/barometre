@@ -1026,21 +1026,25 @@ function ongletTableau(z, e) {
   const barre = (lbl, r, obj, prevu) => {
     const t = obj ? (100 * r) / obj : 0;
     const cls = prevu != null ? (r >= prevu ? "ok" : r < 0.8 * prevu ? "retard" : "") : t >= 100 ? "ok" : "";
-    return `<div class="barre-l"><span class="lbl" title="${esc(lbl)}">${esc(lbl)}</span><span class="piste"><i class="${cls}" style="width:${Math.min(100, t)}%"></i>${prevu != null && obj ? `<span class="repere" style="left:${Math.min(100, (100 * prevu) / obj)}%" title="Prévu à date : ${prevu}"></span>` : ""}</span><span class="chf">${r} / ${obj}</span></div>`;
+    return `<div class="barre-l"><span class="lbl" title="${esc(lbl)}">${esc(lbl)}</span><span class="piste"><i class="${cls}" style="width:${Math.min(100, t)}%"></i>${prevu != null && obj ? `<span class="repere" style="left:${Math.min(100, (100 * prevu) / obj)}%" title="Prévu à date : ${prevu}"></span>` : ""}</span><span class="chf">${obj ? `${r} / ${obj}` : r}</span></div>`;
   };
-  const zones = [...new Set(s.quotas.map((q) => q.zone))];
-  const profs = [...new Set(s.quotas.map((q) => q.profil))];
+  const qc = s.controle_qualite !== false;
+  const croix = s.croisement || [];
+  const zones = [...new Set(croix.map((q) => q.zone))];
+  const sects = [...new Set(croix.map((q) => q.secteur))];
+  const court = (l) => l.split(/ – | \(/)[0];
   const absentes = s.variables_absentes || [];
   z.innerHTML = `
     ${s.donnees_perimees || (s.donnees_perimees == null && absentes.length >= Math.max(3, 0.1 * (s.nb_variables || 0))) ? `<div class="bandeau alerte">${ico("alert")}<div><b>Ces données ont été collectées avec une version antérieure du questionnaire</b> (avant un changement de thème ou d'indicateurs) : les réponses ne correspondent plus aux questions actuelles. Réimportez les données du formulaire à jour, ou régénérez les données de test, avant la note de suivi et le rapport.</div></div>` : ""}
     <div class="aide" style="margin-bottom:12px;font-size:12.5px">Situation au ${dateFr(s.reference)} · jour ${s.jour_index} sur ${s.nb_jours} · dernière synchronisation ${heureFr(s.maj)}
       ${api_ ? `· <b>${esc(e.data.source)}</b>${auto ? " · resynchronisation automatique toutes les 5 minutes" : " · mémorisez le jeton pour la resynchronisation automatique"}` : ""}
-      <button class="btn btn-fantome btn-petit" id="maj-tb">${ico("refresh")} ${api_ ? "Synchroniser maintenant" : "Recalculer"}</button></div>
+      <button class="btn btn-fantome btn-petit" id="maj-tb">${ico("refresh")} ${api_ ? "Synchroniser maintenant" : "Recalculer"}</button>
+      <label class="bascule" style="display:inline-flex;margin-left:6px" title="Activé : réponses hors cible et entretiens trop rapides écartés"><input type="checkbox" id="tb-qc" ${qc ? "checked" : ""} ${e.statut === "valide" ? "disabled" : ""}> Contrôle qualité</label></div>
     <div class="kpis-tb kpis-5">
-      <div class="carte kpi"><div class="t">Questionnaires reçus</div><div class="v" data-compte="${s.brut}">0</div><div class="s">${[s.hors_cible && `${s.hors_cible} hors cible`, s.refus && `${s.refus} refus`, s.rapides && `${s.rapides} trop rapides`].filter(Boolean).join(" · ") || "tous exploitables"}</div></div>
-      <div class="carte kpi"><div class="t">Questionnaires valides</div><div class="v"><span data-compte="${s.realise}">0</span><span style="font-size:15px;color:var(--texte-3)"> / ${s.objectif}</span></div><div class="s">${nf(s.taux, 1)} % de l'objectif</div></div>
+      <div class="carte kpi"><div class="t">Questionnaires reçus</div><div class="v" data-compte="${s.brut}">0</div><div class="s">${[qc && s.hors_cible && `${s.hors_cible} hors cible`, s.refus && `${s.refus} refus`, qc && s.rapides && `${s.rapides} trop rapides`].filter(Boolean).join(" · ") || "tous exploitables"}</div></div>
+      <div class="carte kpi"><div class="t">${qc ? "Questionnaires valides" : "Questionnaires renseignés"}</div><div class="v"><span data-compte="${s.realise}">0</span><span style="font-size:15px;color:var(--texte-3)"> / ${s.objectif}</span></div><div class="s">${nf(s.taux, 1)} % de l'objectif</div></div>
       <div class="carte kpi"><div class="t">Écart au calendrier</div><div class="v" data-compte="${ecart}" data-prefixe="${ecart > 0 ? "+" : ""}">0</div><div class="s ${ecart >= 0 ? "pos" : "neg"}">${s.prevu_a_date} prévus à date</div></div>
-      <div class="carte kpi"><div class="t">Taux de complétion</div><div class="v" data-compte="${s.taux_completion}" data-dec="1" data-suffixe=" %">0</div><div class="s">${s.brut} reçus · ${s.refus} refus · ${s.rapides} rapides</div></div>
+      <div class="carte kpi"><div class="t">Taux de complétion</div><div class="v" data-compte="${s.taux_completion}" data-dec="1" data-suffixe=" %">0</div><div class="s">${s.brut} reçus · ${s.refus} refus${qc ? ` · ${s.rapides} rapides` : ""}</div></div>
       <div class="carte kpi"><div class="t">Durée médiane</div><div class="v" ${s.duree_mediane != null ? `data-compte="${s.duree_mediane}" data-dec="1" data-suffixe=" min"` : ""}>–</div><div class="s">plafond 15 min</div></div>
     </div>
     <div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>Avancement cumulé</h3>
@@ -1058,26 +1062,26 @@ function ongletTableau(z, e) {
         <div class="carte-corps barres">${[...s.par_secteur].sort((a, b) => b.realise - a.realise).map((x) => barre(x.secteur, x.realise, x.objectif)).join("")}</div></div>` : ""}
       <div class="carte"><div class="carte-titre"><h3>Par profil de dirigeant</h3></div>
         <div class="carte-corps barres">${s.par_profil.map((x) => barre(x.profil, x.realise, x.objectif)).join("")}
-          ${s.hors_cible ? `<p class="aide" style="margin:6px 0 0;font-size:12px">${s.hors_cible} réponse(s) hors cible (autre fonction ou entreprise sous le seuil), non comptées.</p>` : ""}</div></div>
+          ${qc && s.hors_cible ? `<p class="aide" style="margin:6px 0 0;font-size:12px">${s.hors_cible} réponse(s) hors cible (autre fonction ou entreprise sous le seuil), non comptées.</p>` : ""}</div></div>
     </div>
     ${(s.par_collecteur || []).length ? `<div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>Collecteurs</h3><span class="aide" style="font-size:11.5px">tels qu'enregistrés dans les réponses</span></div>
-      <div class="carte-corps"><div class="grille-tab"><table><thead><tr><th>Collecteur</th><th style="text-align:right">Valides</th><th style="text-align:right">Reçus</th><th style="text-align:right">Écartés</th><th>Pays principaux</th><th>Dernier envoi</th></tr></thead><tbody>
-        ${s.par_collecteur.map((c) => `<tr><td><b>${esc(c.nom)}</b></td><td style="text-align:right">${c.valides}</td><td style="text-align:right">${c.recus}</td><td style="text-align:right">${c.ecartes || "–"}</td><td>${esc(c.pays.join(", ")) || "–"}</td><td>${c.dernier ? dateFr(c.dernier) : "–"}</td></tr>`).join("")}
+      <div class="carte-corps"><div class="grille-tab"><table><thead><tr><th>Collecteur</th><th style="text-align:right">${qc ? "Valides" : "Renseignés"}</th><th style="text-align:right">Reçus</th>${qc ? '<th style="text-align:right">Écartés</th>' : ""}<th>Pays principaux</th><th>Dernier envoi</th></tr></thead><tbody>
+        ${s.par_collecteur.map((c) => `<tr><td><b>${esc(c.nom)}</b></td><td style="text-align:right">${c.valides}</td><td style="text-align:right">${c.recus}</td>${qc ? `<td style="text-align:right">${c.ecartes || "–"}</td>` : ""}<td>${esc(c.pays.join(", ")) || "–"}</td><td>${c.dernier ? dateFr(c.dernier) : "–"}</td></tr>`).join("")}
       </tbody></table></div></div></div>` : ""}
     <div class="grille-tb">
       ${s.par_enqueteur.length ? `<div class="carte"><div class="carte-titre"><h3>Par enquêteur du plan</h3><span class="aide" style="font-size:11.5px">trait = prévu à date</span></div>
         <div class="carte-corps barres">${s.par_enqueteur.map((x) => barre(`${x.nom} · ${x.zone}`, x.realise, x.objectif, x.prevu)).join("")}</div></div>` : ""}
-      <div class="carte"><div class="carte-titre"><h3>Quotas zone × profil</h3></div>
-        <div class="carte-corps"><table class="carte-chaleur"><thead><tr><th></th>${profs.map((p) => `<th>${esc(p)}</th>`).join("")}</tr></thead><tbody>
-          ${zones.map((zn) => `<tr><th>${esc(zn)}</th>${profs.map((p) => { const q = s.quotas.find((x) => x.zone === zn && x.profil === p); return `<td style="background:${coul(q.taux)}22;color:${q.taux >= 100 ? "#0A6B4B" : "#1B2333"}" title="${q.taux} %">${q.realise}/${q.objectif}</td>`; }).join("")}</tr>`).join("")}
-        </tbody></table>
-        </div></div>
+      ${croix.length ? `<div class="carte"><div class="carte-titre"><h3>Croisement pays × secteur</h3><span class="aide" style="font-size:11.5px">réalisé / objectif</span></div>
+        <div class="carte-corps"><div class="grille-tab"><table class="carte-chaleur"><thead><tr><th></th>${sects.map((p) => `<th title="${esc(p)}">${esc(court(p))}</th>`).join("")}<th>Total</th></tr></thead><tbody>
+          ${zones.map((zn) => { const l = croix.filter((x) => x.zone === zn); const r = l.reduce((a, x) => a + x.realise, 0), o = l.reduce((a, x) => a + x.objectif, 0);
+            return `<tr><th>${esc(zn)}</th>${sects.map((p) => { const q = l.find((x) => x.secteur === p); return `<td style="background:${coul(q.taux)}22;color:${q.taux >= 100 ? "#0A6B4B" : "#1B2333"}" title="${esc(zn)} · ${esc(p)} : ${q.realise} / ${q.objectif}">${q.realise}/${q.objectif}</td>`; }).join("")}<td><b>${r}/${o}</b></td></tr>`; }).join("")}
+        </tbody></table></div></div></div>` : ""}
     </div>
-    <div class="carte"><div class="carte-titre"><h3>Incidents et qualité des données</h3></div>
-      <div class="carte-corps">${s.incidents.length ? `<ul class="incidents" style="margin:0;padding-left:18px">${s.incidents.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>` : `<span class="aide">Aucun incident relevé.</span>`}</div></div>`;
+    ${qc ? `<div class="carte"><div class="carte-titre"><h3>Incidents et qualité des données</h3></div>
+      <div class="carte-corps">${s.incidents.length ? `<ul class="incidents" style="margin:0;padding-left:18px">${s.incidents.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>` : `<span class="aide">Aucun incident relevé.</span>`}</div></div>` : ""}`;
   z.classList.add("tb-anime");
   A.compter(z);
-  z.querySelectorAll(".carte-chaleur td").forEach((td, k) => (td.style.animationDelay = `${k * 45}ms`));
+  z.querySelectorAll(".carte-chaleur td").forEach((td, k) => (td.style.animationDelay = `${Math.min(k * 12, 900)}ms`));
   z.querySelectorAll(".barre-l .piste i").forEach((b, k) => (b.style.animationDelay = `${200 + k * 50}ms`));
   const synchroniser = async () => {
     const avant = s.brut;
@@ -1085,6 +1089,10 @@ function ongletTableau(z, e) {
     const apres = (r.etapes.collecte.data.stats || {}).brut || 0;
     return { r, nouveaux: apres - avant };
   };
+  $("#tb-qc").onchange = (ev) => occupe(ev.currentTarget, async () => {
+    const r = await api("PUT", `/api/projets/${S.projet.slug}/etapes/collecte/data`, { controle_qualite: ev.currentTarget.checked });
+    majProjet(r, ev.currentTarget.checked ? "Contrôle qualité activé : hors cible et entretiens trop rapides écartés." : "Suivi seul : toutes les réponses renseignées sont comptées.");
+  });
   $("#maj-tb").onclick = (ev) => occupe(ev.currentTarget, async () => {
     const { r, nouveaux } = await synchroniser();
     majProjet(r, api_ ? (nouveaux > 0 ? `${nouveaux} nouvelle(s) soumission(s) reçue(s).` : "Aucune nouvelle soumission.") : "Tableau de bord recalculé.");

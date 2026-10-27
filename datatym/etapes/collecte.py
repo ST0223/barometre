@@ -411,7 +411,9 @@ def tableau_de_bord(projet, quest, ech):
     ok_cons = df.get("consentement", pd.Series(["oui"] * len(df))).str.lower().isin(["oui", "1", "yes"])
     med = float(duree[ok_cons].median()) if duree[ok_cons].notna().any() else None
     rapides = int(((duree < 0.4 * med) & ok_cons).sum()) if med else 0
-    v = valides(df, quest)
+    # suivi seul : toute réponse renseignée compte ; contrôle qualité : hors cible et entretiens trop rapides écartés
+    controle = projet["etapes"]["collecte"]["data"].get("controle_qualite", True)
+    v = valides(df, quest) if controle else df[ok_cons]
     n = len(v)
     dates = v["start"].map(_date) if "start" in v else pd.Series([None] * n)
     dates_toutes = [d for d in dates if d]
@@ -429,8 +431,9 @@ def tableau_de_bord(projet, quest, ech):
     for z, c, obj in ech["quotas"]:
         r = int(((v.get(v_zone, "") == code_zone(z)) & (v.get(v_prof, "") == c)).sum()) if v_zone in v and v_prof in v else 0
         quotas.append({"zone": z, "profil": lib.get(c, c), "code": c, "objectif": obj, "realise": r, "taux": round(100 * r / obj, 1) if obj else 0})
-    par_zone = [{"zone": z, "code": code_zone(z), "objectif": ech["tot_zone"][z], "realise": sum(q["realise"] for q in quotas if q["zone"] == z)}
-                for z in ech["zones"]]
+    # par pays : toutes les réponses comptées du pays, quelle que soit la fonction
+    par_zone = [{"zone": z, "code": code_zone(z), "objectif": ech["tot_zone"][z],
+                 "realise": int((v.get(v_zone, pd.Series(dtype=str)) == code_zone(z)).sum()) if v_zone in v else 0} for z in ech["zones"]]
     par_profil = [{"profil": lib[c], "code": c, "objectif": sum(q["objectif"] for q in quotas if q["code"] == c),
                    "realise": sum(q["realise"] for q in quotas if q["code"] == c)} for c in lib]
     # secteurs : pas de quota par secteur dans le plan, objectif réparti à parts égales
@@ -441,6 +444,18 @@ def tableau_de_bord(projet, quest, ech):
         for m, obj in zip(q_sect["modalites"], objectifs):
             par_secteur.append({"secteur": m["label"], "code": m["code"], "objectif": obj,
                                 "realise": int((v.get(q_sect["var"], pd.Series(dtype=str)) == m["code"]).sum())})
+    if not controle:
+        autres = int((v.get(v_prof, pd.Series(dtype=str)) == "autre_hors").sum())
+        if autres:
+            par_profil.append({"profil": "Autre fonction", "code": "autre_hors", "objectif": 0, "realise": autres})
+    # croisement pays × secteur : objectif du pays réparti à parts égales entre secteurs
+    croisement = []
+    if q_sect and v_zone:
+        for z in ech["zones"]:
+            for m, obj in zip(q_sect["modalites"], repartir(ech["tot_zone"][z], [1] * len(q_sect["modalites"]))):
+                r = int(((v.get(v_zone, "") == code_zone(z)) & (v.get(q_sect["var"], "") == m["code"])).sum()) if q_sect["var"] in v and v_zone in v else 0
+                croisement.append({"zone": z, "secteur": m["label"], "code": m["code"], "objectif": obj, "realise": r,
+                                   "taux": round(100 * r / obj, 1) if obj else 0})
     for x in par_zone + par_profil + par_secteur:
         x["taux"] = round(100 * x["realise"] / x["objectif"], 1) if x["objectif"] else 0
     par_collecteur = collecteurs(df, v, quest, ech)
@@ -474,7 +489,7 @@ def tableau_de_bord(projet, quest, ech):
         "taux_completion": round(100 * n / total_brut, 1) if total_brut else 0,
         "duree_mediane": round(med, 1) if med else None,
         "par_enqueteur": par_enq if plan_suivi else [], "par_zone": par_zone, "par_profil": par_profil, "par_secteur": par_secteur,
-        "par_collecteur": par_collecteur, "quotas": quotas, "par_jour": par_jour,
+        "par_collecteur": par_collecteur, "quotas": quotas, "croisement": croisement, "par_jour": par_jour, "controle_qualite": controle,
         "incidents": incidents,
         # questions du questionnaire actuel sans colonne dans les données (données importées avant une modification)
         "variables_absentes": [q["var"] for q in quest["questions_plates"] if q["var"] not in df.columns],
@@ -488,5 +503,7 @@ def generer(projet, precedent=None):
     data = {"source": prec.get("source", ""), "kobo": prec.get("kobo", {"serveur": "https://kf.kobotoolbox.org", "asset": ""}),
             "stats": prec.get("stats")}
     if prec.get("questionpro"):
-        data["questionpro"] = prec["questionpro"]  # enquête et centre de données : la resynchronisation en dépend
+        data["questionpro"] = prec["questionpro"]
+    if "controle_qualite" in prec:
+        data["controle_qualite"] = prec["controle_qualite"]  # enquête et centre de données : la resynchronisation en dépend
     return data
