@@ -22,7 +22,9 @@ COLONNES = [
     ("Téléphone", "telephone", "Numéro joignable sur le terrain (WhatsApp de préférence), précédé de l'indicatif du pays "
      "et saisi avec une apostrophe devant ('+221 771234567), sinon Excel le transforme en nombre et supprime le +"),
     ("Mail", "mail", "Adresse personnelle et active : contrat, ordre de mission et notes de suivi y seront envoyés"),
+    ("Rôle", "role", "Titulaire (reçoit des quotas) ou Réserve (formée, mobilisée pour remplacer un abandon), choisi dans la liste déroulante"),
 ]
+ROLES = {"titulaire": "Titulaire", "reserve": "Réserve"}
 
 INDICATIFS = {
     "senegal": "221", "mauritanie": "222", "mali": "223", "guinee": "224", "cote_d_ivoire": "225", "burkina_faso": "226",
@@ -74,19 +76,20 @@ def exemples(zones):
     local = {"senegal": "771234567", "cote_d_ivoire": "0701020304", "cameroun": "677123456", "rd_congo": "812345678", "guinee": "621123456"}
     tel = lambda z, defaut: f"+{INDICATIFS.get(slug(z), '221')} {local.get(slug(z), defaut)}"
     return [
-        {"nom": "DIOP", "prenom": "Awa", "pays": z1, "ville": CAPITALES.get(slug(z1), z1), "telephone": tel(z1, "90123456"), "mail": "awa.diop@exemple.com"},
-        {"nom": "KOUASSI", "prenom": "Jean-Marc", "pays": z2, "ville": CAPITALES.get(slug(z2), z2), "telephone": tel(z2, "70123456"), "mail": "jm.kouassi@exemple.com"},
+        {"nom": "DIOP", "prenom": "Awa", "pays": z1, "ville": CAPITALES.get(slug(z1), z1), "telephone": tel(z1, "90123456"), "mail": "awa.diop@exemple.com", "role": "Titulaire"},
+        {"nom": "KOUASSI", "prenom": "Jean-Marc", "pays": z2, "ville": CAPITALES.get(slug(z2), z2), "telephone": tel(z2, "70123456"), "mail": "jm.kouassi@exemple.com", "role": "Réserve"},
     ]
 
 
-def modele_xlsx(chemin, zones, besoin):
+def modele_xlsx(chemin, zones, besoin, reserve=None):
     """Fichier à renseigner par les RH : feuille Enquêteurs (vide, pays en liste déroulante), consignes et exemple."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Enquêteurs"
     _feuille(ws, [c for c, _, _ in COLONNES], [], {c: 24 for c, _, _ in COLONNES})
     ws.column_dimensions["F"].width = 34
-    nb = max(sum(besoin.values()) + 20, 50)
+    reserve = reserve or {}
+    nb = max(sum(besoin.values()) + sum(reserve.values()) + 20, 50)
     for row in ws.iter_rows(min_row=2, max_row=nb + 1, min_col=5, max_col=5):
         row[0].number_format = "@"  # le « + » de l'indicatif est conservé
     if zones and len(",".join(zones)) < 250:
@@ -94,6 +97,9 @@ def modele_xlsx(chemin, zones, besoin):
         dv.error, dv.errorTitle = "Choisissez un pays de l'étude.", "Pays de résidence"
         ws.add_data_validation(dv)
         dv.add(f"C2:C{nb + 1}")
+    dv = DataValidation(type="list", formula1='"Titulaire,Réserve"', allow_blank=True)
+    ws.add_data_validation(dv)
+    dv.add(f"G2:G{nb + 1}")
     ws2 = wb.create_sheet("Consignes")
     _feuille(ws2, ["Colonne", "Consigne"], [[c, t] for c, _, t in COLONNES]
              + [["", ""], ["Une ligne", "Une ligne par enquêteur retenu, sans ligne vide ni cellule fusionnée ; ne pas renommer les colonnes."],
@@ -106,7 +112,8 @@ def modele_xlsx(chemin, zones, besoin):
     for e in exemples(zones):
         ws2.append([e[k] for _, k, _ in COLONNES])
     ws3 = wb.create_sheet("Besoin")
-    _feuille(ws3, ["Pays", "Enquêteurs à recruter"], [[z, besoin.get(z, 0)] for z in zones] + [["Total", sum(besoin.values())]], {"Pays": 28})
+    _feuille(ws3, ["Pays", "Titulaires", "Réserves"], [[z, besoin.get(z, 0), reserve.get(z, 0)] for z in zones]
+             + [["Total", sum(besoin.values()), sum(reserve.values())]], {"Pays": 28})
     for c in ws3[ws3.max_row]:
         c.font = Font(bold=True)
         c.alignment = Alignment()
@@ -121,6 +128,8 @@ def _cle_colonne(entete):
         return "prenom"
     if s == "nom" or s.startswith("nom_de_famille") or s.startswith("nom_"):
         return "nom"
+    if s.startswith(("role", "statut", "fonction")):
+        return "role"
     if s.startswith("pays"):
         return "pays"
     if s.startswith("ville") or s.startswith("localite"):
@@ -176,7 +185,7 @@ def telephone(brut, zone):
     return (f"+{ind} {chiffres[len(ind):]}" if ind else f"+{chiffres}"), None
 
 
-def lire(chemin, zones, besoin):
+def lire(chemin, zones, besoin, reserve=None):
     """Liste des RH -> (équipe, alertes, rejetés). Une ligne sans nom ou hors des pays de l'étude est rejetée."""
     lignes = [l for l in _lignes(chemin) if any(str(x).strip() for x in l)]
     if not lignes:
@@ -189,7 +198,7 @@ def lire(chemin, zones, besoin):
         k = _cle_colonne(x)
         if k and k not in cols:
             cols[k] = j
-    manquantes = [c for c, k, _ in COLONNES if k not in cols]
+    manquantes = [c for c, k, _ in COLONNES if k not in cols and k != "role"]
     exemple = {(e["nom"], e["prenom"]) for e in exemples(zones)}
     equipe, alertes, rejetes, vus, completes = [], [], [], {}, []
     for n, l in enumerate(lignes[i_ent + 1:], i_ent + 2):
@@ -218,8 +227,9 @@ def lire(chemin, zones, besoin):
                 alertes.append(f"{qui} : même {cle} que la ligne {vus[(cle, val)]}")
             elif val:
                 vus[(cle, val)] = n
+        role = "reserve" if slug(v.get("role", "")).startswith(("reserve", "rempla", "suppl")) else "titulaire"
         equipe.append({"nom": v.get("nom", "").upper(), "prenom": v.get("prenom", ""), "pays": zone,
-                       "ville": v.get("ville", ""), "telephone": tel, "mail": mail})
+                       "ville": v.get("ville", ""), "telephone": tel, "mail": mail, "role": role})
     if not equipe:
         raise ValueError("Aucun enquêteur lu dans le fichier." + (f" Lignes rejetées : {'; '.join(rejetes[:3])}." if rejetes else ""))
     if manquantes:
@@ -227,7 +237,10 @@ def lire(chemin, zones, besoin):
     if completes:
         alertes.append(f"Indicatif du pays ajouté à {len(completes)} numéro(s) (ligne{'s' if len(completes) > 1 else ''} {', '.join(completes)})")
     for z in zones:
-        nb = sum(1 for e in equipe if e["pays"] == z)
+        nb = sum(1 for e in equipe if e["pays"] == z and e["role"] == "titulaire")
         if besoin.get(z) and nb != besoin[z]:
-            alertes.append(f"{z} : {nb} enquêteur(s) pour {besoin[z]} prévu(s)")
+            alertes.append(f"{z} : {nb} titulaire(s) pour {besoin[z]} prévu(s)")
+        nr = sum(1 for e in equipe if e["pays"] == z and e["role"] == "reserve")
+        if (reserve or {}).get(z) and nr < reserve[z]:
+            alertes.append(f"{z} : {nr} réserve(s) pour {reserve[z]} prévue(s)")
     return equipe, alertes, rejetes

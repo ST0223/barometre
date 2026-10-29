@@ -28,6 +28,13 @@ HYPOTHESES_DEFAUT = {
     "jours_analyse": 8, "imprevus": 8, "coef_deplacement": 1.0,
 }
 
+# Organisation du terrain : Datatym forme en ligne (Teams) et supervise à distance ; le présentiel reste possible
+OPTIONS_DEFAUT = {"formation": "en_ligne", "supervision": "distance"}
+OPTIONS = {"formation": ("en_ligne", "presentiel"), "supervision": ("distance", "terrain")}
+# postes qui n'existent qu'en présentiel ou avec des superviseurs sur le terrain
+POSTES_FORMATION_PRESENTIEL = ("formation_enqueteur", "formation_zone")
+POSTES_SUPERVISION_TERRAIN = ("supervision_jour",)
+
 # Scénarios de la fourchette du cadrage : seules les hypothèses incertaines varient
 SCENARIOS = [
     ("bas", "Bas", 8, {"jours_preparation": 4, "jours_analyse": 6, "part_rappels": 10, "imprevus": 5},
@@ -55,16 +62,19 @@ def completer(couts, hypotheses):
                 "actif": c.get("actif", True) is not False, "perso": True}
                for c in couts or [] if str(c.get("cle", "")).startswith("perso_")]
     hyp = {**HYPOTHESES_DEFAUT, **{k: float(v) for k, v in (hypotheses or {}).items() if k in HYPOTHESES_DEFAUT and v not in (None, "")}}
+    hyp.update({k: (hypotheses or {}).get(k) if (hypotheses or {}).get(k) in OPTIONS[k] else v for k, v in OPTIONS_DEFAUT.items()})
     return grille, hyp
 
 
-def calculer(n, n_enq, n_jours, n_zones, couts, hypotheses):
-    """Budget poste par poste. Renvoie les lignes, le sous-total, les imprévus et le total."""
+def calculer(n, n_enq, n_jours, n_zones, couts, hypotheses, n_reserves=0):
+    """Budget poste par poste. Renvoie les lignes, le sous-total, les imprévus et le total.
+    Les réserves ne coûtent qu'en formation présentielle : elles sont payées au questionnaire validé."""
     grille, h = completer(couts, hypotheses)
     u = {c["cle"]: c["valeur"] for c in grille}
     lib = {c["cle"]: c["libelle"] for c in grille}
     jf = h["jours_formation"]
-    n_sup = max(n_zones, math.ceil(n_enq / max(h["enq_par_superviseur"], 1)))
+    n_sup = max(n_zones, math.ceil(n_enq / max(h["enq_par_superviseur"], 1))) if h["supervision"] == "terrain" else 0
+    n_form = n_enq + n_reserves
     rappels = math.ceil(n * h["part_rappels"] / 100)
     ej = n_enq * n_jours
 
@@ -78,7 +88,7 @@ def calculer(n, n_enq, n_jours, n_zones, couts, hypotheses):
               + (f" × {h['coef_deplacement']:.2f}".replace(".", ",") if h["coef_deplacement"] != 1 else ""),
               ej, u["transport_jour"] * h["coef_deplacement"]),
         ligne("communication_jour", f"{n_enq} enquêteurs × {n_jours} jours", ej, u["communication_jour"]),
-        ligne("formation_enqueteur", f"{n_enq} enquêteurs × {jf:g} jour(s)", n_enq * jf, u["formation_enqueteur"]),
+        ligne("formation_enqueteur", f"{n_form} enquêteurs × {jf:g} jour(s)", n_form * jf, u["formation_enqueteur"]),
         ligne("formation_zone", f"{n_zones} zone(s)", n_zones, u["formation_zone"]),
         ligne("supervision_jour", f"{n_sup} superviseur(s) × {n_jours + jf:g} jours", n_sup * (n_jours + jf), u["supervision_jour"]),
         ligne("controle_rappel", f"{h['part_rappels']:g} % des questionnaires rappelés", rappels, u["controle_rappel"]),
@@ -87,7 +97,8 @@ def calculer(n, n_enq, n_jours, n_zones, couts, hypotheses):
         ligne("analyse_jour", f"{h['jours_analyse']:g} jours", h["jours_analyse"], u["analyse_jour"], False),
     ] + [ligne(c["cle"], "forfait", 1, c["valeur"], False) for c in grille if c.get("perso")]
     actif = {c["cle"]: c["actif"] for c in grille}
-    lignes = [l for l in lignes if actif.get(l["cle"], True)]
+    hors = (POSTES_FORMATION_PRESENTIEL if h["formation"] == "en_ligne" else ()) + (POSTES_SUPERVISION_TERRAIN if h["supervision"] == "distance" else ())
+    lignes = [l for l in lignes if actif.get(l["cle"], True) and l["cle"] not in hors]
     sous_total = sum(l["montant"] for l in lignes)
     imprevus = sous_total * h["imprevus"] / 100
     total = sous_total + imprevus

@@ -181,10 +181,12 @@ def exporter(projet, cle):
         f = store.nom_fichier(projet, "Formation_Enqueteurs", v, "pptx")
         formation.generer_pptx(out / f, projet, _data(projet, "cadrage"), q, e["data"])
         ajout("Présentation de formation des enquêteurs", f)
-        formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, q, e["data"]["enqueteurs"])
+        # réserves incluses : un remplacement se fait sans redéployer le formulaire
+        formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, q, e["data"]["enqueteurs"]
+                                     + [{**r, "categorie": "reserve"} for r in e["data"].get("reserves") or []])
         ajout("Liste des enquêteurs pour Kobo (noms définitifs)", formulaires.FICHIER_ENQUETEURS)
         f = store.nom_fichier(projet, "Liste_Enqueteurs_A_Renseigner", v, "xlsx")
-        equipe.modele_xlsx(out / f, e["data"]["zones"], e["data"].get("besoin") or {})
+        equipe.modele_xlsx(out / f, e["data"]["zones"], e["data"].get("besoin") or {}, e["data"].get("reserve") or {})
         ajout("Liste des enquêteurs à renseigner par les RH (jointe à la note de recrutement)", f)
     if cle == "collecte" and collecte.chemin_donnees(projet).exists():
         f = store.nom_fichier(projet, "Donnees_Collecte", v, "csv")

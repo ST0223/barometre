@@ -891,6 +891,14 @@ function editeurEchantillonnage(z, e) {
       <div class="champ"><label>Taux de réalisation attendu</label><input class="saisie" type="number" step="0.05" min="0.3" max="1" data-p="marge" value="${P.marge}"><span class="aide" style="font-size:12px">0,9 = marge de 10 % pour les refus</span></div>
       <div class="champ"><label>Début de la collecte</label><input class="saisie" type="date" data-p="date_debut" value="${P.date_debut}"></div>
       <div class="champ"><label class="bascule" style="margin-top:26px"><input type="checkbox" data-p="sans_dimanche" ${P.sans_dimanche ? "checked" : ""}> Pas de collecte le dimanche</label></div>
+      <div class="champ"><label>Formation des enquêteurs</label><select class="saisie" data-hyp-opt="formation">
+        ${[["en_ligne", "En ligne (Microsoft Teams)"], ["presentiel", "En présentiel dans les pays"]].map(([v, l]) => `<option value="${v}" ${(P.hypotheses || {}).formation === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <span class="aide" style="font-size:12px">En ligne : ni salle ni per diem dans le budget</span></div>
+      <div class="champ"><label>Supervision</label><select class="saisie" data-hyp-opt="supervision">
+        ${[["distance", "À distance par Datatym"], ["terrain", "Superviseurs sur le terrain"]].map(([v, l]) => `<option value="${v}" ${(P.hypotheses || {}).supervision === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <span class="aide" style="font-size:12px">À distance : suivi par le tableau de bord, sans superviseur payé</span></div>
+      <div class="champ"><label>Réserves à recruter (% des enquêteurs)</label><input class="saisie" type="number" min="0" max="100" step="5" data-p="part_reserve" value="${P.part_reserve ?? 15}">
+        <span class="aide" style="font-size:12px">${(d.reserves || []).length || Object.values(d.reserve || {}).reduce((a, b) => a + b, 0)} réserve(s), formées avec l'équipe, payées seulement si elles remplacent un abandon</span></div>
     </div>
     ${blocEquipe(d, P)}
     <div class="grille-2" style="margin-bottom:18px">
@@ -907,8 +915,9 @@ function editeurEchantillonnage(z, e) {
     S.sale = true;
     if (t.dataset.p) {
       const k = t.dataset.p;
-      P[k] = k === "sans_dimanche" ? t.checked : k === "noms_enqueteurs" ? t.value.split("\n").map((x) => x.trim()).filter(Boolean) : ["rendement", "marge"].includes(k) ? Number(t.value) : t.value;
-    } else if (t.dataset.pz) P.poids_zones[t.dataset.pz] = Number(t.value);
+      P[k] = k === "sans_dimanche" ? t.checked : k === "noms_enqueteurs" ? t.value.split("\n").map((x) => x.trim()).filter(Boolean) : ["rendement", "marge", "part_reserve"].includes(k) ? Number(t.value) : t.value;
+    } else if (t.dataset.hypOpt) P.hypotheses = { ...P.hypotheses, [t.dataset.hypOpt]: t.value };
+    else if (t.dataset.pz) P.poids_zones[t.dataset.pz] = Number(t.value);
     else if (t.dataset.pp) P.poids_profils[t.dataset.pp] = Number(t.value);
     else if (t.dataset.cu !== undefined) P.couts[+t.dataset.cu].valeur = Number(t.value);
     else if (t.dataset.cuLib !== undefined) P.couts[+t.dataset.cuLib].libelle = t.value;
@@ -960,20 +969,23 @@ function blocEquipe(d, P) {
   // identifiants attribués au dernier enregistrement (ENQML01, ENQCI01… pays par pays)
   const ids = {};
   d.enqueteurs.forEach((m) => m.contact && (ids[`${m.contact.telephone}|${m.contact.mail}`] = m.code));
-  const parPays = d.zones.map((z) => [z, eq.filter((m) => m.pays === z).length, besoin[z] || 0]);
+  const reserve = d.reserve || {};
+  const titulaires = eq.filter((m) => m.role !== "reserve");
+  (d.reserves || []).forEach((r) => (ids[`${r.contact.telephone}|${r.contact.mail}`] = r.code));
+  const parPays = d.zones.map((z) => [z, titulaires.filter((m) => m.pays === z).length, besoin[z] || 0, eq.filter((m) => m.pays === z && m.role === "reserve").length, reserve[z] || 0]);
   const telecharger = `<a class="btn" href="/api/projets/${S.projet.slug}/equipe/modele">${ico("download")} Fichier à envoyer aux RH</a>`;
   const importer = `<label class="btn btn-ed btn-primaire" style="cursor:pointer">${ico("upload")} ${eq.length ? "Importer une nouvelle liste" : "Importer la liste des RH"}<input type="file" id="equipe-fic" accept=".xlsx,.csv" hidden></label>`;
   return `<div id="bloc-equipe" style="margin-bottom:18px">
-    <div class="lib" style="margin-bottom:6px">Équipe d'enquêteurs <span class="ex">${eq.length ? `liste des RH : ${eq.length} enquêteurs` : `${d.nb_enqueteurs} à recruter, désignés Enq1, Enq2… en attendant la liste des RH`}</span></div>
+    <div class="lib" style="margin-bottom:6px">Équipe d'enquêteurs <span class="ex">${eq.length ? `liste des RH : ${titulaires.length} titulaires, ${eq.length - titulaires.length} réserves` : `${d.nb_enqueteurs} titulaires et ${Object.values(reserve).reduce((a, b) => a + b, 0)} réserves à recruter ; Enq1, Enq2… en attendant la liste des RH`}</span></div>
     <div class="actions" style="margin-bottom:10px;flex-wrap:wrap">${telecharger}${importer}${eq.length || (P.noms_enqueteurs || []).length ? `<button class="btn btn-ed" data-equipe-retirer>Revenir à Enq1, Enq2…</button>` : ""}</div>
-    ${eq.length ? "" : `<p class="aide" style="margin-top:0">Envoyez aux RH la note de recrutement et le fichier Excel : ils le renvoient avec une ligne par enquêteur retenu (nom, prénom, pays de résidence, ville, téléphone avec indicatif, mail). Les identifiants sont attribués ici, à l'import.</p>`}
+    ${eq.length ? "" : `<p class="aide" style="margin-top:0">Envoyez aux RH la note de recrutement et le fichier Excel : ils le renvoient avec une ligne par enquêteur retenu (nom, prénom, pays de résidence, ville, téléphone avec indicatif, mail, rôle titulaire ou réserve). Les identifiants sont attribués ici, à l'import.</p>`}
     ${lu && (lu.alertes.length || lu.rejetes.length) ? `<div class="bandeau alerte" style="margin-bottom:10px">${ico("alert")}<div><b>À vérifier dans « ${esc(lu.fichier)} » :</b><ul style="margin:6px 0 0;padding-left:18px">
       ${lu.rejetes.map((x) => `<li><b>Non retenu</b> — ${esc(x)}</li>`).join("")}${lu.alertes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div></div>` : ""}
-    ${eq.length ? `<div class="puces" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${parPays.map(([z, n, b]) =>
-      `<span class="tag" style="${n < b ? "color:var(--rouge)" : ""}">${esc(z)} : ${n}${b ? ` / ${b}` : ""}</span>`).join("")}</div>
-      <div class="grille-tab" style="max-height:340px;overflow:auto"><table><thead><tr><th>ID</th><th>Nom</th><th>Prénom</th><th>Pays</th><th>Ville</th><th>Téléphone</th><th>Mail</th></tr></thead><tbody>
+    ${eq.length ? `<div class="puces" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${parPays.map(([z, n, b, nr, br]) =>
+      `<span class="tag" style="${n < b || nr < br ? "color:var(--rouge)" : ""}" title="titulaires / prévus · réserves / prévues">${esc(z)} : ${n}${b ? ` / ${b}` : ""}${br || nr ? ` · R ${nr}/${br}` : ""}</span>`).join("")}</div>
+      <div class="grille-tab" style="max-height:340px;overflow:auto"><table><thead><tr><th>ID</th><th>Nom</th><th>Prénom</th><th>Pays</th><th>Ville</th><th>Téléphone</th><th>Mail</th><th>Rôle</th></tr></thead><tbody>
       ${eq.map((m) => `<tr><td>${ids[`${m.telephone}|${m.mail}`] ? `<b>${esc(ids[`${m.telephone}|${m.mail}`])}</b>` : '<span class="aide">à l\'enregistrement</span>'}</td>
-        <td>${esc(m.nom)}</td><td>${esc(m.prenom)}</td><td>${esc(m.pays)}</td><td>${esc(m.ville)}</td><td style="white-space:nowrap">${esc(m.telephone)}</td><td>${esc(m.mail)}</td></tr>`).join("")}
+        <td>${esc(m.nom)}</td><td>${esc(m.prenom)}</td><td>${esc(m.pays)}</td><td>${esc(m.ville)}</td><td style="white-space:nowrap">${esc(m.telephone)}</td><td>${esc(m.mail)}</td><td>${m.role === "reserve" ? "Réserve" : "Titulaire"}</td></tr>`).join("")}
       </tbody></table></div>` : ""}
   </div>`;
 }
@@ -987,6 +999,10 @@ function blocBudget(d, P) {
   const est = S.projet.etapes.cadrage.data.estimation;
   const plafond = S.projet.fiche.cout;
   // étude créée avant le budget de collecte : il apparaît à la prochaine mise à jour de l'étape
+  const h = P.hypotheses || {};
+  // postes sans objet avec la formation en ligne ou la supervision à distance
+  const horsMode = (cle) => (h.formation !== "presentiel" && ["formation_enqueteur", "formation_zone"].includes(cle) ? "Sans objet : formation en ligne"
+    : h.supervision !== "terrain" && cle === "supervision_jour" ? "Sans objet : supervision à distance" : "");
   if (!P.couts) return `<div class="bandeau info">${ico("info")}<div>Le budget de collecte sera calculé à la prochaine mise à jour de cette étape (bouton <b>Mettre à jour</b>, ou rouvrir puis régénérer).</div></div>`;
   return `<div class="lib" style="margin-bottom:6px">Budget de collecte <span class="ex">document interne, recalculé à partir du plan</span></div>
     ${b ? `<div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
@@ -996,7 +1012,7 @@ function blocBudget(d, P) {
     ${est ? `<p class="aide">Estimation du cadrage : ${nf(est.bas)} à ${nf(est.haut)} FCFA${plafond ? ` · plafond : ${nf(plafond)} FCFA${b.total > plafond ? ` <b style="color:var(--rouge)">dépassé de ${nf(b.total - plafond)} FCFA</b>` : ""}` : ""}</p>` : ""}` : ""}
     <div class="grille-2" style="margin-bottom:18px;align-items:start">
       <div class="grille-tab"><table><thead><tr><th>Coût unitaire</th><th>Unité</th><th>FCFA</th></tr></thead><tbody>
-        ${P.couts.map((c, k) => `<tr style="${c.actif === false ? "opacity:.45" : ""}">
+        ${P.couts.map((c, k) => `<tr style="${c.actif === false || horsMode(c.cle) ? "opacity:.45" : ""}" title="${horsMode(c.cle) ? esc(horsMode(c.cle)) : ""}">
           <td><label class="bascule" title="Inclure ce poste dans le budget"><input type="checkbox" data-cu-actif="${k}" ${c.actif === false ? "" : "checked"}>
             ${c.perso ? `<input class="saisie petite" style="width:170px" data-cu-lib="${k}" value="${esc(c.libelle)}" placeholder="Intitulé du poste">` : esc(c.libelle)}</label></td>
           <td class="aide">${esc(c.unite)}</td>
@@ -1004,8 +1020,8 @@ function blocBudget(d, P) {
             ${c.perso ? `<button class="btn btn-ed petit" data-cu-suppr="${k}" title="Supprimer ce poste">×</button>` : ""}</td></tr>`).join("")}
       </tbody></table>
       <button class="btn btn-ed" data-cu-ajout style="margin-top:8px">+ Ajouter un poste</button>
-      <p class="aide" style="font-size:12px">Décochez un poste pour l'exclure du budget (ex. salle déjà disponible). Un poste ajouté est un forfait.</p></div>
-      <div>${HYPOTHESES_BUDGET.map(([k, l]) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="flex:1">${esc(l)}</span><input class="saisie petite" style="width:90px" type="number" min="0" step="1" data-hyp="${k}" value="${P.hypotheses[k]}"></div>`).join("")}</div>
+      <p class="aide" style="font-size:12px">Décochez un poste pour l'exclure du budget. Un poste ajouté est un forfait. Les postes estompés sont sans objet avec l'organisation choisie (formation en ligne, supervision à distance).</p></div>
+      <div>${HYPOTHESES_BUDGET.filter(([k]) => k !== "enq_par_superviseur" || h.supervision === "terrain").map(([k, l]) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="flex:1">${esc(l)}</span><input class="saisie petite" style="width:90px" type="number" min="0" step="1" data-hyp="${k}" value="${P.hypotheses[k]}"></div>`).join("")}</div>
     </div>
     ${b ? `<div class="grille-tab"><table><thead><tr><th>Poste</th><th>Base de calcul</th><th>Montant</th></tr></thead><tbody>
       ${b.lignes.map((l) => `<tr><td>${esc(l.poste)}</td><td class="aide">${esc(l.base)}</td><td>${nf(l.montant)} FCFA</td></tr>`).join("")}

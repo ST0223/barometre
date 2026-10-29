@@ -63,7 +63,7 @@ Le coût de revient est construit poste par poste (quantité tirée du plan × c
 | Moment | Ce qui est produit |
 |---|---|
 | Note de cadrage | Fourchette basse, centrale, haute calculée à partir de la fiche ; figée à la génération, c'est la référence annoncée |
-| Échantillonnage | Budget de collecte détaillé (document interne), à partir des quotas, enquêteurs, superviseurs, jours et zones ; coûts unitaires et hypothèses modifiables dans l'onglet Paramètres ; chaque poste peut être décoché (exclu du budget) et des postes forfaitaires peuvent être ajoutés |
+| Échantillonnage | Budget de collecte détaillé (document interne), à partir des quotas, enquêteurs, superviseurs, jours et zones ; coûts unitaires et hypothèses modifiables dans l'onglet Paramètres ; chaque poste peut être décoché (exclu du budget) et des postes forfaitaires peuvent être ajoutés ; par défaut, formation en ligne (Teams, sans salle ni per diem) et supervision à distance par Datatym (sans superviseur payé), le présentiel et les superviseurs terrain restant des options |
 | Note de suivi | Dépenses réelles saisies dans l'onglet « Bilan financier » ; écarts par poste, coût réel par questionnaire validé, coût des questionnaires écartés |
 
 Le plafond budgétaire de la fiche ne sert qu'à vérifier que l'estimation reste dans l'enveloppe. Aucun montant
@@ -75,7 +75,9 @@ Les coûts unitaires livrés sont indicatifs : à remplacer par les tarifs de Da
 1. Étape **Échantillonnage › Paramètres** : bouton « Fichier à envoyer aux RH ». L'envoyer aux RH avec la note
    de recrutement (besoin par pays, profil, calendrier, consignes de remplissage avec un exemple de deux lignes).
 2. Les RH renvoient le fichier avec une ligne par enquêteur retenu : Nom, Prénom, Pays de résidence, Ville,
-   Téléphone (avec l'indicatif du pays, saisi `'+221…` pour qu'Excel garde le « + »), Mail.
+   Téléphone (avec l'indicatif du pays, saisi `'+221…` pour qu'Excel garde le « + »), Mail, Rôle (Titulaire ou Réserve).
+   Les réserves (15 % des enquêteurs par défaut) sont formées avec l'équipe, n'ont pas de quotas et figurent dans
+   `liste_enqueteurs.csv` (catégorie `reserve`) : un remplacement se fait sans redéployer le formulaire.
 3. « Importer la liste des RH » : la plateforme contrôle le fichier (pays hors de l'étude, mails invalides,
    doublons, nombre d'enquêteurs par pays comparé au besoin, indicatif ajouté s'il manque), puis, à l'enregistrement,
    attribue les identifiants pays par pays (ENQ, code du pays et numéro d'ordre : ENQML01, ENQCI01, ENQSN01…) et met à jour quotas, calendrier, formation et `liste_enqueteurs.csv`.
