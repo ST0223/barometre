@@ -70,7 +70,7 @@ def recrutement_defaut(projet, n_enq, jours, n_res=0, hyp=None):
         ],
         "remuneration": "Rémunération au questionnaire validé, versée par Mobile Money à la fin de la collecte.",
         "dossier": [
-            "CV à jour, indiquant le pays et la ville de résidence, les missions de collecte réalisées et les outils utilisés.",
+            "CV à jour.",
             "Lettre de motivation.",
             "Certificat ou attestation de collecte, si vous en disposez (atout).",
         ],
@@ -88,7 +88,9 @@ CHAMPS_CALCULES = ("intitule", "mission", "date_limite", "date_candidature", "ob
 # anciens textes par défaut : une étude qui les a gardés tels quels reçoit les nouveaux (annonce publiée, ATS)
 ANCIENS_DEFAUTS = {
     "dossier": [["CV à jour", "Lettre de motivation", "Copie du dernier diplôme",
-                 "Références de missions d'enquête antérieures (facultatif, constituent un atout)"]],
+                 "Références de missions d'enquête antérieures (facultatif, constituent un atout)"],
+                ["CV à jour, indiquant le pays et la ville de résidence, les missions de collecte réalisées et les outils utilisés.",
+                 "Lettre de motivation.", "Certificat ou attestation de collecte, si vous en disposez (atout)."]],
     "taches": [["Identifier et contacter les répondants éligibles selon les quotas attribués.",
                 "Présenter l'étude, recueillir le consentement et administrer le questionnaire sur smartphone ou tablette.",
                 "Saisir les réponses avec rigueur et envoyer les formulaires chaque jour.",
