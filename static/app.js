@@ -912,7 +912,20 @@ function editeurEchantillonnage(z, e) {
     } else if (t.dataset.pz) P.poids_zones[t.dataset.pz] = Number(t.value);
     else if (t.dataset.pp) P.poids_profils[t.dataset.pp] = Number(t.value);
     else if (t.dataset.cu !== undefined) P.couts[+t.dataset.cu].valeur = Number(t.value);
-    else if (t.dataset.hyp) P.hypotheses[t.dataset.hyp] = Number(t.value);
+    else if (t.dataset.cuLib !== undefined) P.couts[+t.dataset.cuLib].libelle = t.value;
+    else if (t.dataset.cuActif !== undefined && ev.type === "change") {
+      P.couts[+t.dataset.cuActif].actif = t.checked;
+      t.closest("tr").style.opacity = t.checked ? "" : ".45";
+    } else if (t.dataset.hyp) P.hypotheses[t.dataset.hyp] = Number(t.value);
+  };
+  z.onclick = (ev) => {
+    const b = ev.target.closest("[data-cu-ajout],[data-cu-suppr]");
+    if (!b) return;
+    S.sale = true;
+    if (b.dataset.cuSuppr !== undefined) P.couts.splice(+b.dataset.cuSuppr, 1);
+    else P.couts.push({ cle: `perso_${Date.now().toString(36)}`, libelle: "", unite: "forfait", valeur: 0, actif: true, perso: true });
+    editeurEchantillonnage(z, e);
+    if (b.dataset.cuAjout !== undefined) [...z.querySelectorAll("[data-cu-lib]")].pop()?.focus();
   };
   piedEnregistrer(z, "echantillonnage", () => ({ params: P }), "Recalculer et mettre à jour les documents");
 }
@@ -935,8 +948,15 @@ function blocBudget(d, P) {
     ${est ? `<p class="aide">Estimation du cadrage : ${nf(est.bas)} à ${nf(est.haut)} FCFA${plafond ? ` · plafond : ${nf(plafond)} FCFA${b.total > plafond ? ` <b style="color:var(--rouge)">dépassé de ${nf(b.total - plafond)} FCFA</b>` : ""}` : ""}</p>` : ""}` : ""}
     <div class="grille-2" style="margin-bottom:18px;align-items:start">
       <div class="grille-tab"><table><thead><tr><th>Coût unitaire</th><th>Unité</th><th>FCFA</th></tr></thead><tbody>
-        ${P.couts.map((c, k) => `<tr><td>${esc(c.libelle)}</td><td class="aide">${esc(c.unite)}</td><td><input class="saisie petite" style="width:110px" type="number" min="0" step="500" data-cu="${k}" value="${c.valeur}"></td></tr>`).join("")}
-      </tbody></table></div>
+        ${P.couts.map((c, k) => `<tr style="${c.actif === false ? "opacity:.45" : ""}">
+          <td><label class="bascule" title="Inclure ce poste dans le budget"><input type="checkbox" data-cu-actif="${k}" ${c.actif === false ? "" : "checked"}>
+            ${c.perso ? `<input class="saisie petite" style="width:170px" data-cu-lib="${k}" value="${esc(c.libelle)}" placeholder="Intitulé du poste">` : esc(c.libelle)}</label></td>
+          <td class="aide">${esc(c.unite)}</td>
+          <td style="white-space:nowrap"><input class="saisie petite" style="width:110px" type="number" min="0" step="500" data-cu="${k}" value="${c.valeur}">
+            ${c.perso ? `<button class="btn btn-ed petit" data-cu-suppr="${k}" title="Supprimer ce poste">×</button>` : ""}</td></tr>`).join("")}
+      </tbody></table>
+      <button class="btn btn-ed" data-cu-ajout style="margin-top:8px">+ Ajouter un poste</button>
+      <p class="aide" style="font-size:12px">Décochez un poste pour l'exclure du budget (ex. salle déjà disponible). Un poste ajouté est un forfait.</p></div>
       <div>${HYPOTHESES_BUDGET.map(([k, l]) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="flex:1">${esc(l)}</span><input class="saisie petite" style="width:90px" type="number" min="0" step="1" data-hyp="${k}" value="${P.hypotheses[k]}"></div>`).join("")}</div>
     </div>
     ${b ? `<div class="grille-tab"><table><thead><tr><th>Poste</th><th>Base de calcul</th><th>Montant</th></tr></thead><tbody>

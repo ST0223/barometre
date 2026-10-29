@@ -48,7 +48,12 @@ def couts_reference():
 def completer(couts, hypotheses):
     """Grille et hypothèses complètes, dans l'ordre de référence (une étude ancienne peut en manquer)."""
     par_cle = {c["cle"]: c for c in couts or []}
-    grille = [{**c, "valeur": float(par_cle.get(c["cle"], c)["valeur"] or 0)} for c in couts_reference()]
+    # postes de référence (un poste décoché est exclu du budget), puis postes ajoutés par l'utilisateur (forfaits)
+    grille = [{**c, "valeur": float(par_cle.get(c["cle"], c)["valeur"] or 0), "actif": par_cle.get(c["cle"], {}).get("actif", True) is not False}
+              for c in couts_reference()]
+    grille += [{"cle": c["cle"], "libelle": str(c.get("libelle") or "Autre poste"), "unite": "forfait", "valeur": float(c.get("valeur") or 0),
+                "actif": c.get("actif", True) is not False, "perso": True}
+               for c in couts or [] if str(c.get("cle", "")).startswith("perso_")]
     hyp = {**HYPOTHESES_DEFAUT, **{k: float(v) for k, v in (hypotheses or {}).items() if k in HYPOTHESES_DEFAUT and v not in (None, "")}}
     return grille, hyp
 
@@ -80,7 +85,9 @@ def calculer(n, n_enq, n_jours, n_zones, couts, hypotheses):
         ligne("outils_forfait", "forfait", 1, u["outils_forfait"], False),
         ligne("preparation_jour", f"{h['jours_preparation']:g} jours", h["jours_preparation"], u["preparation_jour"], False),
         ligne("analyse_jour", f"{h['jours_analyse']:g} jours", h["jours_analyse"], u["analyse_jour"], False),
-    ]
+    ] + [ligne(c["cle"], "forfait", 1, c["valeur"], False) for c in grille if c.get("perso")]
+    actif = {c["cle"]: c["actif"] for c in grille}
+    lignes = [l for l in lignes if actif.get(l["cle"], True)]
     sous_total = sum(l["montant"] for l in lignes)
     imprevus = sous_total * h["imprevus"] / 100
     total = sous_total + imprevus

@@ -63,7 +63,7 @@ Le coût de revient est construit poste par poste (quantité tirée du plan × c
 | Moment | Ce qui est produit |
 |---|---|
 | Note de cadrage | Fourchette basse, centrale, haute calculée à partir de la fiche ; figée à la génération, c'est la référence annoncée |
-| Échantillonnage | Budget de collecte détaillé (document interne), à partir des quotas, enquêteurs, superviseurs, jours et zones ; coûts unitaires et hypothèses modifiables dans l'onglet Paramètres |
+| Échantillonnage | Budget de collecte détaillé (document interne), à partir des quotas, enquêteurs, superviseurs, jours et zones ; coûts unitaires et hypothèses modifiables dans l'onglet Paramètres ; chaque poste peut être décoché (exclu du budget) et des postes forfaitaires peuvent être ajoutés |
 | Note de suivi | Dépenses réelles saisies dans l'onglet « Bilan financier » ; écarts par poste, coût réel par questionnaire validé, coût des questionnaires écartés |
 
 Le plafond budgétaire de la fiche ne sert qu'à vérifier que l'estimation reste dans l'enveloppe. Aucun montant
