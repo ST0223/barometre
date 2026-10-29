@@ -1,6 +1,8 @@
 """Stockage d'un baromètre : un dossier par baromètre (fiche, livrables, versions validées, données)."""
 import json
+import os
 import shutil
+import stat
 from datetime import datetime
 
 from .banque import mots_theme, slug
@@ -100,15 +102,28 @@ def sauver(projet):
 
 
 def supprimer(slug_):
+    """Supprime une étude. Le dossier est d'abord renommé d'un seul coup : si un fichier est ouvert (Word, Excel,
+    synchronisation OneDrive), rien n'est supprimé à moitié et l'erreur remonte. Le dossier renommé disparaît de la liste."""
     d = dossier(slug_)
-    if d.exists() and d.parent == PROJETS_DIR:
-        shutil.rmtree(d)
+    if not (d.exists() and d.parent == PROJETS_DIR):
+        return
+    corbeille = PROJETS_DIR / f".supprime-{slug_}-{datetime.now():%Y%m%d%H%M%S}"
+    d.rename(corbeille)
+
+    def forcer(fonction, chemin, _):
+        os.chmod(chemin, stat.S_IWRITE)  # fichier en lecture seule (OneDrive, Word) : on retire la protection et on réessaie
+        fonction(chemin)
+    shutil.rmtree(corbeille, onerror=forcer)
 
 
 def lister():
     PROJETS_DIR.mkdir(parents=True, exist_ok=True)
     res = []
+    for reste in PROJETS_DIR.glob(".supprime-*"):
+        shutil.rmtree(reste, ignore_errors=True)  # suppression interrompue (fichier qui était ouvert) : on termine
     for f in PROJETS_DIR.glob("*/projet.json"):
+        if f.parent.name.startswith("."):
+            continue
         try:
             p = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):

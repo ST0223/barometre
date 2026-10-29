@@ -391,10 +391,14 @@ function lierColonne() {
     if (!(await confirmer("Êtes-vous sûr de vouloir supprimer ce projet ?",
       `**${S.projet.fiche.theme}** : tous ses documents, versions et données seront définitivement supprimés. Cette action est irréversible.`,
       "OUI", "btn-danger", "NON"))) return;
-    await api("DELETE", `/api/projets/${S.projet.slug}`);
+    try {
+      await api("DELETE", `/api/projets/${S.projet.slug}`);
+    } catch (err) {
+      return toast(err.message, "erreur");  // ex. fichier ouvert dans Word : rien n'a été supprimé
+    }
     S.projet = null;
-    toast("Baromètre supprimé.");
-    location.hash = "#/";
+    toast("Baromètre supprimé.", "succes");
+    location.hash = "#/etudes";
   };
 }
 

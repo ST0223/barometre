@@ -96,7 +96,11 @@ def maj_fiche(slug):
 
 @app.delete("/api/projets/<slug>")
 def supprimer(slug):
-    store.supprimer(slug)
+    try:
+        store.supprimer(slug)
+    except OSError:
+        return jsonify({"erreur": "Suppression impossible : un fichier de cette étude est ouvert (Word, Excel…) ou en cours de "
+                                  "synchronisation OneDrive. Fermez-le, puis réessayez."}), 409
     return jsonify({"ok": True})
 
 
