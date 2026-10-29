@@ -84,7 +84,8 @@ def construire_docs(projet, data, cadrage, quest, ech):
         section("outils", "6. Outils d'enquête et système de suivi", [
             liste([
                 f"**Collecte :** {outil}, sur smartphone ou tablette, avec saisie hors ligne et envoi quotidien.",
-                "**Formulaires :** fichier XLSForm pour KoboToolbox et fichier d'import pour QuestionPro, générés depuis le questionnaire validé.",
+                ("**Formulaire :** fichier XLSForm pour KoboToolbox, généré depuis le questionnaire validé." if fiche.get("outil") == "kobo"
+                 else "**Formulaire :** fichier d'import pour QuestionPro, généré depuis le questionnaire validé."),
                 "**Suivi :** tableau de bord de la plateforme Datatym, alimenté par les soumissions : avancement par enquêteur, par zone et par quota, écarts au calendrier.",
             ]),
         ], source="auto"),

@@ -263,7 +263,8 @@ def construire_docs(projet, data):
         section("livrables", "7. Livrables et calendrier indicatif", [
             tableau(["Livrable", "Contenu"], [
                 ["Note de cadrage", "Le présent document, validé avant le questionnaire"],
-                ["Questionnaire", "Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo, import QuestionPro"],
+                ["Questionnaire", "Versions terrain et digitale, dictionnaire des variables, "
+                                  + ("formulaire XLSForm pour KoboToolbox" if fiche.get("outil") == "kobo" else "fichier d'import QuestionPro")],
                 ["Note d'échantillonnage", "Quotas, répartition par enquêteur, calendrier, annonce de recrutement, demande aux RH, formation"],
                 ["Budget de collecte", "Coût de revient détaillé poste par poste, établi avec le plan de collecte (document interne)"],
                 ["Note méthodologique", "Synthèse de la méthode, des outils et du calcul des indicateurs"],
