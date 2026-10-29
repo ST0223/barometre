@@ -171,11 +171,12 @@ async function router() {
   const { h, params } = lireRoute();
   const app = $("#app");
   const page = h[0] === "p" ? "projet" : h[0] || "accueil";
-  document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("actif", a.dataset.nav === (page === "projet" ? "etudes" : page)));
+  document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("actif", a.dataset.nav === (page === "projet" ? "etudes" : page === "importer" ? "nouveau" : page)));
   $("#nav").classList.toggle("sur-sombre", page === "accueil" || page === "projet");
   const memePage = page === "projet" && S.projet && S.projet.slug === h[1];
   if (!memePage) window.scrollTo(0, 0);
   if (page === "nouveau") { S.projet = null; await chargerListe(); return vueEtude(app, params); }
+  if (page === "importer") { S.projet = null; await chargerListe(); return vueImport(app); }
   if (page === "etudes") { S.projet = null; await chargerListe(); return vueEtudes(app); }
   if (page === "parametres") { S.projet = null; await chargerListe(); return vueParametres(app); }
   if (page === "projet" && h[1]) {

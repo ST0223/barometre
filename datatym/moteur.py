@@ -149,6 +149,16 @@ def exporter(projet, cle):
             f = store.nom_fichier(projet, code, v, "docx")
             rendre_modele(e["docs"][nom], out / f)
             ajout(affiche, f, nom)
+    # étude lancée à partir de documents importés : ils restent disponibles tels quels, à côté des versions de la plateforme
+    sources = (projet["etapes"]["cadrage"].get("data") or {}).get("sources") or {}
+    origine = {"cadrage": ("note", "NoteCadrage_DocumentOrigine", "Note de cadrage — document d'origine"),
+               "questionnaire": ("questionnaire", "Questionnaire_DocumentOrigine", "Questionnaire — document d'origine")}.get(cle)
+    if origine and sources.get(origine[0]):
+        src = store.dossier(projet["slug"]) / "sources" / sources[origine[0]]
+        if src.exists():
+            f = store.nom_fichier(projet, origine[1], 1, src.suffix[1:]).replace("_v1.", ".")
+            shutil.copy(src, out / f)
+            ajout(origine[2], f)
     if cle == "questionnaire":
         c = _data(projet, "cadrage")
         f = store.nom_fichier(projet, "Dictionnaire", v, "xlsx")

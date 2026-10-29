@@ -48,6 +48,7 @@ function vueEtude(app, params) {
       <span class="sur" data-reveal="haut">Nouvelle étude</span>
       <h1 class="titre-section-l" data-reveal="haut" data-delai="80">Les éléments essentiels pour lancer le baromètre.</h1>
       <p class="aide-l" data-reveal="haut" data-delai="160">Partir d'un modèle Datatym, ou saisir librement. Tout reste modifiable ensuite.</p>
+      <a class="btn btn-import" href="#/importer" data-reveal="haut" data-delai="200">${ico("upload")} Vous avez déjà une note de cadrage ? Importez-la</a>
       <div class="modeles">${MODELES.map((x, k) => `<button class="modele ${m && m.cle === x.cle ? "actif" : ""}" data-modele="${x.cle}" style="--f1:${x.fond[0]};--f2:${x.fond[1]}" data-reveal="haut" data-delai="${220 + k * 70}"><span>${esc(x.sur)}</span><b>${esc(x.titre)}</b></button>`).join("")}</div>
     </div>
     <div class="etude-corps">

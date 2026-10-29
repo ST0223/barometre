@@ -2,17 +2,20 @@
 
 Lancement : python app.py  puis ouvrir http://127.0.0.1:8765
 """
+import json
 import logging
 import re
+import shutil
 import tempfile
 import urllib.error
+import uuid
 import webbrowser
 from pathlib import Path
 from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import budget, llm, moteur, store
+from datatym import budget, importation, llm, moteur, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -127,6 +130,54 @@ def maj_doc(slug, cle, nom):
     if cle not in store.CLES:
         abort(404)
     return ok(moteur.maj_doc(_projet(slug), cle, nom, request.get_json(force=True)))
+
+
+# ------------------------------------------------------------------ import d'une note de cadrage (et de son questionnaire)
+IMPORTS = PROJETS_DIR / ".imports"
+
+
+@app.post("/api/import/analyser")
+def import_analyser():
+    """Lit la note (et le questionnaire s'il est joint) et renvoie une proposition d'étude à vérifier."""
+    note, quest = request.files.get("note"), request.files.get("questionnaire")
+    if not note or not note.filename.lower().endswith(".docx"):
+        return jsonify({"erreur": "La note de cadrage doit être un document Word (.docx)."}), 400
+    if quest and quest.filename and not quest.filename.lower().endswith(".docx"):
+        return jsonify({"erreur": "Le questionnaire doit être un document Word (.docx)."}), 400
+    ident = uuid.uuid4().hex
+    d = IMPORTS / ident
+    d.mkdir(parents=True, exist_ok=True)
+    note.save(d / "note.docx")
+    avec_q = bool(quest and quest.filename)
+    if avec_q:
+        quest.save(d / "questionnaire.docx")
+    try:
+        prop, notes = importation.proposer(d / "note.docx", d / "questionnaire.docx" if avec_q else None)
+    except Exception as exc:  # document illisible ou d'un format inattendu
+        shutil.rmtree(d, ignore_errors=True)
+        return jsonify({"erreur": f"Lecture impossible du document : {exc}"}), 400
+    (d / "proposition.json").write_text(json.dumps(prop, ensure_ascii=False), encoding="utf-8")
+    return jsonify({"id": ident, "proposition": prop, "notes": notes,
+                    "fichiers": {"note": note.filename, "questionnaire": quest.filename if avec_q else None}})
+
+
+@app.post("/api/import/creer")
+def import_creer():
+    """Crée l'étude à partir de la proposition vérifiée et de la fiche corrigée."""
+    c = request.get_json(force=True)
+    ident = str(c.get("id", ""))
+    d = IMPORTS / ident
+    if not re.fullmatch(r"[0-9a-f]{32}", ident) or not (d / "proposition.json").exists():
+        return jsonify({"erreur": "Import introuvable : déposez à nouveau les documents."}), 404
+    prop = json.loads((d / "proposition.json").read_text(encoding="utf-8"))
+    fiche = store.nettoyer_fiche({**prop["fiche"], **(c.get("fiche") or {})})
+    manquants = store.erreurs_fiche(fiche)
+    if manquants:
+        return jsonify({"erreur": "Champs obligatoires manquants : " + ", ".join(manquants)}), 400
+    q = d / "questionnaire.docx"
+    p = importation.creer_etude(prop, fiche, d / "note.docx", q if q.exists() else None, valider=bool(c.get("valider", True)))
+    shutil.rmtree(d, ignore_errors=True)
+    return ok(p)
 
 
 @app.post("/api/projets/<slug>/boucler")
