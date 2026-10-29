@@ -482,7 +482,7 @@ function panneauCloture() {
             ${c ? `<p style="margin:10px 0 0"><b>${esc(c.fichier)}</b> · ${c.nb} fichiers · ${mo(c.taille)} · constituée le ${heureFr(c.date)}</p>` : ""}</div>
           <div class="cl-actions">
             ${c ? `<a class="btn btn-succes" href="/api/projets/${p.slug}/archive">${ico("download")} Télécharger le dossier (ZIP)</a>` : ""}
-            <button class="btn ${c ? "" : "btn-primaire btn-boucle"}" id="boucler">${ico("check")} ${c ? "Reconstituer l'archive" : "BOUCLER"}</button>
+            <button class="btn ${c ? "" : "btn-primaire btn-boucle"}" id="boucler">${ico(c ? "refresh" : "check")} ${c ? "Mettre à jour l'archive" : "BOUCLER"}</button>
           </div>
         </div>
         <h3 class="cl-titre">Bilan des étapes</h3>
@@ -499,14 +499,16 @@ function panneauCloture() {
       </div></div></div>`;
   $("#boucler").onclick = async (ev) => {
     const btn = ev.currentTarget;
-    if (!(await confirmer(c ? "Reconstituer l'archive ?" : "Boucler l'étude ?",
-      `Tous les fichiers de **${p.fiche.theme}** (livrables, versions validées, données) et son historique seront rassemblés dans une archive ZIP téléchargeable.`
-      + (!c && enCours.length ? ` ${enCours.length} étape(s) ne sont pas validées : elles seront archivées dans leur état actuel.` : ""),
+    if (!(await confirmer(c ? "Mettre à jour l'archive ?" : "Boucler l'étude ?",
+      c ? `L'archive de **${p.fiche.theme}** sera refaite avec les fichiers actuels ; le bilan et l'historique seront actualisés. Elle reste à télécharger avec le bouton « Télécharger le dossier ».`
+        : `Tous les fichiers de **${p.fiche.theme}** (livrables, versions validées, données) et son historique seront rassemblés dans une archive ZIP téléchargeable.`
+          + (enCours.length ? ` ${enCours.length} étape(s) ne sont pas validées : elles seront archivées dans leur état actuel.` : ""),
       "OUI", "btn-primaire", "NON"))) return;
     await occupe(btn, async () => {
       const r = await api("POST", `/api/projets/${p.slug}/boucler`);
-      majProjet(r, "Étude bouclée : l'archive est prête à télécharger.");
-      window.location.href = `/api/projets/${p.slug}/archive`;
+      majProjet(r, c ? "Archive mise à jour : bilan et historique actualisés." : "Étude bouclée : l'archive est prête à télécharger.");
+      // seul le premier bouclage télécharge l'archive ; ensuite, le bouton « Télécharger le dossier » est à côté
+      if (!c) window.location.href = `/api/projets/${p.slug}/archive`;
     });
   };
   A.reveler($("#zone-etape"));
