@@ -8,6 +8,7 @@ from . import budget
 from .banque import decouper, nom_barometre, sont_des_pays
 from .charte import chiffres, liste, p, rendre_modele, section, tableau
 from .outils import MOIS, aujourdhui, date_fr, debut_collecte, fcfa, fmt_marge, jours_collecte, nombre
+from .config import auteur_fichiers
 
 MOIS_COURTS = ["janv.", "févr.", "mars", "avril", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
 PART_RESERVE = 15
@@ -326,5 +327,7 @@ def pptx(chemin, projet, d=None):
         k.texte(s, 6.8, y + 0.08, 1.55, 0.85, [str(dd.day), MOIS_COURTS[dd.month - 1]], 18, True, OR, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
         k.texte(s, 8.55, y + 0.05, 4.2, 0.4, x["titre"], 15, True, MARINE)
         k.texte(s, 8.55, y + 0.45, 4.2, 0.5, x["detail"], 12, couleur=GRIS)
+    k.prs.core_properties.author = k.prs.core_properties.last_modified_by = auteur_fichiers()
+    k.prs.core_properties.title, k.prs.core_properties.subject = d["titre"], "Déroulement de l'étude"
     k.prs.save(chemin)
     return chemin

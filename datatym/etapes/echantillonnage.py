@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from .. import budget, equipe
 from ..banque import decouper, du_barometre, nom_barometre, slug, sont_des_pays
 from ..charte import liste, p, section, tableau, chiffres
-from ..config import charger_parametres
+from ..config import auteur_fichiers, charger_parametres
 from ..outils import aujourdhui, date_courte, date_fr, debut_collecte, fcfa, fmt_marge, jours_collecte, nombre, pct, repartir
 
 DOCS = {
@@ -488,6 +488,6 @@ def calendrier_xlsx(chemin, data):
               + [m["objectif"]] + [m["par_profil"].get(c, 0) for c in lib] for m in data["enqueteurs"]]
              + [[r["code"], f"{r['nom']} (réserve)", r["zone"]] + [r["contact"].get(k, "") for k in ("ville", "telephone", "mail")] + [0] + [0 for c in lib]
                 for r in data.get("reserves") or []])
-    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
+    wb.properties.creator = wb.properties.lastModifiedBy = auteur_fichiers()
     wb.save(chemin)
     return chemin

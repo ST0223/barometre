@@ -7,7 +7,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .banque import NSP_CODE, TYPES, nom_barometre, nom_court, slug, sont_des_pays
-from .config import MARINE
+from .config import MARINE, auteur_fichiers
 
 ENTETE_FILL = PatternFill("solid", fgColor=MARINE)
 ENTETE_FONT = Font(bold=True, color="FFFFFF", name="Calibri")
@@ -110,7 +110,7 @@ def dictionnaire(chemin, quest, cadrage):
         l2.append([i["id"], i["libelle"], i.get("definition", ""), TYPES[i["type"]]["libelle"], TYPES[i["type"]]["calcul"], vars_])
     _feuille(ws2, ["code", "indicateur", "définition", "type de mesure", "mode de calcul", "variables"], l2,
              {"définition": 50, "mode de calcul": 70, "indicateur": 40})
-    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
+    wb.properties.creator = wb.properties.lastModifiedBy = auteur_fichiers()
     wb.save(chemin)
     return chemin
 
@@ -258,7 +258,7 @@ def xlsform(chemin, projet, quest, cadrage=None, enqueteurs=None):
     _feuille(wb.create_sheet("choices"), ["list_name", "name", "label"], choices, {"label": 45})
     _feuille(wb.create_sheet("settings"), ["form_title", "form_id", "version", "style", "allow_choice_duplicates"],
              [[nom_barometre(fiche["theme"]), nom_court(fiche["theme"]), datetime.now().strftime("%Y%m%d%H%M"), "pages", "yes"]])
-    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
+    wb.properties.creator = wb.properties.lastModifiedBy = auteur_fichiers()
     wb.save(chemin)
     return chemin
 

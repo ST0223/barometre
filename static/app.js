@@ -1503,6 +1503,7 @@ function vueParametres(app) {
         </div></div>
       <div class="carte"><div class="carte-titre"><h3>Textes Datatym</h3></div><div class="carte-corps">
         <div class="champ" style="margin-bottom:14px"><label>Présentation de Datatym (annonces de recrutement, formation)</label><textarea class="saisie" id="p-pres" rows="5">${esc(P.presentation_datatym)}</textarea></div>
+        <div class="champ" style="margin-bottom:14px"><label>Auteur des fichiers <span class="ex">métadonnées Word, Excel et PowerPoint (Fichier › Informations) ; les pages de garde restent signées DATATYM</span></label><input class="saisie" id="p-auteur" value="${esc(P.auteur_fichiers || "DATATYM")}"></div>
         <div class="champ" style="margin-bottom:14px"><label>Site de dépôt des candidatures <span class="ex">site d'emploi (avec ATS) cité dans les annonces de recrutement</span></label><input class="saisie" id="p-contact" value="${esc(P.contact_recrutement || "")}"></div>
         <div class="champ"><label>Adresse de retour de la liste des enquêteurs <span class="ex">mail de l'équipe projet, repris dans la demande de recrutement aux RH</span></label><input class="saisie" id="p-mail-rh" type="email" value="${esc(P.mail_rh || "")}" placeholder="projets@datatym.com"></div>
         <div class="pied-form"><button class="btn btn-primaire" data-enr-params>${ico("check")} Enregistrer</button></div>
@@ -1517,7 +1518,7 @@ function vueParametres(app) {
     </div>`;
   A.reveler(app);
   app.querySelectorAll("[data-theme-choix]").forEach((x) => (x.onclick = () => appliquerTheme(x.dataset.themeChoix, true)));
-  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value.trim(), mail_rh: $("#p-mail-rh").value.trim(),
+  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value.trim(), auteur_fichiers: $("#p-auteur").value.trim() || "DATATYM", mail_rh: $("#p-mail-rh").value.trim(),
     couts_unitaires: P.couts_unitaires.map((c, k) => ({ cle: c.cle, valeur: Number(app.querySelector(`[data-cu-ref="${k}"]`).value) || 0 })) });
   app.querySelectorAll("[data-enr-params]").forEach((b) => (b.onclick = (e) => occupe(e.currentTarget, async () => {
     await api("PUT", "/api/parametres", lire());

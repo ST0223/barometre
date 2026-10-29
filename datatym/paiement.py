@@ -7,6 +7,7 @@ from openpyxl.styles import Font
 
 from .etapes import collecte
 from .formulaires import _feuille
+from .config import auteur_fichiers
 
 
 def calculer(projet):
@@ -76,6 +77,6 @@ def xlsx(chemin, projet):
         ["Réserves", "Une réserve n'apparaît que si elle a été mobilisée (au moins un questionnaire validé)."],
         ["Paiement", "Mobile Money ou virement, sur le moyen et le numéro transmis par les RH."],
     ], {"Règle": 18, "Détail": 90})
-    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
+    wb.properties.creator = wb.properties.lastModifiedBy = auteur_fichiers()
     wb.save(chemin)
     return chemin

@@ -17,7 +17,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor, Twips
 
-from .config import BLEU, BLEU_CLAIR, GRIS, LOGO, LOGO_AGILTYM, MARINE, POLICE, BASE_DIR
+from .config import BASE_DIR, BLEU, BLEU_CLAIR, GRIS, LOGO, LOGO_AGILTYM, MARINE, POLICE, auteur_fichiers
 
 GRAS_RE = re.compile(r"\*\*(.+?)\*\*")
 
@@ -384,7 +384,7 @@ def rendre_modele(modele, chemin):
     """Produit le .docx d'un modèle de document."""
     d = DocDatatym(modele.get("en_tete", ""), paysage=modele.get("paysage", False),
                    pied=modele.get("pied", "Document interne — Confidentiel"))
-    d.proprietes(modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("auteur", "DATATYM"))
+    d.proprietes(modele.get("titre", ""), modele.get("sous_titre", ""), auteur_fichiers())
     d.couverture(modele.get("surtitre", ""), modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("meta", []))
     if modele.get("sommaire"):
         d.sommaire()

@@ -12,6 +12,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from .banque import slug
 from .formulaires import _feuille
+from .config import auteur_fichiers
 
 # colonne, clé, consigne
 COLONNES = [
@@ -127,7 +128,7 @@ def modele_xlsx(chemin, zones, besoin, reserve=None):
     for c in ws3[ws3.max_row]:
         c.font = Font(bold=True)
         c.alignment = Alignment()
-    wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
+    wb.properties.creator = wb.properties.lastModifiedBy = auteur_fichiers()
     wb.save(chemin)
     return chemin
 

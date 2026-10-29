@@ -35,6 +35,8 @@ PARAMS_DEFAUT = {
     "contact_recrutement": "https://www.intowork.co/offres",
     # adresse à laquelle les RH retournent la liste des enquêteurs retenus (demande de recrutement)
     "mail_rh": "",
+    # auteur inscrit dans les métadonnées des fichiers produits (Word, Excel, PowerPoint)
+    "auteur_fichiers": "DATATYM",
     # jetons des plateformes de collecte, conservés sur ce poste uniquement (parametres.json est exclu de Git)
     "kobo_jeton": "",
     "questionpro_cle": "",
@@ -51,6 +53,11 @@ def charger_parametres():
         except (OSError, ValueError):
             pass
     return params
+
+
+def auteur_fichiers():
+    """Auteur des métadonnées des fichiers (Fichier › Informations) ; la page de garde garde « Auteur : DATATYM »."""
+    return (charger_parametres().get("auteur_fichiers") or "DATATYM").strip()
 
 
 def enregistrer_parametres(maj):

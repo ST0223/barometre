@@ -17,6 +17,7 @@ from pptx.util import Emu, Pt
 from .banque import nom_barometre, sont_des_pays
 from .etapes.questionnaire import consignes_terrain
 from .outils import MOIS, date_fr
+from .config import auteur_fichiers
 
 MODELE = Path(__file__).resolve().parent / "modeles" / "formation"
 MARINE, BLEU, OR, CLAIR, JAUNE = "19243E", "0087E0", "E0B61F", "EEF4FB", "FCF6DE"
@@ -409,7 +410,7 @@ def generer_pptx(chemin, projet, cadrage, quest, ech):
     d.couverture("Merci et bonne collecte", "Place aux questions et à la mise en situation", f"DATATYM, marque d'AGILTYM  ·  {mois}")
 
     cp = d.prs.core_properties
-    cp.author = cp.last_modified_by = "DATATYM"
+    cp.author = cp.last_modified_by = auteur_fichiers()
     cp.title, cp.subject = nom, "Formation des enquêteurs"
     d.prs.save(chemin)
     return chemin
