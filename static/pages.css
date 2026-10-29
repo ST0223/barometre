@@ -63,8 +63,6 @@ body[data-page="accueil"] .principal { padding-bottom: 0; }
 .nav.sur-sombre:not(.defile) .nav-liens a.actif, .nav.sur-sombre:not(.defile) .nav-liens a:hover { color: #fff; }
 .nav.sur-sombre:not(.defile) .nav-liens a::after { background: var(--azur); }
 .nav.sur-sombre:not(.defile) .badge-ia { background: rgba(255, 255, 255, .1); color: rgba(255, 255, 255, .75); }
-.nav.sur-sombre:not(.defile) .nav-cta { background: #fff; color: var(--abysse); border-color: #fff; }
-body[data-page="nouveau"] .nav-cta, body[data-page="etude"] .nav-cta { display: none; }
 
 /* ---------- matières : liquide, grain, halo ---------- */
 .liquide { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
