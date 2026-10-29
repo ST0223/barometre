@@ -216,11 +216,12 @@ body[data-page="accueil"] .principal { padding-bottom: 0; }
 .palette { display: flex; align-items: flex-end; height: 470px; padding-left: 30px; }
 .pilule { position: relative; flex: 0 0 120px; height: 100%; margin-left: -30px; border-radius: 999px; padding: 34px 22px; color: #fff; overflow: hidden; cursor: pointer; outline: none;
   display: flex; flex-direction: column; justify-content: flex-end; box-shadow: -14px 0 30px rgba(0, 10, 40, .18); transition: flex-basis .7s var(--ease), border-radius .7s var(--ease), padding .7s var(--ease), opacity .9s var(--ease), transform .9s var(--ease); }
-.pilule.p0 { background: linear-gradient(180deg, #C0E6FD, #80AAD3); color: var(--encre-a); height: 78%; }
-.pilule.p1 { background: linear-gradient(180deg, #80AAD3, #5B86B6); height: 84%; }
-.pilule.p2 { background: linear-gradient(180deg, #5B86B6, #3F6593); height: 90%; }
-.pilule.p3 { background: linear-gradient(180deg, #3F6593, #1B3554); height: 95%; }
-.pilule.p4 { background: linear-gradient(180deg, #1B3554, #000F22); height: 100%; }
+.pilule.p0 { background: linear-gradient(180deg, #C0E6FD, #80AAD3); color: var(--encre-a); height: 74%; }
+.pilule.p1 { background: linear-gradient(180deg, #80AAD3, #5B86B6); height: 79%; }
+.pilule.p2 { background: linear-gradient(180deg, #5B86B6, #3F6593); height: 84%; }
+.pilule.p3 { background: linear-gradient(180deg, #3F6593, #1B3554); height: 89%; }
+.pilule.p4 { background: linear-gradient(180deg, #1B3554, #000F22); height: 94%; }
+.pilule.p5 { background: linear-gradient(180deg, #0E9F6E, #04372A); height: 100%; }
 .pilule:hover, .pilule:focus { flex-basis: 320px; border-radius: 60px; padding: 34px 30px; }
 .pl-num { position: absolute; top: 30px; left: 0; right: 0; text-align: center; font-family: var(--titre); font-weight: 700; font-size: 13px; opacity: .8; }
 .pilule b { font-family: var(--titre); font-size: 18px; letter-spacing: -.02em; writing-mode: vertical-rl; transform: rotate(180deg); align-self: center; transition: all .5s var(--ease); white-space: nowrap; }

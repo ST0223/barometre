@@ -21,13 +21,15 @@ const MODELES = [
 ];
 
 const PHASES = [
-  { n: "01", mot: "CADRER", titre: "Note de cadrage", desc: "Contexte, objectifs, cible, champ et taille visée, la liste des indicateurs recherchés, base de tout le reste, et une première estimation du coût.", liv: ["Note de cadrage"], ic: "target", c: "#0087E0" },
-  { n: "02", mot: "QUESTIONNER", titre: "Questionnaire", desc: "Des questions simples tirées des indicateurs, adaptées à chaque profil, en version terrain et digitale, avec une durée de passation volontairement courte, prêtes pour Kobo et QuestionPro.", liv: ["Questionnaire terrain", "Questionnaire digital", "Dictionnaire des variables", "XLSForm Kobo", "Import QuestionPro", "Liste des enquêteurs"], ic: "edit", c: "#334EAC" },
-  { n: "03", mot: "ÉCHANTILLONNER", titre: "Plan de terrain", desc: "Quotas par zone et par profil, répartition par enquêteur, calendrier jour par jour, recrutement, formation et budget de collecte calculé poste par poste.", liv: ["Note d'échantillonnage", "Annonce de recrutement", "Demande aux RH", "Calendrier et quotas", "Formation PowerPoint", "Budget de collecte"], ic: "users", c: "#00B4D8" },
-  { n: "04", mot: "DOCUMENTER", titre: "Note méthodologique", desc: "La méthode consolidée automatiquement : échantillonnage, questionnaire, mode de calcul de chaque indicateur, outils.", liv: ["Note méthodologique"], ic: "file", c: "#7096D1" },
-  { n: "05", mot: "COLLECTER", titre: "Suivi de la collecte", desc: "Les réponses arrivent de Kobo ou de QuestionPro, par API ou par fichier, et alimentent un tableau de bord : avancement par enquêteur, zone et quota, écarts au calendrier.", liv: ["Tableau de bord", "Base des soumissions"], ic: "chart", c: "#0077B6" },
-  { n: "06", mot: "CONTRÔLER", titre: "Note de suivi", desc: "Réalisé contre prévu, refus, entretiens trop rapides, incidents, puis bilan financier prévu contre réalisé : la qualité et le coût, documentés.", liv: ["Note de suivi des enquêtes", "État de paiement des enquêteurs"], ic: "check", c: "#081F5C" },
-  { n: "07", mot: "ANALYSER", titre: "Rapport d'analyse", desc: "Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés et enseignements pour la décision.", liv: ["Rapport d'analyse"], ic: "sparkle", c: "#000F22" },
+  { n: "01", mot: "PRÉVOIR", titre: "Déroulement de l'étude", desc: "Dès la fiche saisie, le dirigeant voit comment l'étude va se dérouler : calendrier semaine par semaine, trois scénarios de coût et de délai, taille de l'échantillon face à la précision, points de vigilance et rendez-vous de décision.", liv: ["Déroulement de l'étude (Word et PowerPoint)"], ic: "clock", c: "#5B86B6" },
+  { n: "02", mot: "CADRER", titre: "Note de cadrage", desc: "Contexte, objectifs, cible, champ et taille visée, la liste des indicateurs recherchés, base de tout le reste, et une première estimation du coût. Une note déjà rédigée peut aussi être importée.", liv: ["Note de cadrage"], ic: "target", c: "#0087E0" },
+  { n: "03", mot: "QUESTIONNER", titre: "Questionnaire", desc: "Des questions simples tirées des indicateurs, adaptées à chaque profil, en version terrain et digitale, avec une durée de passation volontairement courte, prêtes pour l'outil de collecte choisi.", liv: ["Questionnaire terrain", "Questionnaire digital", "Dictionnaire des variables", "Formulaire Kobo ou import QuestionPro"], ic: "edit", c: "#334EAC" },
+  { n: "04", mot: "ÉCHANTILLONNER", titre: "Plan de terrain", desc: "Quotas par zone et par profil, calendrier jour par jour, recrutement confié aux RH (annonce publiée, liste des enquêteurs importée et contrôlée, réserves), formation en ligne et budget de collecte calculé au plus juste.", liv: ["Note d'échantillonnage", "Annonce de recrutement", "Demande aux RH", "Fichier des enquêteurs", "Calendrier et quotas", "Formation PowerPoint", "Budget de collecte"], ic: "users", c: "#00B4D8" },
+  { n: "05", mot: "DOCUMENTER", titre: "Note méthodologique", desc: "La méthode consolidée automatiquement : échantillonnage, questionnaire, mode de calcul de chaque indicateur, outils.", liv: ["Note méthodologique"], ic: "file", c: "#7096D1" },
+  { n: "06", mot: "COLLECTER", titre: "Suivi de la collecte", desc: "Les réponses arrivent de Kobo ou de QuestionPro, par API ou par fichier, et alimentent un tableau de bord suivi à distance : avancement par enquêteur, pays et quota, carte, indicateurs calculés en direct.", liv: ["Tableau de bord", "Base des soumissions"], ic: "chart", c: "#0077B6" },
+  { n: "07", mot: "CONTRÔLER", titre: "Note de suivi", desc: "Réalisé contre prévu, refus, entretiens trop rapides, incidents, bilan financier prévu contre réalisé, puis paiement de chaque enquêteur au questionnaire validé.", liv: ["Note de suivi des enquêtes", "État de paiement des enquêteurs"], ic: "check", c: "#081F5C" },
+  { n: "08", mot: "ANALYSER", titre: "Rapport d'analyse", desc: "Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés et enseignements pour la décision.", liv: ["Rapport d'analyse"], ic: "sparkle", c: "#000F22" },
+  { n: "09", mot: "BOUCLER", titre: "Clôture", desc: "Bilan des étapes et historique des fichiers générés ; un clic rassemble livrables, versions validées et base des soumissions dans une archive.", liv: ["Archive de l'étude (ZIP)"], ic: "download", c: "#0E9F6E" },
 ];
 
 const PILIERS = [
@@ -44,6 +46,7 @@ const PRINCIPES = [
   ["Validation humaine", "Aucune étape ne démarre sans l'accord du cabinet sur la précédente."],
   ["Contrôle qualité", "Entretiens trop rapides écartés, cohérence vérifiée, rappels de contrôle."],
   ["Reconductible", "Mêmes indicateurs, mêmes échelles : chaque édition devient une tendance."],
+  ["Sobre et connecté", "Formation en ligne, supervision à distance, enquêteurs payés au questionnaire validé : chaque franc sert la qualité des données."],
 ];
 
 function miniDoc(type) {
@@ -70,7 +73,7 @@ function vueAccueil(app) {
           <button class="btn btn-verre" data-defile="cabinet">Découvrir le cabinet</button>
         </div>
         <div class="hero2-chiffres">
-          ${[[7, "paramètres à saisir"], [18, "livrables produits"], [6, "formats générés : Word, PDF, Excel, PowerPoint…"], [100, "% des documents modifiables"]]
+          ${[[7, "paramètres à saisir"], [20, "livrables produits"], [7, "formats générés : Word, PDF, Excel, PowerPoint, ZIP…"], [100, "% des documents modifiables"]]
             .map(([v, l], k) => `<div data-reveal="haut" data-delai="${800 + k * 90}"><b data-compte="${v}">0</b><span>${l}</span></div>`).join("")}
         </div>
       </div>
@@ -86,7 +89,7 @@ function vueAccueil(app) {
     <button class="defiler-indice" data-defile="cabinet" aria-label="Défiler"><span></span></button>
   </section>
 
-  <div class="defilant" aria-hidden="true"><div class="piste-def">${Array(2).fill([...PILIERS.map((p) => p.nom), "Études quantitatives", "Baromètres", "Data science", "IA appliquée", "KoboToolbox", "QuestionPro", "Tableaux de bord", "Python · R · Stata", "Afrique de l'Ouest et centrale"].map((x) => `<span>${x}</span><i>✦</i>`).join("")).join("")}</div></div>
+  <div class="defilant" aria-hidden="true"><div class="piste-def">${Array(2).fill([...PILIERS.map((p) => p.nom), "Études quantitatives", "Baromètres", "Data science", "IA appliquée", "KoboToolbox", "QuestionPro", "Formation en ligne", "Tableaux de bord", "Mobile Money", "Python · R · Stata", "Afrique de l'Ouest et centrale"].map((x) => `<span>${x}</span><i>✦</i>`).join("")).join("")}</div></div>
 
   <section class="cabinet" id="cabinet">
     <div class="cabinet-gauche">
@@ -131,7 +134,7 @@ function vueAccueil(app) {
   <section class="methode">
     <div class="methode-texte">
       <span class="sur" data-reveal="haut">Notre méthode</span>
-      <h2 class="titre-section-l" data-reveal="haut" data-delai="80">Cinq principes, appliqués à chaque édition.</h2>
+      <h2 class="titre-section-l" data-reveal="haut" data-delai="80">Six principes, appliqués à chaque édition.</h2>
       <p class="aide-l" data-reveal="haut" data-delai="160">Survolez un pilier pour le déplier.</p>
     </div>
     <div class="palette" data-reveal="groupe">
@@ -162,7 +165,7 @@ function vueAccueil(app) {
       <i class="cr hg"></i><i class="cr hd"></i><i class="cr bg"></i><i class="cr bd"></i>
       <span class="cc-gauche">(LANCER)</span><span class="cc-centre">${ico("play")}</span><span class="cc-droite">UNE ÉTUDE</span>
     </a>
-    <p data-reveal="haut">Sept paramètres. Dix-huit livrables. Zéro ressaisie.</p>
+    <p data-reveal="haut">Sept paramètres. Vingt livrables. Zéro ressaisie.</p>
   </section>
 
   <footer class="pied">
