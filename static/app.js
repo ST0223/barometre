@@ -483,6 +483,7 @@ function panneauCloture() {
           <div class="cl-actions">
             ${c ? `<a class="btn btn-succes" href="/api/projets/${p.slug}/archive">${ico("download")} Télécharger le dossier (ZIP)</a>` : ""}
             <button class="btn ${c ? "" : "btn-primaire btn-boucle"}" id="boucler">${ico(c ? "refresh" : "check")} ${c ? "Mettre à jour l'archive" : "BOUCLER"}</button>
+            ${c ? `<a class="btn btn-primaire" href="#/nouveau">${ico("play")} Lancer une nouvelle étude</a>` : ""}
           </div>
         </div>
         <h3 class="cl-titre">Bilan des étapes</h3>
