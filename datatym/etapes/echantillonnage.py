@@ -2,7 +2,7 @@
 import math
 from datetime import date, timedelta
 
-from .. import budget
+from .. import budget, equipe
 from ..banque import decouper, du_barometre, nom_barometre, slug, sont_des_pays
 from ..charte import liste, p, section, tableau, chiffres
 from ..config import charger_parametres
@@ -32,10 +32,9 @@ def recrutement_defaut(projet, n_enq, jours):
     fiche = projet["fiche"]
     params = charger_parametres()
     return {
-        "intitule": f"Enquêteurs et enquêtrices — {nom_barometre(fiche['theme'])}",
-        "presentation": params.get("presentation_datatym", ""),
-        "mission": (f"Dans le cadre {du_barometre(fiche['theme'])}, Datatym recrute {n_enq} enquêteurs et enquêtrices "
-                    f"pour administrer un questionnaire auprès de {fiche['cible']}, dans "
+        "intitule": f"Recrutement des enquêteurs — {nom_barometre(fiche['theme'])}",
+        "mission": (f"Dans le cadre {du_barometre(fiche['theme'])}, Datatym demande au service des ressources humaines de recruter "
+                    f"{n_enq} enquêteurs et enquêtrices chargés d'administrer un questionnaire auprès de {fiche['cible']}, dans "
                     f"{'les pays suivants' if sont_des_pays(fiche['zones']) else 'les zones suivantes'} : {', '.join(decouper(fiche['zones']))}. "
                     f"La collecte se déroule sur {len(jours)} jours, du {date_fr(jours[0])} au {date_fr(jours[-1])}, "
                     "précédée d'une journée de formation obligatoire."),
@@ -55,10 +54,8 @@ def recrutement_defaut(projet, n_enq, jours):
             "Bonne capacité de communication.",
             "Parler et lire couramment le français ; la pratique d'une langue locale est un atout.",
         ],
-        "dossier": ["CV à jour", "Lettre de motivation", "Copie du dernier diplôme",
-                    "Références de missions d'enquête antérieures (facultatif, constituent un atout)"],
-        "date_limite": (jours[0] - timedelta(days=10)).isoformat(),
-        "contact": params.get("contact_recrutement", ""),
+        "date_limite": (jours[0] - timedelta(days=7)).isoformat(),
+        "retour": params.get("mail_rh", ""),
     }
 
 
@@ -94,9 +91,6 @@ def calculer(projet, quest, params, recrutement=None):
     rend = max(float(params.get("rendement") or 6), 1)
     marge = min(max(float(params.get("marge") or 0.9), 0.3), 1)
     n_enq = params.get("nb_enqueteurs_force") or math.ceil(n / (rend * len(jours) * marge))
-    noms = [x for x in params.get("noms_enqueteurs", []) if str(x).strip()]
-    if noms:
-        n_enq = len(noms)
     n_enq = max(int(n_enq), len(zones))
 
     # Quotas zone × profil
@@ -109,16 +103,36 @@ def calculer(projet, quest, params, recrutement=None):
             quotas[(z, pr["code"])] = cellules[i * len(profils) + j]
     tot_zone = {z: sum(quotas[(z, pr["code"])] for pr in profils) for z in zones}
 
-    # Enquêteurs par zone (au moins un par zone)
-    enq_zone = repartir(n_enq - len(zones), [tot_zone[z] for z in zones])
-    enq_zone = [k + 1 for k in enq_zone]
+    # Besoin par zone (au moins un enquêteur par zone) : c'est ce qui est demandé aux RH
+    besoin = dict(zip(zones, [k + 1 for k in repartir(n_enq - len(zones), [tot_zone[z] for z in zones])]))
+    # Équipe : liste des RH (chaque enquêteur dans son pays), sinon ancienne liste de noms, sinon Enq1, Enq2…
+    liste_rh = [m for m in params.get("equipe") or [] if m.get("pays") in besoin]
+    noms = [x for x in params.get("noms_enqueteurs", []) if str(x).strip()]
+    if liste_rh:
+        # rangée pays par pays, dans l'ordre des identifiants attribués ci-dessous
+        params["equipe"] = liste_rh = sorted(liste_rh, key=lambda m: zones.index(m["pays"]))
+        par_zone = {z: [m for m in liste_rh if m["pays"] == z] for z in zones}
+    else:
+        if noms:
+            n_enq = max(len(noms), len(zones))
+        nb = dict(zip(zones, [k + 1 for k in repartir(n_enq - len(zones), [tot_zone[z] for z in zones])])) if noms else besoin
+        it = iter(noms)
+        par_zone = {z: [{"nom_complet": next(it, None)} for _ in range(nb[z])] for z in zones}
     enqueteurs, k = [], 0
-    for z, nb in zip(zones, enq_zone):
+    for z in zones:
         membres = []
-        for _ in range(nb):
+        # pays sans enquêteur dans la liste des RH : un poste reste à pourvoir pour ne pas perdre ses quotas
+        for e in par_zone[z] or [{}]:
             k += 1
-            nom = noms[k - 1] if k - 1 < len(noms) else f"Enq{k}"
-            membres.append({"code": f"enq{k}", "nom": nom, "zone": z, "par_profil": {}, "objectif": 0})
+            if e.get("prenom") or e.get("nom"):
+                nom = f"{e.get('prenom', '')} {e.get('nom', '')}".strip()
+            else:
+                nom = e.get("nom_complet") or (f"Enq{k}" if not liste_rh else f"Enq{k} (à pourvoir)")
+            m = {"code": f"enq{k}", "nom": nom, "zone": z, "par_profil": {}, "objectif": 0}
+            if e.get("telephone") or e.get("mail"):
+                m["contact"] = {c: e.get(c, "") for c in ("nom", "prenom", "ville", "telephone", "mail")}
+            membres.append(m)
+        nb = len(membres)
         for j, pr in enumerate(profils):
             parts = repartir(quotas[(z, pr["code"])], [1] * nb)
             parts = parts[j % nb:] + parts[:j % nb]  # rotation pour équilibrer
@@ -140,6 +154,7 @@ def calculer(projet, quest, params, recrutement=None):
                 pos += nj
                 m["par_jour"].append({c: bloc.count(c) for c in m["par_profil"]})
         enqueteurs += membres
+    n_enq = len(enqueteurs)
 
     calendrier = []
     cumul = 0
@@ -160,9 +175,9 @@ def calculer(projet, quest, params, recrutement=None):
     bud = budget.calculer(n, n_enq, len(jours), len(zones), params["couts"], params["hypotheses"])
     bud["marginal_100"] = budget.marginal(n, n_enq, len(jours), len(zones), params["couts"], params["hypotheses"])
 
-    rec = actualiser_recrutement(recrutement, recrutement_defaut(projet, n_enq, jours))
+    rec = actualiser_recrutement(recrutement, recrutement_defaut(projet, sum(besoin.values()), jours))
     return {"params": params, "zones": zones, "profils": profils, "jours": [d.isoformat() for d in jours],
-            "nb_enqueteurs": n_enq, "quotas": [[z, c, v] for (z, c), v in quotas.items()], "tot_zone": tot_zone,
+            "nb_enqueteurs": n_enq, "besoin": besoin, "equipe_rh": bool(liste_rh), "quotas": [[z, c, v] for (z, c), v in quotas.items()], "tot_zone": tot_zone,
             "enqueteurs": enqueteurs, "calendrier": calendrier, "budget": bud, "recrutement": rec}
 
 
@@ -191,7 +206,7 @@ def construire_docs(projet, data, quest):
 
     lignes_quotas = [[z] + [str(q[(z, c)]) for c in codes] + [str(data["tot_zone"][z])] for z in data["zones"]]
     lignes_quotas.append(["**Total**"] + [f"**{sum(q[(z, c)] for z in data['zones'])}**" for c in codes] + [f"**{n}**"])
-    lignes_enq = [[m["nom"], m["zone"]] + [str(m["par_profil"][c]) for c in codes] + [str(m["objectif"]), nombre(m["objectif"] / len(jours), 1)]
+    lignes_enq = [[m["code"], m["nom"], m["zone"]] + [str(m["par_profil"][c]) for c in codes] + [str(m["objectif"]), nombre(m["objectif"] / len(jours), 1)]
                   for m in data["enqueteurs"]]
     # au-delà de 6 pays, les colonnes par pays ne tiennent plus sur la page : le détail reste dans l'Excel
     zones_cal = data["zones"] if len(data["zones"]) <= 6 else []
@@ -216,8 +231,10 @@ def construire_docs(projet, data, quest):
                     "Précision attendue"),
         ], source="auto"),
         section("repartition", "3. Répartition par enquêteur", [
-            p("Les enquêteurs sont désignés Enq1, Enq2… tant que la liste nominative n'est pas chargée. Chaque enquêteur reçoit un objectif par profil."),
-            tableau(["Enquêteur", Z] + [lib[c] for c in codes] + ["Objectif", "Par jour"], lignes_enq, "Objectifs par enquêteur"),
+            p(("Les enquêteurs sont ceux de la liste transmise par les ressources humaines, affectés à leur pays de résidence. "
+               if data.get("equipe_rh") else "Les enquêteurs sont désignés Enq1, Enq2… tant que la liste des ressources humaines n'est pas chargée. ")
+              + "Chaque enquêteur reçoit un objectif par profil."),
+            tableau(["ID", "Enquêteur", Z] + [lib[c] for c in codes] + ["Objectif", "Par jour"], lignes_enq, "Objectifs par enquêteur"),
         ], source="auto"),
         section("calendrier", "4. Calendrier de collecte", [
             p("Objectifs quotidiens par " + ("zone et par profil" if zones_cal else "profil") + ". Le détail par "
@@ -242,19 +259,44 @@ def construire_docs(projet, data, quest):
         "meta": [f"{n} questionnaires · {data['nb_enqueteurs']} enquêteurs · {len(jours)} jours", f"Version du {aujourdhui()}"],
         "en_tete": f"Baromètre {fiche['theme']} — Note d'échantillonnage", "sections": sections,
     }
+    besoin = data.get("besoin") or {z: sum(1 for m in data["enqueteurs"] if m["zone"] == z) for z in data["zones"]}
+    retour = rec.get("retour") or "l'équipe projet Datatym"
     recrut = {
-        "titre": "Note de recrutement", "surtitre": "Datatym recrute", "sous_titre": rec["intitule"],
-        "meta": [f"Date limite de candidature : {date_fr(rec['date_limite'])}", f"Candidature : {rec['contact']}"],
+        "titre": "Note de recrutement", "surtitre": "À l'attention du service des ressources humaines", "sous_titre": rec["intitule"],
+        "meta": [f"{sum(besoin.values())} enquêteurs · {len(data['zones'])} {Z.lower()}{'s' if len(data['zones']) > 1 else ''}",
+                 f"Liste à retourner au plus tard le {date_fr(rec['date_limite'])}"],
         "en_tete": "Datatym — Note de recrutement",
         "sections": [
-            section("datatym", "À propos de Datatym", [p(rec["presentation"])]),
-            section("mission", "La mission", [p(rec["mission"]), p("Tâches principales :"), liste(rec["taches"])]),
-            section("profil", "Le profil recherché", [liste([f"Diplôme : {rec['diplome']} minimum.", f"Expérience d'enquête : {rec['experience']} minimum."] + rec["competences"])]),
-            section("conditions", "Conditions", [liste([
-                f"Nombre de postes : {data['nb_enqueteurs']}.", f"Zones : {', '.join(data['zones'])}.",
-                f"Période : du {date_fr(jours[0])} au {date_fr(jours[-1])}, formation la veille du démarrage."])]),
-            section("candidature", "Comment postuler", [liste(rec["dossier"]),
-                    p(f"Candidatures à déposer sur **{rec['contact']}** au plus tard le **{date_fr(rec['date_limite'])}**, en précisant « {rec['intitule']} ».")]),
+            section("objet", "1. Objet de la demande", [p(rec["mission"])]),
+            section("besoin", f"2. Besoin par {Z.lower()}", [
+                tableau([Z, "Enquêteurs à recruter", "Questionnaires à réaliser"],
+                        [[z, str(besoin.get(z, 0)), str(data["tot_zone"][z])] for z in data["zones"]]
+                        + [["**Total**", f"**{sum(besoin.values())}**", f"**{n}**"]], "Enquêteurs à recruter"),
+                p(f"Chaque enquêteur travaille dans son pays de résidence ; il est recruté pour toute la durée de la collecte."),
+            ], source="auto"),
+            section("profil", "3. Profil recherché", [liste([f"Diplôme : {rec['diplome']} minimum.", f"Expérience d'enquête : {rec['experience']} minimum."] + rec["competences"])]),
+            section("mission", "4. Mission confiée aux enquêteurs", [liste(rec["taches"])]),
+            section("calendrier", "5. Calendrier", [tableau(["Échéance", "Étape"], [
+                [date_fr(rec["date_limite"]), "Retour de la liste des enquêteurs retenus à Datatym"],
+                [date_fr(jours[0] - timedelta(days=1)), "Formation obligatoire des enquêteurs"],
+                [f"Du {date_fr(jours[0])} au {date_fr(jours[-1])}", "Collecte sur le terrain"],
+            ], "Calendrier du recrutement et du terrain")], source="auto"),
+            section("livrable", "6. Livrable attendu : la liste des enquêteurs retenus", [
+                p("La liste est renseignée dans le fichier Excel joint à cette note (feuille « Enquêteurs »), "
+                  "à raison d'une ligne par enquêteur retenu. Elle sert à affecter les quotas, organiser la formation "
+                  "et envoyer à chacun son contrat, son ordre de mission et les notes de suivi."),
+                tableau(["Colonne", "Consigne de remplissage"], [[c, t] for c, _, t in equipe.COLONNES], "Colonnes à renseigner", [1.6, 4.6]),
+                p("Exemple de remplissage (personnes fictives) :"),
+                tableau([c for c, _, _ in equipe.COLONNES], [[e[k] for _, k, _ in equipe.COLONNES] for e in equipe.exemples(data["zones"])],
+                        "Exemple", [1.1, 1.1, 1.2, 1.0, 1.4, 1.9], 8.5),
+                liste(["Une ligne par enquêteur, sans ligne vide ni cellule fusionnée ; ne pas renommer les colonnes.",
+                       "Le pays de résidence est choisi dans la liste déroulante du fichier.",
+                       "Le téléphone commence par l'indicatif du pays (+221, +225…).",
+                       "Ne pas ajouter d'identifiant : Datatym l'attribue à chaque enquêteur à la réception de la liste."]),
+            ]),
+            section("retour", "7. Retour de la liste", [
+                p(f"Le fichier renseigné est à retourner à **{retour}** au plus tard le **{date_fr(rec['date_limite'])}**, "
+                  f"en précisant « {rec['intitule']} ».")]),
         ],
     }
     return {"note_echantillonnage": note, "note_recrutement": recrut,
@@ -329,8 +371,9 @@ def calendrier_xlsx(chemin, data):
                     lignes.append([d, m["nom"], m["zone"], lib.get(c, c), v])
     _feuille(ws, ["date", "enquêteur", "zone", "profil", "objectif"], lignes)
     ws2 = wb.create_sheet("Enquêteurs")
-    _feuille(ws2, ["code", "nom", "zone", "objectif total"] + [lib[c] for c in lib],
-             [[m["code"], m["nom"], m["zone"], m["objectif"]] + [m["par_profil"].get(c, 0) for c in lib] for m in data["enqueteurs"]])
+    _feuille(ws2, ["ID", "nom", "zone", "ville", "téléphone", "mail", "objectif total"] + [lib[c] for c in lib],
+             [[m["code"], m["nom"], m["zone"]] + [(m.get("contact") or {}).get(k, "") for k in ("ville", "telephone", "mail")]
+              + [m["objectif"]] + [m["par_profil"].get(c, 0) for c in lib] for m in data["enqueteurs"]])
     wb.properties.creator = wb.properties.lastModifiedBy = "DATATYM"
     wb.save(chemin)
     return chemin

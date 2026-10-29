@@ -39,7 +39,7 @@ Thème clair ou sombre : Paramètres › Apparence, ou bouton dans le menu (Auto
 | 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, plafond budgétaire (facultatif) |
 | 1. Note de cadrage | Note de cadrage (.docx/.pdf) avec la liste des indicateurs et l'estimation préliminaire du coût (fourchette basse, centrale, haute) |
 | 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteurs.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro ; conditions d'affichage entre questions, questions de profil avec exclusion (ex. chiffre d'affaires sous le seuil) |
-| 3. Échantillonnage | Note d'échantillonnage, note de recrutement, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
+| 3. Échantillonnage | Note d'échantillonnage, note de recrutement adressée aux RH (besoin par pays, profil, calendrier, consignes et exemple de remplissage), fichier Excel des enquêteurs à renseigner par les RH, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
 | 4. Méthodologie | Note méthodologique, assemblée depuis les étapes 1 à 3 |
 | 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées : avancement cumulé, carte des pays, suivi par pays, par secteur, par profil et par collecteur, quotas, incidents |
 | 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité, bilan financier prévu contre réalisé |
@@ -69,6 +69,18 @@ Le coût de revient est construit poste par poste (quantité tirée du plan × c
 Le plafond budgétaire de la fiche ne sert qu'à vérifier que l'estimation reste dans l'enveloppe. Aucun montant
 ne figure dans la note d'échantillonnage, la note de recrutement ni la formation, qui peuvent circuler hors de Datatym.
 Les coûts unitaires livrés sont indicatifs : à remplacer par les tarifs de Datatym dans **Paramètres**.
+
+## Recruter les enquêteurs
+
+1. Étape **Échantillonnage › Paramètres** : bouton « Fichier à envoyer aux RH ». L'envoyer aux RH avec la note
+   de recrutement (besoin par pays, profil, calendrier, consignes de remplissage avec un exemple de deux lignes).
+2. Les RH renvoient le fichier avec une ligne par enquêteur retenu : Nom, Prénom, Pays de résidence, Ville,
+   Téléphone (avec l'indicatif du pays), Mail.
+3. « Importer la liste des RH » : la plateforme contrôle le fichier (pays hors de l'étude, mails invalides,
+   doublons, nombre d'enquêteurs par pays comparé au besoin, indicatif ajouté s'il manque), puis, à l'enregistrement,
+   attribue les identifiants enq1, enq2… pays par pays et met à jour quotas, calendrier, formation et `liste_enqueteurs.csv`.
+
+L'adresse de retour de la liste se règle dans **Paramètres** (repris dans chaque note de recrutement).
 
 ## Déployer le formulaire sur KoboToolbox
 

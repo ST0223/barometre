@@ -15,7 +15,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import budget, importation, llm, moteur, store
+from datatym import budget, equipe, importation, llm, moteur, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -191,6 +191,43 @@ def archive(slug):
     if not chemin.exists():
         abort(404)
     return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
+def _plan(p):
+    d = (p["etapes"]["echantillonnage"].get("data") or {})
+    if not d.get("zones"):
+        raise moteur.ErreurChaine("Générez d'abord le plan d'échantillonnage.")
+    besoin = d.get("besoin") or {z: sum(1 for m in d["enqueteurs"] if m["zone"] == z) for z in d["zones"]}
+    return d["zones"], besoin
+
+
+@app.get("/api/projets/<slug>/equipe/modele")
+def modele_equipe(slug):
+    """Fichier Excel que les RH renseignent avec les enquêteurs retenus."""
+    p = _projet(slug)
+    zones, besoin = _plan(p)
+    chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, "Liste_Enqueteurs_A_Renseigner", 1, "xlsx").replace("_v1.", ".")
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    equipe.modele_xlsx(chemin, zones, besoin)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
+@app.post("/api/projets/<slug>/equipe/lire")
+def lire_equipe(slug):
+    """Lit et contrôle la liste retournée par les RH ; elle n'est enregistrée qu'avec les paramètres de l'étape."""
+    p = _projet(slug)
+    zones, besoin = _plan(p)
+    f = request.files.get("fichier")
+    if not f or not f.filename.lower().endswith((".xlsx", ".csv")):
+        return jsonify({"erreur": "Choisissez le fichier Excel (.xlsx) renseigné par les RH."}), 400
+    chemin = store.dossier(slug) / "donnees" / ("equipe_rh" + Path(f.filename).suffix.lower())
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    f.save(chemin)
+    try:
+        liste, alertes, rejetes = equipe.lire(chemin, zones, besoin)
+    except Exception as exc:  # fichier illisible ou sans les colonnes attendues
+        return jsonify({"erreur": f"Lecture impossible : {exc}"}), 400
+    return jsonify({"equipe": liste, "alertes": alertes, "rejetes": rejetes, "fichier": f.filename})
 
 
 @app.get("/api/projets/<slug>/fichiers/<path:nom>")

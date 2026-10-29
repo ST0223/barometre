@@ -891,9 +891,8 @@ function editeurEchantillonnage(z, e) {
       <div class="champ"><label>Taux de réalisation attendu</label><input class="saisie" type="number" step="0.05" min="0.3" max="1" data-p="marge" value="${P.marge}"><span class="aide" style="font-size:12px">0,9 = marge de 10 % pour les refus</span></div>
       <div class="champ"><label>Début de la collecte</label><input class="saisie" type="date" data-p="date_debut" value="${P.date_debut}"></div>
       <div class="champ"><label class="bascule" style="margin-top:26px"><input type="checkbox" data-p="sans_dimanche" ${P.sans_dimanche ? "checked" : ""}> Pas de collecte le dimanche</label></div>
-      <div class="champ plein"><label>Liste réelle des enquêteurs <span class="ex">un nom par ligne — vide : Enq1, Enq2…</span></label>
-        <textarea class="saisie" rows="3" data-p="noms_enqueteurs" placeholder="Awa Diop&#10;Moussa Ndiaye">${esc((P.noms_enqueteurs || []).join("\n"))}</textarea></div>
     </div>
+    ${blocEquipe(d, P)}
     <div class="grille-2" style="margin-bottom:18px">
       <div><div class="lib" style="margin-bottom:6px">Poids des zones</div>${Object.entries(P.poids_zones).map(([k, v]) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="flex:1">${esc(k)}</span><input class="saisie petite" style="width:90px" type="number" min="0" step="0.5" data-pz="${esc(k)}" value="${v}"></div>`).join("")}</div>
       <div><div class="lib" style="margin-bottom:6px">Poids des profils</div>${Object.entries(P.poids_profils).map(([k, v]) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="flex:1">${esc(libP[k] || k)}</span><input class="saisie petite" style="width:90px" type="number" min="0" step="0.5" data-pp="${esc(k)}" value="${v}"></div>`).join("")}</div>
@@ -918,7 +917,30 @@ function editeurEchantillonnage(z, e) {
       t.closest("tr").style.opacity = t.checked ? "" : ".45";
     } else if (t.dataset.hyp) P.hypotheses[t.dataset.hyp] = Number(t.value);
   };
+  const fic = z.querySelector("#equipe-fic");
+  if (fic) fic.onchange = (ev) => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    const form = new FormData();
+    form.append("fichier", f);
+    api("POST", `/api/projets/${S.projet.slug}/equipe/lire`, undefined, form).then((r) => {
+      P.equipe = r.equipe;
+      P.noms_enqueteurs = [];
+      S.travail.lectureEquipe = r;
+      S.sale = true;
+      editeurEchantillonnage(z, e);
+      z.querySelector("#bloc-equipe").scrollIntoView({ block: "start", behavior: "smooth" });
+      toast(`${r.equipe.length} enquêteurs lus : enregistrez pour attribuer les identifiants et mettre à jour les documents.`, "succes");
+    }).catch((err) => toast(err.message, "erreur"));
+  };
   z.onclick = (ev) => {
+    if (ev.target.closest("[data-equipe-retirer]")) {
+      P.equipe = [];
+      P.noms_enqueteurs = [];
+      S.travail.lectureEquipe = null;
+      S.sale = true;
+      return editeurEchantillonnage(z, e);
+    }
     const b = ev.target.closest("[data-cu-ajout],[data-cu-suppr]");
     if (!b) return;
     S.sale = true;
@@ -928,6 +950,32 @@ function editeurEchantillonnage(z, e) {
     if (b.dataset.cuAjout !== undefined) [...z.querySelectorAll("[data-cu-lib]")].pop()?.focus();
   };
   piedEnregistrer(z, "echantillonnage", () => ({ params: P }), "Recalculer et mettre à jour les documents");
+}
+
+/** Équipe recrutée par les RH : modèle Excel à leur envoyer, import de la liste retournée, contrôle par pays. */
+function blocEquipe(d, P) {
+  const eq = P.equipe || [];
+  const lu = S.travail.lectureEquipe;
+  const besoin = d.besoin || {};
+  // identifiants attribués au dernier enregistrement (enq1, enq2… pays par pays)
+  const ids = {};
+  d.enqueteurs.forEach((m) => m.contact && (ids[`${m.contact.telephone}|${m.contact.mail}`] = m.code));
+  const parPays = d.zones.map((z) => [z, eq.filter((m) => m.pays === z).length, besoin[z] || 0]);
+  const telecharger = `<a class="btn" href="/api/projets/${S.projet.slug}/equipe/modele">${ico("download")} Fichier à envoyer aux RH</a>`;
+  const importer = `<label class="btn btn-ed btn-primaire" style="cursor:pointer">${ico("upload")} ${eq.length ? "Importer une nouvelle liste" : "Importer la liste des RH"}<input type="file" id="equipe-fic" accept=".xlsx,.csv" hidden></label>`;
+  return `<div id="bloc-equipe" style="margin-bottom:18px">
+    <div class="lib" style="margin-bottom:6px">Équipe d'enquêteurs <span class="ex">${eq.length ? `liste des RH : ${eq.length} enquêteurs` : `${d.nb_enqueteurs} à recruter, désignés Enq1, Enq2… en attendant la liste des RH`}</span></div>
+    <div class="actions" style="margin-bottom:10px;flex-wrap:wrap">${telecharger}${importer}${eq.length || (P.noms_enqueteurs || []).length ? `<button class="btn btn-ed" data-equipe-retirer>Revenir à Enq1, Enq2…</button>` : ""}</div>
+    ${eq.length ? "" : `<p class="aide" style="margin-top:0">Envoyez aux RH la note de recrutement et le fichier Excel : ils le renvoient avec une ligne par enquêteur retenu (nom, prénom, pays de résidence, ville, téléphone avec indicatif, mail). Les identifiants sont attribués ici, à l'import.</p>`}
+    ${lu && (lu.alertes.length || lu.rejetes.length) ? `<div class="bandeau alerte" style="margin-bottom:10px">${ico("alert")}<div><b>À vérifier dans « ${esc(lu.fichier)} » :</b><ul style="margin:6px 0 0;padding-left:18px">
+      ${lu.rejetes.map((x) => `<li><b>Non retenu</b> — ${esc(x)}</li>`).join("")}${lu.alertes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div></div>` : ""}
+    ${eq.length ? `<div class="puces" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${parPays.map(([z, n, b]) =>
+      `<span class="tag" style="${n < b ? "color:var(--rouge)" : ""}">${esc(z)} : ${n}${b ? ` / ${b}` : ""}</span>`).join("")}</div>
+      <div class="grille-tab" style="max-height:340px;overflow:auto"><table><thead><tr><th>ID</th><th>Nom</th><th>Prénom</th><th>Pays</th><th>Ville</th><th>Téléphone</th><th>Mail</th></tr></thead><tbody>
+      ${eq.map((m) => `<tr><td>${ids[`${m.telephone}|${m.mail}`] ? `<b>${esc(ids[`${m.telephone}|${m.mail}`])}</b>` : '<span class="aide">à l\'enregistrement</span>'}</td>
+        <td>${esc(m.nom)}</td><td>${esc(m.prenom)}</td><td>${esc(m.pays)}</td><td>${esc(m.ville)}</td><td style="white-space:nowrap">${esc(m.telephone)}</td><td>${esc(m.mail)}</td></tr>`).join("")}
+      </tbody></table></div>` : ""}
+  </div>`;
 }
 
 const HYPOTHESES_BUDGET = [["jours_formation", "Jours de formation"], ["enq_par_superviseur", "Enquêteurs par superviseur"], ["part_rappels", "Rappels de contrôle (%)"],
@@ -1014,14 +1062,13 @@ function editeurRecrutement(z, e) {
   const champ = (k, l, type = "input", plein = false) => `<div class="champ ${plein ? "plein" : ""}"><label>${esc(l)}</label>${type === "area" ? `<textarea class="saisie" rows="4" data-r="${k}">${esc(Array.isArray(R[k]) ? R[k].join("\n") : R[k])}</textarea>` : `<input class="saisie" ${type === "date" ? 'type="date"' : ""} data-r="${k}" value="${esc(R[k])}">`}</div>`;
   z.className = "carte-corps";
   z.innerHTML = `<div class="grille-2">
-    ${champ("intitule", "Intitulé de l'annonce", "input", true)}
+    <p class="aide plein" style="margin-top:0">Note adressée au service des ressources humaines, avec le fichier Excel à renseigner (téléchargeable dans l'onglet Paramètres).</p>
+    ${champ("intitule", "Intitulé", "input", true)}
     ${champ("experience", "Expérience d'enquête minimale")}${champ("diplome", "Diplôme minimum")}
-    ${champ("date_limite", "Date limite de candidature", "date")}${champ("contact", "Lien de dépôt des candidatures")}
-    ${champ("presentation", "Présentation de Datatym", "area", true)}
-    ${champ("mission", "Mission proposée", "area", true)}
-    ${champ("taches", "Tâches (une par ligne)", "area", true)}
+    ${champ("date_limite", "Date limite de retour de la liste", "date")}${champ("retour", "Adresse de retour de la liste")}
+    ${champ("mission", "Objet de la demande", "area", true)}
+    ${champ("taches", "Mission confiée aux enquêteurs (une tâche par ligne)", "area", true)}
     ${champ("competences", "Compétences (une par ligne)", "area", true)}
-    ${champ("dossier", "Pièces du dossier (une par ligne)", "area", true)}
   </div>`;
   z.oninput = (ev) => {
     const t = ev.target;
@@ -1369,8 +1416,8 @@ function vueParametres(app) {
           <div class="actions" style="margin-top:12px"><button class="btn btn-petit" id="p-test">${ico("sparkle")} Tester la connexion</button><span id="p-res" class="aide" style="align-self:center"></span></div>
         </div></div>
       <div class="carte"><div class="carte-titre"><h3>Textes Datatym</h3></div><div class="carte-corps">
-        <div class="champ" style="margin-bottom:14px"><label>Présentation de Datatym (notes de recrutement, formation)</label><textarea class="saisie" id="p-pres" rows="5">${esc(P.presentation_datatym)}</textarea></div>
-        <div class="champ"><label>Lien de dépôt des candidatures par défaut</label><input class="saisie" id="p-contact" value="${esc(P.contact_recrutement)}"></div>
+        <div class="champ" style="margin-bottom:14px"><label>Présentation de Datatym (formation des enquêteurs)</label><textarea class="saisie" id="p-pres" rows="5">${esc(P.presentation_datatym)}</textarea></div>
+        <div class="champ"><label>Adresse de retour de la liste des enquêteurs <span class="ex">mail de l'équipe projet, repris dans la note de recrutement envoyée aux RH</span></label><input class="saisie" id="p-mail-rh" type="email" value="${esc(P.mail_rh || "")}" placeholder="projets@datatym.com"></div>
         <div class="pied-form"><button class="btn btn-primaire" data-enr-params>${ico("check")} Enregistrer</button></div>
       </div></div>
       <div class="carte" style="margin-top:16px"><div class="carte-titre"><h3>${ico("coin")} Coûts unitaires de référence</h3></div><div class="carte-corps">
@@ -1383,7 +1430,7 @@ function vueParametres(app) {
     </div>`;
   A.reveler(app);
   app.querySelectorAll("[data-theme-choix]").forEach((x) => (x.onclick = () => appliquerTheme(x.dataset.themeChoix, true)));
-  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value,
+  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, mail_rh: $("#p-mail-rh").value.trim(),
     couts_unitaires: P.couts_unitaires.map((c, k) => ({ cle: c.cle, valeur: Number(app.querySelector(`[data-cu-ref="${k}"]`).value) || 0 })) });
   app.querySelectorAll("[data-enr-params]").forEach((b) => (b.onclick = (e) => occupe(e.currentTarget, async () => {
     await api("PUT", "/api/parametres", lire());
