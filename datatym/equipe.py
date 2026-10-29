@@ -1,6 +1,6 @@
 """Équipe d'enquêteurs recrutée par les RH : fichier Excel à renseigner, lecture et contrôle de la liste retournée.
 
-Les RH renseignent une ligne par enquêteur retenu ; l'identifiant (enq1, enq2…) est attribué par la plateforme
+Les RH renseignent une ligne par enquêteur retenu ; l'identifiant (ENQML01, ENQCI01…) est attribué par la plateforme
 à l'import, pays par pays, et sert ensuite dans Kobo, QuestionPro (custom1) et le suivi par collecteur.
 """
 import csv
@@ -19,7 +19,8 @@ COLONNES = [
     ("Prénom", "prenom", "Prénom(s) usuel(s)"),
     ("Pays de résidence", "pays", "Pays où l'enquêteur travaillera, choisi dans la liste déroulante"),
     ("Ville", "ville", "Ville de résidence"),
-    ("Téléphone", "telephone", "Numéro joignable sur le terrain (WhatsApp de préférence), précédé de l'indicatif du pays"),
+    ("Téléphone", "telephone", "Numéro joignable sur le terrain (WhatsApp de préférence), précédé de l'indicatif du pays "
+     "et saisi avec une apostrophe devant ('+221 771234567), sinon Excel le transforme en nombre et supprime le +"),
     ("Mail", "mail", "Adresse personnelle et active : contrat, ordre de mission et notes de suivi y seront envoyés"),
 ]
 
@@ -30,6 +31,34 @@ INDICATIFS = {
     "republique_du_congo": "242", "congo_brazzaville": "242", "rd_congo": "243", "rdc": "243",
     "republique_democratique_du_congo": "243", "guinee_bissau": "245", "maroc": "212", "tunisie": "216", "france": "33",
 }
+# code pays des identifiants (ENQML01, ENQCI01, ENQSN01…)
+CODES_PAYS = {
+    "senegal": "SN", "mauritanie": "MR", "mali": "ML", "guinee": "GN", "cote_d_ivoire": "CI", "burkina_faso": "BF",
+    "niger": "NE", "togo": "TG", "benin": "BJ", "ghana": "GH", "nigeria": "NG", "tchad": "TD", "centrafrique": "CF",
+    "republique_centrafricaine": "CF", "cameroun": "CM", "guinee_equatoriale": "GQ", "gabon": "GA", "congo": "CG",
+    "republique_du_congo": "CG", "congo_brazzaville": "CG", "rd_congo": "CD", "rdc": "CD",
+    "republique_democratique_du_congo": "CD", "guinee_bissau": "GW", "maroc": "MA", "tunisie": "TN", "france": "FR",
+}
+
+
+def codes_zones(zones):
+    """Code à deux lettres de chaque zone : code pays connu, sinon les premières lettres (sans doublon)."""
+    codes, pris = {}, set()
+    for z in zones:
+        s = slug(z, "").upper()
+        c = CODES_PAYS.get(slug(z)) or s[:2]
+        i = 2
+        while c in pris and i < len(s):
+            c, i = s[0] + s[i], i + 1
+        codes[z] = c
+        pris.add(c)
+    return codes
+
+
+def identifiant(code_zone, rang):
+    return f"ENQ{code_zone}{rang:02d}"
+
+
 CAPITALES = {
     "senegal": "Dakar", "mali": "Bamako", "cote_d_ivoire": "Abidjan", "burkina_faso": "Ouagadougou", "niger": "Niamey",
     "togo": "Lomé", "benin": "Cotonou", "guinee": "Conakry", "guinee_bissau": "Bissau", "cameroun": "Douala",
@@ -68,7 +97,8 @@ def modele_xlsx(chemin, zones, besoin):
     ws2 = wb.create_sheet("Consignes")
     _feuille(ws2, ["Colonne", "Consigne"], [[c, t] for c, _, t in COLONNES]
              + [["", ""], ["Une ligne", "Une ligne par enquêteur retenu, sans ligne vide ni cellule fusionnée ; ne pas renommer les colonnes."],
-                ["Identifiant", "Ne pas en ajouter : Datatym attribue l'identifiant de chaque enquêteur à l'import."]],
+                ["Identifiant", "Ne pas en ajouter : Datatym attribue l'identifiant de chaque enquêteur à l'import "
+                 "(ENQ, code du pays et numéro d'ordre : ENQML01, ENQCI01, ENQSN01…)."]],
              {"Colonne": 20, "Consigne": 90})
     ws2.append([])
     ws2.append(["Exemple de remplissage (personnes fictives)"])

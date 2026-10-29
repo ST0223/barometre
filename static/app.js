@@ -957,7 +957,7 @@ function blocEquipe(d, P) {
   const eq = P.equipe || [];
   const lu = S.travail.lectureEquipe;
   const besoin = d.besoin || {};
-  // identifiants attribués au dernier enregistrement (enq1, enq2… pays par pays)
+  // identifiants attribués au dernier enregistrement (ENQML01, ENQCI01… pays par pays)
   const ids = {};
   d.enqueteurs.forEach((m) => m.contact && (ids[`${m.contact.telephone}|${m.contact.mail}`] = m.code));
   const parPays = d.zones.map((z) => [z, eq.filter((m) => m.pays === z).length, besoin[z] || 0]);
@@ -1127,7 +1127,7 @@ function ongletImport(z, e) {
           <input class="saisie petite" id="q-cle" type="password" placeholder="${S.params.questionpro_cle_definie ? "Clé mémorisée sur ce poste (laisser vide)" : "Clé API"}">
           <label class="bascule" style="font-size:12.5px"><input type="checkbox" id="q-memo" checked> Mémoriser la clé sur ce poste</label>
           <button class="btn btn-petit" id="q-sync">${ico("refresh")} Synchroniser</button>
-          <small class="aide">Enquêteur : partagez le lien avec <code>?custom1=enq1</code>, <code>enq2</code>… pour le suivi par enquêteur.</small></div>`;
+          <small class="aide">Enquêteur : partagez le lien avec <code>?custom1=</code> suivi de son identifiant (<code>ENQML01</code>…, ou <code>enq1</code>… sans liste des RH) pour le suivi par enquêteur.</small></div>`;
         const fichier = `<div class="source"><div class="source-tete"><span class="source-logo fic">${ico("upload")}</span><div><b>Fichier d'export</b><small>CSV ou Excel, Kobo ou QuestionPro</small></div></div>
           <label class="depot" id="depot"><div style="font-weight:600">Déposer un fichier</div><div class="aide" style="font-size:12px">ou cliquer pour choisir</div>
           <input type="file" id="fic" accept=".csv,.xlsx,.xls" hidden></label></div>`;

@@ -75,10 +75,10 @@ Les coûts unitaires livrés sont indicatifs : à remplacer par les tarifs de Da
 1. Étape **Échantillonnage › Paramètres** : bouton « Fichier à envoyer aux RH ». L'envoyer aux RH avec la note
    de recrutement (besoin par pays, profil, calendrier, consignes de remplissage avec un exemple de deux lignes).
 2. Les RH renvoient le fichier avec une ligne par enquêteur retenu : Nom, Prénom, Pays de résidence, Ville,
-   Téléphone (avec l'indicatif du pays), Mail.
+   Téléphone (avec l'indicatif du pays, saisi `'+221…` pour qu'Excel garde le « + »), Mail.
 3. « Importer la liste des RH » : la plateforme contrôle le fichier (pays hors de l'étude, mails invalides,
    doublons, nombre d'enquêteurs par pays comparé au besoin, indicatif ajouté s'il manque), puis, à l'enregistrement,
-   attribue les identifiants enq1, enq2… pays par pays et met à jour quotas, calendrier, formation et `liste_enqueteurs.csv`.
+   attribue les identifiants pays par pays (ENQ, code du pays et numéro d'ordre : ENQML01, ENQCI01, ENQSN01…) et met à jour quotas, calendrier, formation et `liste_enqueteurs.csv`.
 
 L'adresse de retour de la liste se règle dans **Paramètres** (repris dans chaque note de recrutement).
 
@@ -104,7 +104,7 @@ et clé API QuestionPro (non conservée). Seules les réponses complétées sont
 - Les questions sont reconnues par leur code (a2, b1…) s'il est renseigné dans QuestionPro, sinon par le
   numéro « A2. » placé en tête de chaque question par le fichier d'import généré à l'étape Questionnaire.
 - Les libellés des réponses sont retraduits en codes (1, 2, 99…) ; les réponses « Autre » sont conservées.
-- Pour le suivi par enquêteur, chaque enquêteur partage le lien de l'enquête avec `?custom1=enq1`, `enq2`…
+- Pour le suivi par enquêteur, chaque enquêteur partage le lien de l'enquête avec `?custom1=` suivi de son identifiant (`ENQML01`…, ou `enq1`… tant que la liste des RH n'est pas importée)
 
 ## Rédaction assistée par Claude (masquée)
 

@@ -403,7 +403,7 @@ def collecteurs(df, v, quest, ech):
     col = "enqueteur" if "enqueteur" in df else v_enq
     if col not in df:
         return []
-    noms = {m["code"]: m["nom"] for m in ech["enqueteurs"]}
+    noms = {m["code"].lower(): m["nom"] for m in ech["enqueteurs"]}  # QuestionPro remonte custom1 en minuscules
     q_zone = next((x for x in quest["questions_plates"] if x["id"] == "id_zone"), {})
     lib_zone = {m["code"]: m["label"] for m in q_zone.get("modalites", [])}
     res = []
@@ -411,7 +411,7 @@ def collecteurs(df, v, quest, ech):
         bons = v[v[col].fillna("").astype(str).str.strip() == cle] if col in v else v.iloc[0:0]
         pays = bons[v_zone].map(lambda c: lib_zone.get(c, c)).value_counts() if v_zone in bons else pd.Series(dtype=int)
         dates = [d for d in (bons["end"] if "end" in bons else pd.Series(dtype=str)).map(_date) if d]
-        res.append({"nom": noms.get(cle, cle) or "Non renseigné", "recus": len(recus), "valides": len(bons),
+        res.append({"nom": noms.get(cle.lower(), cle) or "Non renseigné", "recus": len(recus), "valides": len(bons),
                     "ecartes": len(recus) - len(bons), "pays": [f"{p} ({n})" for p, n in pays.head(3).items() if p],
                     "dernier": max(dates).isoformat() if dates else None})
     return sorted(res, key=lambda x: (-x["valides"], x["nom"]))
@@ -446,7 +446,7 @@ def tableau_de_bord(projet, quest, ech):
 
     par_enq = []
     for i, m in enumerate(ech["enqueteurs"]):
-        sel = v[v.get(v_enq, v.get("enqueteur", pd.Series(dtype=str))) == m["code"]] if (v_enq in v or "enqueteur" in v) else v.iloc[0:0]
+        sel = v[v.get(v_enq, v.get("enqueteur", pd.Series(dtype=str))).fillna("").astype(str).str.lower() == m["code"].lower()] if (v_enq in v or "enqueteur" in v) else v.iloc[0:0]
         prevu = sum(sum(j.values()) for j in m["par_jour"][:idx_ref + 1])
         par_enq.append({"code": m["code"], "nom": m["nom"], "zone": m["zone"], "objectif": m["objectif"], "prevu": prevu,
                         "realise": len(sel), "ecart": len(sel) - prevu,

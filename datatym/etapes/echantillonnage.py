@@ -119,16 +119,19 @@ def calculer(projet, quest, params, recrutement=None):
         it = iter(noms)
         par_zone = {z: [{"nom_complet": next(it, None)} for _ in range(nb[z])] for z in zones}
     enqueteurs, k = [], 0
+    code_zone = equipe.codes_zones(zones)
     for z in zones:
         membres = []
         # pays sans enquêteur dans la liste des RH : un poste reste à pourvoir pour ne pas perdre ses quotas
-        for e in par_zone[z] or [{}]:
+        for r, e in enumerate(par_zone[z] or [{}], 1):
             k += 1
+            # liste des RH : identifiant ENQ + code pays + rang dans le pays (ENQML01) ; sinon enq1, enq2…
+            code = equipe.identifiant(code_zone[z], r) if liste_rh else f"enq{k}"
             if e.get("prenom") or e.get("nom"):
                 nom = f"{e.get('prenom', '')} {e.get('nom', '')}".strip()
             else:
-                nom = e.get("nom_complet") or (f"Enq{k}" if not liste_rh else f"Enq{k} (à pourvoir)")
-            m = {"code": f"enq{k}", "nom": nom, "zone": z, "par_profil": {}, "objectif": 0}
+                nom = e.get("nom_complet") or (f"Enq{k}" if not liste_rh else f"{code} (à pourvoir)")
+            m = {"code": code, "nom": nom, "zone": z, "par_profil": {}, "objectif": 0}
             if e.get("telephone") or e.get("mail"):
                 m["contact"] = {c: e.get(c, "") for c in ("nom", "prenom", "ville", "telephone", "mail")}
             membres.append(m)
@@ -291,8 +294,10 @@ def construire_docs(projet, data, quest):
                         "Exemple", [1.1, 1.1, 1.2, 1.0, 1.4, 1.9], 8.5),
                 liste(["Une ligne par enquêteur, sans ligne vide ni cellule fusionnée ; ne pas renommer les colonnes.",
                        "Le pays de résidence est choisi dans la liste déroulante du fichier.",
-                       "Le téléphone commence par l'indicatif du pays (+221, +225…).",
-                       "Ne pas ajouter d'identifiant : Datatym l'attribue à chaque enquêteur à la réception de la liste."]),
+                       "Le téléphone commence par l'indicatif du pays, saisi avec une apostrophe devant : **'+221 771234567**. "
+                       "Sans l'apostrophe, Excel considère le numéro comme un nombre et supprime le « + ».",
+                       "Ne pas ajouter d'identifiant : Datatym l'attribue à chaque enquêteur à la réception de la liste "
+                       f"(ENQ, code du pays et numéro d'ordre : {', '.join(equipe.identifiant(c, 1) for c in list(equipe.codes_zones(data['zones']).values())[:3])}…)."]),
             ]),
             section("retour", "7. Retour de la liste", [
                 p(f"Le fichier renseigné est à retourner à **{retour}** au plus tard le **{date_fr(rec['date_limite'])}**, "
