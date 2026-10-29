@@ -143,6 +143,7 @@ def exporter(projet, cle):
     def ajout(nom_affiche, nom_fichier, doc=None):
         fichiers.append({"nom": nom_affiche, "fichier": nom_fichier, "type": Path(nom_fichier).suffix[1:], "doc": doc})
 
+    kobo = projet["fiche"].get("outil", "kobo") == "kobo"
     mod = MODULES[cle]
     for nom, (code, affiche) in getattr(mod, "DOCS", {}).items():
         if nom in e["docs"]:
@@ -167,9 +168,12 @@ def exporter(projet, cle):
         f = f"{nom_court(projet['fiche']['theme'])}.xlsx"  # nom court, identique au form_id du formulaire
         formulaires.xlsform(out / f, projet, e["data"], c)
         ajout("Formulaire XLSForm (KoboToolbox)", f)
-        # fichier média à joindre au formulaire dans Kobo (nom imposé par le XLSForm)
-        formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, e["data"])
-        ajout("Liste des enquêteurs pour Kobo (Enq1, Enq2…)", formulaires.FICHIER_ENQUETEURS)
+        # fichier média à joindre au formulaire dans Kobo (nom imposé par le XLSForm) : noms provisoires,
+        # pour déployer et tester le formulaire avant le recrutement ; inutile si la collecte se fait sur QuestionPro
+        ech = _data(projet, "echantillonnage") or {}
+        if kobo and not ech.get("equipe_rh"):
+            formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, e["data"])
+            ajout("Liste des enquêteurs pour Kobo (provisoire, pour tester le formulaire)", formulaires.FICHIER_ENQUETEURS)
         f = store.nom_fichier(projet, "Import_QuestionPro", v, "txt")
         formulaires.questionpro(out / f, e["data"])
         ajout("Fichier d'import QuestionPro", f)
@@ -181,10 +185,11 @@ def exporter(projet, cle):
         f = store.nom_fichier(projet, "Formation_Enqueteurs", v, "pptx")
         formation.generer_pptx(out / f, projet, _data(projet, "cadrage"), q, e["data"])
         ajout("Présentation de formation des enquêteurs", f)
-        # réserves incluses : un remplacement se fait sans redéployer le formulaire
-        formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, q, e["data"]["enqueteurs"]
-                                     + [{**r, "categorie": "reserve"} for r in e["data"].get("reserves") or []])
-        ajout("Liste des enquêteurs pour Kobo (noms définitifs)", formulaires.FICHIER_ENQUETEURS)
+        # seulement avec la vraie équipe (liste des RH) ; réserves incluses : un remplacement se fait sans redéployer
+        if kobo and e["data"].get("equipe_rh"):
+            formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, q, e["data"]["enqueteurs"]
+                                         + [{**r, "categorie": "reserve"} for r in e["data"].get("reserves") or []])
+            ajout("Liste des enquêteurs pour Kobo (équipe définitive)", formulaires.FICHIER_ENQUETEURS)
         f = store.nom_fichier(projet, "Liste_Enqueteurs_A_Renseigner", v, "xlsx")
         equipe.modele_xlsx(out / f, e["data"]["zones"], e["data"].get("besoin") or {}, e["data"].get("reserve") or {})
         ajout("Liste des enquêteurs à renseigner par les RH (jointe à la demande de recrutement)", f)
