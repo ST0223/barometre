@@ -15,7 +15,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import budget, equipe, importation, llm, moteur, store
+from datatym import budget, deroulement, equipe, importation, llm, moteur, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -190,6 +190,23 @@ def archive(slug):
     chemin = moteur.chemin_archive(_projet(slug))
     if not chemin.exists():
         abort(404)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
+@app.get("/api/projets/<slug>/deroulement")
+def deroulement_etude(slug):
+    """Déroulement de l'étude présenté au dirigeant : calendrier, scénarios, options de taille, vigilance."""
+    return jsonify(deroulement.presenter(_projet(slug)))
+
+
+@app.get("/api/projets/<slug>/deroulement/<fmt>")
+def deroulement_fichier(slug, fmt):
+    if fmt not in ("docx", "pptx"):
+        abort(404)
+    p = _projet(slug)
+    chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, "Deroulement_Etude", 1, fmt).replace("_v1.", ".")
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    (deroulement.docx if fmt == "docx" else deroulement.pptx)(chemin, p)
     return send_file(chemin, as_attachment=True, download_name=chemin.name)
 
 

@@ -344,7 +344,9 @@ function panneauFiche() {
         ${engage ? `<div class="bandeau alerte">${ico("alert")}<div>Modifier la fiche marque les documents déjà produits comme <b>à mettre à jour</b>. Les rédactions manuelles sont conservées lors de la régénération.</div></div>` : ""}
         ${formFiche(p.fiche)}
         <div class="pied-form"><button class="btn btn-primaire" id="enr-fiche">${ico("check")} Enregistrer la fiche</button></div>
+        <div id="deroulement" style="margin-top:28px"></div>
       </div></div>${colonneDroite()}</div>`;
+  blocDeroulement();
   const zones = $("#f-zones");
   zones.insertAdjacentHTML("afterend", `<div class="suggestions" style="margin-top:2px">${Object.entries(ESPACES_JS).map(([e, l]) =>
     `<button type="button" data-ajout-espace="${esc(e)}">+ ${esc(e)}${l.length > 1 ? ` (${l.length} pays)` : ""}</button>`).join("")}</div>`);
@@ -360,6 +362,62 @@ function panneauFiche() {
   });
   lierColonne();
   A.reveler($("#zone-etape"));
+}
+
+/** Déroulement de l'étude présenté au dirigeant : calendrier, scénarios, taille de l'échantillon, vigilance, décisions. */
+async function blocDeroulement() {
+  const z = $("#deroulement");
+  if (!z) return;
+  const slug = S.projet.slug;
+  let d;
+  try { d = await api("GET", `/api/projets/${slug}/deroulement`); } catch { return; }
+  if (!$("#deroulement") || S.projet.slug !== slug) return;
+  const dt = (x) => new Date(x + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const fc = (x) => `${nf(x)} FCFA`;
+  const prob = d.scenarios.find((s) => s.cle === "central");
+  const t0 = new Date(d.phases[0].debut), t1 = new Date(d.phases[d.phases.length - 1].fin);
+  const span = (t1 - t0) / 864e5 + 1;
+  const pos = (x) => (100 * (new Date(x) - t0) / 864e5) / span;
+  // --pal5 : bleu profond en clair, bleu pâle en sombre (les barres restent visibles dans les deux thèmes)
+  const couleurs = ["var(--bleu)", "var(--pal5)", "var(--bleu)", "var(--ambre)", "var(--pal5)", "var(--bleu)", "var(--pal5)"];
+  const zone = d.Z === "pays" ? "pays" : "zone";
+  z.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <div><div class="lib">Comment va se dérouler l'étude</div><span class="aide">Calculé à partir de la fiche, à présenter au dirigeant avant la note de cadrage</span></div>
+      <div class="actions"><a class="btn" href="/api/projets/${slug}/deroulement/docx">${ico("download")} Word</a>
+        <a class="btn btn-primaire" href="/api/projets/${slug}/deroulement/pptx">${ico("download")} PowerPoint</a></div>
+    </div>
+    <div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
+      ${[["Début de la collecte", dt(d.debut)], ["Remise du rapport", dt(prob.rapport)], ["Coût probable", fc(prob.total)], ["Équipe", `${prob.enqueteurs} + ${prob.reserves} réserves`]]
+        .map(([t, v]) => `<div class="carte kpi"><div class="t">${t}</div><div class="v" style="font-size:18px">${v}</div></div>`).join("")}
+    </div>
+    <div class="lib" style="margin:18px 0 8px">Calendrier</div>
+    <div style="display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:6px 14px;align-items:center">
+      ${d.phases.map((p, i) => `<div><b style="font-size:13px">${esc(p.nom)}</b><div class="aide" style="font-size:11.5px">${p.debut === p.fin ? dt(p.debut) : `${dt(p.debut)} → ${dt(p.fin)}`}</div></div>
+        <div style="position:relative;height:18px;background:var(--bleu-50);border-radius:9px" title="${esc(p.detail)}">
+          <div style="position:absolute;top:0;bottom:0;left:${pos(p.debut)}%;width:max(${100 * ((new Date(p.fin) - new Date(p.debut)) / 864e5 + 1) / span}%,8px);background:${couleurs[i % couleurs.length]};border-radius:9px"></div></div>`).join("")}
+    </div>
+    <div class="lib" style="margin:22px 0 8px">Trois scénarios de déroulement <span class="ex">la fin de collecte reste fixe : l'équipe s'adapte au rythme du terrain</span></div>
+    <div class="grille-3">${d.scenarios.map((s) => `
+      <div class="carte" style="padding:16px;${s.cle === "central" ? "border:2px solid var(--bleu)" : ""}">
+        <b style="font-size:17px;color:var(--bleu)">${esc(s.nom)}</b>
+        <p class="aide" style="font-size:12.5px;min-height:38px">${esc(s.contexte)}</p>
+        <div style="font-size:20px;font-weight:700;margin:6px 0">${fc(s.total)}</div>
+        <div style="font-size:13px;line-height:1.7">${s.rendement} questionnaires / enquêteur / jour<br>${s.enqueteurs} enquêteurs + ${s.reserves} réserves<br>${fc(s.par_questionnaire)} par questionnaire<br>Rapport le ${dt(s.rapport)}</div>
+      </div>`).join("")}</div>
+    <div class="lib" style="margin:22px 0 8px">Et si l'on changeait la taille de l'échantillon ?</div>
+    <div class="grille-tab"><table><thead><tr><th>Répondants</th><th>Coût probable</th><th>Enquêteurs</th><th>Marge d'erreur globale</th><th>Marge par ${zone}</th></tr></thead><tbody>
+      ${d.options.map((o) => `<tr style="${o.retenue ? "font-weight:700" : ""}"><td>${o.taille}${o.retenue ? " (retenu)" : ""}</td><td>${fc(o.total)}</td><td>${o.enqueteurs}</td><td>${esc(o.marge)}</td><td>${esc(o.marge_zone)} <span class="aide">(${o.par_zone} rép.)</span></td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="grille-2" style="margin-top:22px;align-items:start">
+      <div><div class="lib" style="margin-bottom:8px">Points de vigilance</div>
+        <div class="bandeau alerte">${ico("alert")}<ul style="margin:0;padding-left:18px">${d.vigilance.map((v) => `<li style="margin-bottom:4px">${esc(v)}</li>`).join("")}</ul></div></div>
+      <div><div class="lib" style="margin-bottom:8px">Rendez-vous de décision du dirigeant</div>
+        ${d.decisions.map((x) => `<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+          <div style="min-width:64px;text-align:center;background:var(--marine);color:#fff;border-radius:10px;padding:6px 4px;font-weight:700;line-height:1.2">${new Date(x.date).getDate()}<br><small>${new Date(x.date + "T00:00:00").toLocaleDateString("fr-FR", { month: "short" })}</small></div>
+          <div><b>${esc(x.titre)}</b><div class="aide" style="font-size:12.5px">${esc(x.detail)}</div></div></div>`).join("")}</div>
+    </div>`;
+  A.reveler(z);
 }
 
 function colonneDroite(e) {

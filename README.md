@@ -36,7 +36,7 @@ Thème clair ou sombre : Paramètres › Apparence, ou bouton dans le menu (Auto
 
 | Étape | Livrables produits |
 |---|---|
-| 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, plafond budgétaire (facultatif) |
+| 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, plafond budgétaire (facultatif) ; « Comment va se dérouler l'étude », à présenter au dirigeant : calendrier, trois scénarios (favorable, probable, difficile), taille de l'échantillon face au coût et à la précision, points de vigilance (dont fêtes pendant la collecte), rendez-vous de décision ; en Word et en PowerPoint |
 | 1. Note de cadrage | Note de cadrage (.docx/.pdf) avec la liste des indicateurs et l'estimation préliminaire du coût (fourchette basse, centrale, haute) |
 | 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteurs.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro ; conditions d'affichage entre questions, questions de profil avec exclusion (ex. chiffre d'affaires sous le seuil) |
 | 3. Échantillonnage | Note d'échantillonnage, note de recrutement adressée aux RH (besoin par pays, profil, calendrier, consignes et exemple de remplissage), fichier Excel des enquêteurs à renseigner par les RH, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
@@ -125,6 +125,8 @@ datatym/
   banque.py            types d'indicateurs, questions, modalités, modes de calcul
   moteur.py            génération, validation, propagation, versions, export PDF
   budget.py            coût de revient : fourchette du cadrage, budget de collecte, bilan financier
+  deroulement.py       déroulement de l'étude présenté au dirigeant (calendrier, scénarios, vigilance), Word et PowerPoint
+  equipe.py            liste des enquêteurs des RH : fichier à renseigner, lecture, contrôles, identifiants
   indice_hc.py         Indice H&C de Maturité IA : barème validé, 5 piliers, 5 niveaux, score par entreprise
   formulaires.py       dictionnaire, XLSForm, import QuestionPro
   formation.py         PowerPoint de formation des enquêteurs
