@@ -39,10 +39,10 @@ Thème clair ou sombre : Paramètres › Apparence, ou bouton dans le menu (Auto
 | 0. Fiche d'entrée | Thème, objectif, cible, zones/secteur, taille, durée, plafond budgétaire (facultatif) ; « Comment va se dérouler l'étude », à présenter au dirigeant : calendrier, trois scénarios (favorable, probable, difficile), taille de l'échantillon face au coût et à la précision, points de vigilance (dont fêtes pendant la collecte), rendez-vous de décision ; en Word et en PowerPoint |
 | 1. Note de cadrage | Note de cadrage (.docx/.pdf) avec la liste des indicateurs et l'estimation préliminaire du coût (fourchette basse, centrale, haute) |
 | 2. Questionnaire | Versions terrain et digitale, dictionnaire des variables, XLSForm Kobo complet (groupes de consentement et d'éligibilité, enquêteur lu dans `liste_enqueteurs.csv`, apparences, exclusivités, indicateurs calculés), import QuestionPro ; conditions d'affichage entre questions, questions de profil avec exclusion (ex. chiffre d'affaires sous le seuil) |
-| 3. Échantillonnage | Note d'échantillonnage, note de recrutement adressée aux RH (besoin par pays, profil, calendrier, consignes et exemple de remplissage), fichier Excel des enquêteurs à renseigner par les RH, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
+| 3. Échantillonnage | Note d'échantillonnage, annonce de recrutement à publier sur le site d'emploi (rédigée pour les candidats et l'ATS : CV et lettre de motivation, certificat de collecte en atout, objet de candidature), demande de recrutement aux RH (besoin par pays, rémunération, calendrier, consignes et exemple de remplissage), fichier Excel des enquêteurs à renseigner par les RH, calendrier et quotas (.xlsx), PowerPoint de formation, `liste_enqueteurs.csv` avec les noms définitifs, budget de collecte (interne) |
 | 4. Méthodologie | Note méthodologique, assemblée depuis les étapes 1 à 3 |
 | 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées : avancement cumulé, carte des pays, suivi par pays, par secteur, par profil et par collecteur, quotas, incidents |
-| 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité, bilan financier prévu contre réalisé |
+| 6. Note de suivi | Réalisé contre prévu, complétion, incidents, qualité, bilan financier prévu contre réalisé ; état de paiement des enquêteurs (questionnaires validés × tarif, forfaits par jour travaillé, moyen et numéro de paiement) |
 | 7. Rapport d'analyse | Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés |
 | 8. Clôture | Bilan des étapes, historique complet ; bouton BOUCLER : une archive ZIP (livrables, versions validées, base des soumissions, historique) à télécharger |
 
@@ -72,17 +72,18 @@ Les coûts unitaires livrés sont indicatifs : à remplacer par les tarifs de Da
 
 ## Recruter les enquêteurs
 
-1. Étape **Échantillonnage › Paramètres** : bouton « Fichier à envoyer aux RH ». L'envoyer aux RH avec la note
-   de recrutement (besoin par pays, profil, calendrier, consignes de remplissage avec un exemple de deux lignes).
+1. Étape **Échantillonnage** : envoyer aux RH la demande de recrutement, l'annonce à publier et le fichier Excel
+   (bouton « Fichier à envoyer aux RH » de l'onglet Paramètres).
 2. Les RH renvoient le fichier avec une ligne par enquêteur retenu : Nom, Prénom, Pays de résidence, Ville,
-   Téléphone (avec l'indicatif du pays, saisi `'+221…` pour qu'Excel garde le « + »), Mail, Rôle (Titulaire ou Réserve).
+   Téléphone (avec l'indicatif du pays, saisi `'+221…` pour qu'Excel garde le « + »), Mail, Rôle (Titulaire ou Réserve), Moyen de paiement (Orange Money, Wave, MTN MoMo…) et numéro de paiement s'il diffère du téléphone.
    Les réserves (15 % des enquêteurs par défaut) sont formées avec l'équipe, n'ont pas de quotas et figurent dans
    `liste_enqueteurs.csv` (catégorie `reserve`) : un remplacement se fait sans redéployer le formulaire.
 3. « Importer la liste des RH » : la plateforme contrôle le fichier (pays hors de l'étude, mails invalides,
    doublons, nombre d'enquêteurs par pays comparé au besoin, indicatif ajouté s'il manque), puis, à l'enregistrement,
    attribue les identifiants pays par pays (ENQ, code du pays et numéro d'ordre : ENQML01, ENQCI01, ENQSN01…) et met à jour quotas, calendrier, formation et `liste_enqueteurs.csv`.
 
-L'adresse de retour de la liste se règle dans **Paramètres** (repris dans chaque note de recrutement).
+Le site de dépôt des candidatures et l'adresse de retour de la liste se règlent dans **Paramètres**. En fin de collecte,
+**Note de suivi › Bilan financier** donne l'état de paiement des enquêteurs en Excel.
 
 ## Déployer le formulaire sur KoboToolbox
 
@@ -127,6 +128,7 @@ datatym/
   budget.py            coût de revient : fourchette du cadrage, budget de collecte, bilan financier
   deroulement.py       déroulement de l'étude présenté au dirigeant (calendrier, scénarios, vigilance), Word et PowerPoint
   equipe.py            liste des enquêteurs des RH : fichier à renseigner, lecture, contrôles, identifiants
+  paiement.py          état de paiement des enquêteurs en fin de collecte
   indice_hc.py         Indice H&C de Maturité IA : barème validé, 5 piliers, 5 niveaux, score par entreprise
   formulaires.py       dictionnaire, XLSForm, import QuestionPro
   formation.py         PowerPoint de formation des enquêteurs

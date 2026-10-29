@@ -23,10 +23,10 @@ const MODELES = [
 const PHASES = [
   { n: "01", mot: "CADRER", titre: "Note de cadrage", desc: "Contexte, objectifs, cible, champ et taille visée, la liste des indicateurs recherchés, base de tout le reste, et une première estimation du coût.", liv: ["Note de cadrage"], ic: "target", c: "#0087E0" },
   { n: "02", mot: "QUESTIONNER", titre: "Questionnaire", desc: "Des questions simples tirées des indicateurs, adaptées à chaque profil, en version terrain et digitale, avec une durée de passation volontairement courte, prêtes pour Kobo et QuestionPro.", liv: ["Questionnaire terrain", "Questionnaire digital", "Dictionnaire des variables", "XLSForm Kobo", "Import QuestionPro", "Liste des enquêteurs"], ic: "edit", c: "#334EAC" },
-  { n: "03", mot: "ÉCHANTILLONNER", titre: "Plan de terrain", desc: "Quotas par zone et par profil, répartition par enquêteur, calendrier jour par jour, recrutement, formation et budget de collecte calculé poste par poste.", liv: ["Note d'échantillonnage", "Note de recrutement", "Calendrier et quotas", "Formation PowerPoint", "Budget de collecte"], ic: "users", c: "#00B4D8" },
+  { n: "03", mot: "ÉCHANTILLONNER", titre: "Plan de terrain", desc: "Quotas par zone et par profil, répartition par enquêteur, calendrier jour par jour, recrutement, formation et budget de collecte calculé poste par poste.", liv: ["Note d'échantillonnage", "Annonce de recrutement", "Demande aux RH", "Calendrier et quotas", "Formation PowerPoint", "Budget de collecte"], ic: "users", c: "#00B4D8" },
   { n: "04", mot: "DOCUMENTER", titre: "Note méthodologique", desc: "La méthode consolidée automatiquement : échantillonnage, questionnaire, mode de calcul de chaque indicateur, outils.", liv: ["Note méthodologique"], ic: "file", c: "#7096D1" },
   { n: "05", mot: "COLLECTER", titre: "Suivi de la collecte", desc: "Les réponses arrivent de Kobo ou de QuestionPro, par API ou par fichier, et alimentent un tableau de bord : avancement par enquêteur, zone et quota, écarts au calendrier.", liv: ["Tableau de bord", "Base des soumissions"], ic: "chart", c: "#0077B6" },
-  { n: "06", mot: "CONTRÔLER", titre: "Note de suivi", desc: "Réalisé contre prévu, refus, entretiens trop rapides, incidents, puis bilan financier prévu contre réalisé : la qualité et le coût, documentés.", liv: ["Note de suivi des enquêtes"], ic: "check", c: "#081F5C" },
+  { n: "06", mot: "CONTRÔLER", titre: "Note de suivi", desc: "Réalisé contre prévu, refus, entretiens trop rapides, incidents, puis bilan financier prévu contre réalisé : la qualité et le coût, documentés.", liv: ["Note de suivi des enquêtes", "État de paiement des enquêteurs"], ic: "check", c: "#081F5C" },
   { n: "07", mot: "ANALYSER", titre: "Rapport d'analyse", desc: "Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés et enseignements pour la décision.", liv: ["Rapport d'analyse"], ic: "sparkle", c: "#000F22" },
 ];
 
@@ -70,7 +70,7 @@ function vueAccueil(app) {
           <button class="btn btn-verre" data-defile="cabinet">Découvrir le cabinet</button>
         </div>
         <div class="hero2-chiffres">
-          ${[[7, "paramètres à saisir"], [16, "livrables produits"], [6, "formats générés : Word, PDF, Excel, PowerPoint…"], [100, "% des documents modifiables"]]
+          ${[[7, "paramètres à saisir"], [18, "livrables produits"], [6, "formats générés : Word, PDF, Excel, PowerPoint…"], [100, "% des documents modifiables"]]
             .map(([v, l], k) => `<div data-reveal="haut" data-delai="${800 + k * 90}"><b data-compte="${v}">0</b><span>${l}</span></div>`).join("")}
         </div>
       </div>
@@ -162,7 +162,7 @@ function vueAccueil(app) {
       <i class="cr hg"></i><i class="cr hd"></i><i class="cr bg"></i><i class="cr bd"></i>
       <span class="cc-gauche">(LANCER)</span><span class="cc-centre">${ico("play")}</span><span class="cc-droite">UNE ÉTUDE</span>
     </a>
-    <p data-reveal="haut">Sept paramètres. Seize livrables. Zéro ressaisie.</p>
+    <p data-reveal="haut">Sept paramètres. Dix-huit livrables. Zéro ressaisie.</p>
   </section>
 
   <footer class="pied">

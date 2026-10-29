@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import budget, equipe, formulaires, formation, store
+from . import budget, equipe, formulaires, formation, paiement, store
 from .banque import nom_court, profils_depuis_cible
 from .charte import rendre_modele
 from .etapes import cadrage, collecte, echantillonnage, methodologie, questionnaire, rapport, suivi
@@ -187,7 +187,11 @@ def exporter(projet, cle):
         ajout("Liste des enquêteurs pour Kobo (noms définitifs)", formulaires.FICHIER_ENQUETEURS)
         f = store.nom_fichier(projet, "Liste_Enqueteurs_A_Renseigner", v, "xlsx")
         equipe.modele_xlsx(out / f, e["data"]["zones"], e["data"].get("besoin") or {}, e["data"].get("reserve") or {})
-        ajout("Liste des enquêteurs à renseigner par les RH (jointe à la note de recrutement)", f)
+        ajout("Liste des enquêteurs à renseigner par les RH (jointe à la demande de recrutement)", f)
+    if cle == "suivi" and collecte.chemin_donnees(projet).exists():
+        f = store.nom_fichier(projet, "Etat_Paiement_Enqueteurs", v, "xlsx")
+        if paiement.xlsx(out / f, projet):
+            ajout("État de paiement des enquêteurs (interne)", f)
     if cle == "collecte" and collecte.chemin_donnees(projet).exists():
         f = store.nom_fichier(projet, "Donnees_Collecte", v, "csv")
         shutil.copy(collecte.chemin_donnees(projet), out / f)

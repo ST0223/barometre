@@ -33,7 +33,7 @@ PARAMS_DEFAUT = {
     "modele": "claude-opus-5-5",
     "presentation_datatym": DATATYM_PRESENTATION,
     "contact_recrutement": "https://www.intowork.co/offres",
-    # adresse à laquelle les RH retournent la liste des enquêteurs retenus (note de recrutement)
+    # adresse à laquelle les RH retournent la liste des enquêteurs retenus (demande de recrutement)
     "mail_rh": "",
     # jetons des plateformes de collecte, conservés sur ce poste uniquement (parametres.json est exclu de Git)
     "kobo_jeton": "",

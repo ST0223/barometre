@@ -34,7 +34,7 @@ const ETAPES_INFO = {
   fiche: { court: "Fiche", desc: "Les sept paramètres du baromètre, saisis une seule fois." },
   cadrage: { court: "Cadrage", desc: "Contexte, objectifs, cible, champ, taille visée, durée et surtout la liste des indicateurs recherchés : la base de tout le reste.", produit: ["Note de cadrage (Word, PDF)"] },
   questionnaire: { court: "Questionnaire", desc: "Questions construites à partir des indicateurs validés, adaptées à chaque profil, avec message de consentement et durée estimée.", produit: ["Questionnaire terrain et digital", "Dictionnaire des variables", "XLSForm KoboToolbox", "Import QuestionPro"] },
-  echantillonnage: { court: "Échantillonnage", desc: "Quotas zone × profil, répartition par enquêteur, calendrier jour par jour, budget de collecte, note de recrutement et formation.", produit: ["Note d'échantillonnage", "Note de recrutement", "Budget de collecte (interne)", "Calendrier et quotas (Excel)", "PowerPoint de formation", "XLSForm avec enquêteurs"] },
+  echantillonnage: { court: "Échantillonnage", desc: "Quotas zone × profil, répartition par enquêteur, calendrier jour par jour, budget de collecte, annonce de recrutement, demande aux RH et formation.", produit: ["Note d'échantillonnage", "Annonce de recrutement", "Demande aux RH", "Budget de collecte (interne)", "Calendrier et quotas (Excel)", "PowerPoint de formation", "XLSForm avec enquêteurs"] },
   methodologie: { court: "Méthodologie", desc: "Assemblage automatique des étapes précédentes : méthode, échantillonnage, questionnaire, indicateurs et modes de calcul, outils, traitement.", produit: ["Note méthodologique"] },
   collecte: { court: "Collecte", desc: "Import des soumissions (fichier Kobo/QuestionPro ou API Kobo) et tableau de bord : avancement par enquêteur, zone et quota, écarts au calendrier.", produit: ["Tableau de bord", "Base des soumissions"] },
   suivi: { court: "Note de suivi", desc: "Bilan de la collecte à partir du tableau de bord : réalisé contre prévu, taux de complétion, incidents, qualité des données, bilan financier.", produit: ["Note de suivi des enquêtes"] },
@@ -1036,14 +1036,15 @@ function blocEquipe(d, P) {
   return `<div id="bloc-equipe" style="margin-bottom:18px">
     <div class="lib" style="margin-bottom:6px">Équipe d'enquêteurs <span class="ex">${eq.length ? `liste des RH : ${titulaires.length} titulaires, ${eq.length - titulaires.length} réserves` : `${d.nb_enqueteurs} titulaires et ${Object.values(reserve).reduce((a, b) => a + b, 0)} réserves à recruter ; Enq1, Enq2… en attendant la liste des RH`}</span></div>
     <div class="actions" style="margin-bottom:10px;flex-wrap:wrap">${telecharger}${importer}${eq.length || (P.noms_enqueteurs || []).length ? `<button class="btn btn-ed" data-equipe-retirer>Revenir à Enq1, Enq2…</button>` : ""}</div>
-    ${eq.length ? "" : `<p class="aide" style="margin-top:0">Envoyez aux RH la note de recrutement et le fichier Excel : ils le renvoient avec une ligne par enquêteur retenu (nom, prénom, pays de résidence, ville, téléphone avec indicatif, mail, rôle titulaire ou réserve). Les identifiants sont attribués ici, à l'import.</p>`}
+    ${eq.length ? "" : `<p class="aide" style="margin-top:0">Envoyez aux RH la demande de recrutement, l'annonce à publier et le fichier Excel : ils le renvoient avec une ligne par enquêteur retenu (nom, prénom, pays de résidence, ville, téléphone avec indicatif, mail, rôle titulaire ou réserve, moyen et numéro de paiement). Les identifiants sont attribués ici, à l'import.</p>`}
     ${lu && (lu.alertes.length || lu.rejetes.length) ? `<div class="bandeau alerte" style="margin-bottom:10px">${ico("alert")}<div><b>À vérifier dans « ${esc(lu.fichier)} » :</b><ul style="margin:6px 0 0;padding-left:18px">
       ${lu.rejetes.map((x) => `<li><b>Non retenu</b> — ${esc(x)}</li>`).join("")}${lu.alertes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div></div>` : ""}
     ${eq.length ? `<div class="puces" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${parPays.map(([z, n, b, nr, br]) =>
       `<span class="tag" style="${n < b || nr < br ? "color:var(--rouge)" : ""}" title="titulaires / prévus · réserves / prévues">${esc(z)} : ${n}${b ? ` / ${b}` : ""}${br || nr ? ` · R ${nr}/${br}` : ""}</span>`).join("")}</div>
-      <div class="grille-tab" style="max-height:340px;overflow:auto"><table><thead><tr><th>ID</th><th>Nom</th><th>Prénom</th><th>Pays</th><th>Ville</th><th>Téléphone</th><th>Mail</th><th>Rôle</th></tr></thead><tbody>
+      <div class="grille-tab" style="max-height:340px;overflow:auto"><table><thead><tr><th>ID</th><th>Nom</th><th>Prénom</th><th>Pays</th><th>Ville</th><th>Téléphone</th><th>Mail</th><th>Rôle</th><th>Paiement</th></tr></thead><tbody>
       ${eq.map((m) => `<tr><td>${ids[`${m.telephone}|${m.mail}`] ? `<b>${esc(ids[`${m.telephone}|${m.mail}`])}</b>` : '<span class="aide">à l\'enregistrement</span>'}</td>
-        <td>${esc(m.nom)}</td><td>${esc(m.prenom)}</td><td>${esc(m.pays)}</td><td>${esc(m.ville)}</td><td style="white-space:nowrap">${esc(m.telephone)}</td><td>${esc(m.mail)}</td><td>${m.role === "reserve" ? "Réserve" : "Titulaire"}</td></tr>`).join("")}
+        <td>${esc(m.nom)}</td><td>${esc(m.prenom)}</td><td>${esc(m.pays)}</td><td>${esc(m.ville)}</td><td style="white-space:nowrap">${esc(m.telephone)}</td><td>${esc(m.mail)}</td><td>${m.role === "reserve" ? "Réserve" : "Titulaire"}</td>
+        <td style="white-space:nowrap">${m.paiement ? `${esc(m.paiement)}${m.num_paiement && m.num_paiement !== m.telephone ? `<div class="aide" style="font-size:11.5px">${esc(m.num_paiement)}</div>` : ""}` : '<span style="color:var(--rouge)">à compléter</span>'}</td></tr>`).join("")}
       </tbody></table></div>` : ""}
   </div>`;
 }
@@ -1102,6 +1103,9 @@ function editeurBilan(z) {
   const saisi = (c) => D[c] !== undefined && D[c] !== "";
   z.innerHTML = `
     <div class="bandeau info">${ico("info")}<div>Saisissez les dépenses réellement engagées, poste par poste. Le bilan financier de la note de suivi compare le réalisé au budget de collecte ; un poste laissé vide n'entre pas dans le calcul.</div></div>
+    <div class="actions" style="margin:0 0 12px;align-items:center;gap:12px;flex-wrap:wrap">
+      <a class="btn" href="/api/projets/${S.projet.slug}/paiements">${ico("download")} État de paiement des enquêteurs (Excel)</a>
+      <span class="aide" style="font-size:12.5px">Questionnaires validés × tarif, forfaits par jour travaillé, moyen et numéro de paiement de chaque enquêteur</span></div>
     <div class="grille-tab"><table><thead><tr><th>Poste</th><th>Prévu</th><th>Réalisé (FCFA)</th><th>Écart</th></tr></thead><tbody>
       ${postes.map((p) => `<tr><td>${esc(p.poste)}</td><td>${nf(p.montant)} FCFA</td>
         <td><input class="saisie petite" style="width:130px" type="number" min="0" step="1000" data-dep="${p.cle}" value="${D[p.cle] ?? ""}" placeholder="non saisi"></td>
@@ -1136,13 +1140,18 @@ function editeurRecrutement(z, e) {
   const champ = (k, l, type = "input", plein = false) => `<div class="champ ${plein ? "plein" : ""}"><label>${esc(l)}</label>${type === "area" ? `<textarea class="saisie" rows="4" data-r="${k}">${esc(Array.isArray(R[k]) ? R[k].join("\n") : R[k])}</textarea>` : `<input class="saisie" ${type === "date" ? 'type="date"' : ""} data-r="${k}" value="${esc(R[k])}">`}</div>`;
   z.className = "carte-corps";
   z.innerHTML = `<div class="grille-2">
-    <p class="aide plein" style="margin-top:0">Note adressée au service des ressources humaines, avec le fichier Excel à renseigner (téléchargeable dans l'onglet Paramètres).</p>
-    ${champ("intitule", "Intitulé", "input", true)}
+    <p class="aide plein" style="margin-top:0">Annonce publiée sur le site d'emploi (lue par les candidats et par l'ATS). La demande aux RH, avec le besoin par pays, la rémunération et le fichier Excel, est produite à part à partir du plan.</p>
+    ${champ("intitule", "Intitulé de l'annonce", "input", true)}
     ${champ("experience", "Expérience d'enquête minimale")}${champ("diplome", "Diplôme minimum")}
-    ${champ("date_limite", "Date limite de retour de la liste", "date")}${champ("retour", "Adresse de retour de la liste")}
-    ${champ("mission", "Objet de la demande", "area", true)}
-    ${champ("taches", "Mission confiée aux enquêteurs (une tâche par ligne)", "area", true)}
-    ${champ("competences", "Compétences (une par ligne)", "area", true)}
+    ${champ("contact", "Site de dépôt des candidatures")}${champ("objet", "Objet de la candidature (complété par le pays du candidat)")}
+    ${champ("date_candidature", "Date limite de candidature", "date")}${champ("date_limite", "Retour de la liste par les RH", "date")}
+    ${champ("retour", "Adresse de retour de la liste (RH)")}${champ("remuneration", "Rémunération annoncée")}
+    ${champ("presentation", "Présentation de Datatym", "area", true)}
+    ${champ("mission", "La mission", "area", true)}
+    ${champ("taches", "Tâches principales (une par ligne)", "area", true)}
+    ${champ("competences", "Profil et compétences (une par ligne)", "area", true)}
+    ${champ("atouts", "Atouts (un par ligne)", "area", true)}
+    ${champ("dossier", "Pièces à joindre (une par ligne)", "area", true)}
   </div>`;
   z.oninput = (ev) => {
     const t = ev.target;
@@ -1490,8 +1499,9 @@ function vueParametres(app) {
           <div class="actions" style="margin-top:12px"><button class="btn btn-petit" id="p-test">${ico("sparkle")} Tester la connexion</button><span id="p-res" class="aide" style="align-self:center"></span></div>
         </div></div>
       <div class="carte"><div class="carte-titre"><h3>Textes Datatym</h3></div><div class="carte-corps">
-        <div class="champ" style="margin-bottom:14px"><label>Présentation de Datatym (formation des enquêteurs)</label><textarea class="saisie" id="p-pres" rows="5">${esc(P.presentation_datatym)}</textarea></div>
-        <div class="champ"><label>Adresse de retour de la liste des enquêteurs <span class="ex">mail de l'équipe projet, repris dans la note de recrutement envoyée aux RH</span></label><input class="saisie" id="p-mail-rh" type="email" value="${esc(P.mail_rh || "")}" placeholder="projets@datatym.com"></div>
+        <div class="champ" style="margin-bottom:14px"><label>Présentation de Datatym (annonces de recrutement, formation)</label><textarea class="saisie" id="p-pres" rows="5">${esc(P.presentation_datatym)}</textarea></div>
+        <div class="champ" style="margin-bottom:14px"><label>Site de dépôt des candidatures <span class="ex">site d'emploi (avec ATS) cité dans les annonces de recrutement</span></label><input class="saisie" id="p-contact" value="${esc(P.contact_recrutement || "")}"></div>
+        <div class="champ"><label>Adresse de retour de la liste des enquêteurs <span class="ex">mail de l'équipe projet, repris dans la demande de recrutement aux RH</span></label><input class="saisie" id="p-mail-rh" type="email" value="${esc(P.mail_rh || "")}" placeholder="projets@datatym.com"></div>
         <div class="pied-form"><button class="btn btn-primaire" data-enr-params>${ico("check")} Enregistrer</button></div>
       </div></div>
       <div class="carte" style="margin-top:16px"><div class="carte-titre"><h3>${ico("coin")} Coûts unitaires de référence</h3></div><div class="carte-corps">
@@ -1504,7 +1514,7 @@ function vueParametres(app) {
     </div>`;
   A.reveler(app);
   app.querySelectorAll("[data-theme-choix]").forEach((x) => (x.onclick = () => appliquerTheme(x.dataset.themeChoix, true)));
-  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, mail_rh: $("#p-mail-rh").value.trim(),
+  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value.trim(), mail_rh: $("#p-mail-rh").value.trim(),
     couts_unitaires: P.couts_unitaires.map((c, k) => ({ cle: c.cle, valeur: Number(app.querySelector(`[data-cu-ref="${k}"]`).value) || 0 })) });
   app.querySelectorAll("[data-enr-params]").forEach((b) => (b.onclick = (e) => occupe(e.currentTarget, async () => {
     await api("PUT", "/api/parametres", lire());

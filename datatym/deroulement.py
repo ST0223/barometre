@@ -79,7 +79,7 @@ def presenter(projet):
     rapport = ouvres(fin, int(hyp_scen["central"]["jours_analyse"]))
     phases = [
         ("Cadrage et questionnaire", depart, envoi_rh, "Note de cadrage, indicateurs, questionnaire validés"),
-        ("Recrutement par les RH", envoi_rh, retour_rh, "Note de recrutement envoyée, liste des enquêteurs retournée"),
+        ("Recrutement par les RH", envoi_rh, retour_rh, "Annonce publiée, candidats sélectionnés, liste des enquêteurs retournée"),
         ("Préparation du terrain", retour_rh, debut - timedelta(days=2), "Contrats, formulaire de collecte, quotas par enquêteur"),
         ("Formation (Teams)", debut - timedelta(days=1), debut - timedelta(days=1), "Titulaires et réserves, prise en main de l'outil"),
         ("Collecte", debut, fin, f"{len(jours)} jours de terrain, suivi quotidien à distance"),

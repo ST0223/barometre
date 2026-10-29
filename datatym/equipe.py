@@ -23,7 +23,10 @@ COLONNES = [
      "et saisi avec une apostrophe devant ('+221 771234567), sinon Excel le transforme en nombre et supprime le +"),
     ("Mail", "mail", "Adresse personnelle et active : contrat, ordre de mission et notes de suivi y seront envoyés"),
     ("Rôle", "role", "Titulaire (reçoit des quotas) ou Réserve (formée, mobilisée pour remplacer un abandon), choisi dans la liste déroulante"),
+    ("Moyen de paiement", "paiement", "Moyen par lequel l'enquêteur sera payé, choisi dans la liste déroulante"),
+    ("Numéro de paiement", "num_paiement", "Numéro Mobile Money ou compte bancaire, seulement s'il diffère du téléphone (même format '+221…)"),
 ]
+MOYENS_PAIEMENT = ["Orange Money", "Wave", "MTN MoMo", "Moov Money", "Free Money", "Airtel Money", "Virement bancaire"]
 ROLES = {"titulaire": "Titulaire", "reserve": "Réserve"}
 
 INDICATIFS = {
@@ -76,8 +79,10 @@ def exemples(zones):
     local = {"senegal": "771234567", "cote_d_ivoire": "0701020304", "cameroun": "677123456", "rd_congo": "812345678", "guinee": "621123456"}
     tel = lambda z, defaut: f"+{INDICATIFS.get(slug(z), '221')} {local.get(slug(z), defaut)}"
     return [
-        {"nom": "DIOP", "prenom": "Awa", "pays": z1, "ville": CAPITALES.get(slug(z1), z1), "telephone": tel(z1, "90123456"), "mail": "awa.diop@exemple.com", "role": "Titulaire"},
-        {"nom": "KOUASSI", "prenom": "Jean-Marc", "pays": z2, "ville": CAPITALES.get(slug(z2), z2), "telephone": tel(z2, "70123456"), "mail": "jm.kouassi@exemple.com", "role": "Réserve"},
+        {"nom": "DIOP", "prenom": "Awa", "pays": z1, "ville": CAPITALES.get(slug(z1), z1), "telephone": tel(z1, "90123456"), "mail": "awa.diop@exemple.com", "role": "Titulaire",
+         "paiement": "Wave" if slug(z1) in ("senegal", "cote_d_ivoire", "mali", "burkina_faso") else "Orange Money", "num_paiement": ""},
+        {"nom": "KOUASSI", "prenom": "Jean-Marc", "pays": z2, "ville": CAPITALES.get(slug(z2), z2), "telephone": tel(z2, "70123456"), "mail": "jm.kouassi@exemple.com", "role": "Réserve",
+         "paiement": "Orange Money" if slug(z2) != "benin" else "MTN MoMo", "num_paiement": tel(z2, "70123499")},
     ]
 
 
@@ -100,6 +105,11 @@ def modele_xlsx(chemin, zones, besoin, reserve=None):
     dv = DataValidation(type="list", formula1='"Titulaire,Réserve"', allow_blank=True)
     ws.add_data_validation(dv)
     dv.add(f"G2:G{nb + 1}")
+    dv = DataValidation(type="list", formula1='"' + ",".join(MOYENS_PAIEMENT) + '"', allow_blank=True)
+    ws.add_data_validation(dv)
+    dv.add(f"H2:H{nb + 1}")
+    for row in ws.iter_rows(min_row=2, max_row=nb + 1, min_col=9, max_col=9):
+        row[0].number_format = "@"
     ws2 = wb.create_sheet("Consignes")
     _feuille(ws2, ["Colonne", "Consigne"], [[c, t] for c, _, t in COLONNES]
              + [["", ""], ["Une ligne", "Une ligne par enquêteur retenu, sans ligne vide ni cellule fusionnée ; ne pas renommer les colonnes."],
@@ -128,6 +138,8 @@ def _cle_colonne(entete):
         return "prenom"
     if s == "nom" or s.startswith("nom_de_famille") or s.startswith("nom_"):
         return "nom"
+    if "paiement" in s or "mobile_money" in s or "compte" in s:
+        return "num_paiement" if s.startswith(("numero", "num_", "compte", "n_")) or "compte" in s else "paiement"
     if s.startswith(("role", "statut", "fonction")):
         return "role"
     if s.startswith("pays"):
@@ -198,9 +210,9 @@ def lire(chemin, zones, besoin, reserve=None):
         k = _cle_colonne(x)
         if k and k not in cols:
             cols[k] = j
-    manquantes = [c for c, k, _ in COLONNES if k not in cols and k != "role"]
+    manquantes = [c for c, k, _ in COLONNES if k not in cols and k not in ("role", "num_paiement")]
     exemple = {(e["nom"], e["prenom"]) for e in exemples(zones)}
-    equipe, alertes, rejetes, vus, completes = [], [], [], {}, []
+    equipe, alertes, rejetes, vus, completes, sans_paiement = [], [], [], {}, [], []
     for n, l in enumerate(lignes[i_ent + 1:], i_ent + 2):
         v = {k: str(l[j]).strip() if j < len(l) else "" for k, j in cols.items()}
         if not (v.get("nom") or v.get("prenom")):
@@ -227,13 +239,20 @@ def lire(chemin, zones, besoin, reserve=None):
                 alertes.append(f"{qui} : même {cle} que la ligne {vus[(cle, val)]}")
             elif val:
                 vus[(cle, val)] = n
+        moyen = next((m for m in MOYENS_PAIEMENT if slug(m) == slug(v.get("paiement", ""))), v.get("paiement", "").strip())
+        if not moyen:
+            sans_paiement.append(str(n))
+        num = telephone(v.get("num_paiement"), zone)[0] if v.get("num_paiement", "").strip() else ""
         role = "reserve" if slug(v.get("role", "")).startswith(("reserve", "rempla", "suppl")) else "titulaire"
         equipe.append({"nom": v.get("nom", "").upper(), "prenom": v.get("prenom", ""), "pays": zone,
-                       "ville": v.get("ville", ""), "telephone": tel, "mail": mail, "role": role})
+                       "ville": v.get("ville", ""), "telephone": tel, "mail": mail, "role": role,
+                       "paiement": moyen, "num_paiement": num or tel})
     if not equipe:
         raise ValueError("Aucun enquêteur lu dans le fichier." + (f" Lignes rejetées : {'; '.join(rejetes[:3])}." if rejetes else ""))
     if manquantes:
         alertes.insert(0, "Colonnes absentes : " + ", ".join(manquantes))
+    if sans_paiement:
+        alertes.append(f"Moyen de paiement manquant pour {len(sans_paiement)} enquêteur(s) (ligne{'s' if len(sans_paiement) > 1 else ''} {', '.join(sans_paiement)})")
     if completes:
         alertes.append(f"Indicatif du pays ajouté à {len(completes)} numéro(s) (ligne{'s' if len(completes) > 1 else ''} {', '.join(completes)})")
     for z in zones:

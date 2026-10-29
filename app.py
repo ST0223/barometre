@@ -15,7 +15,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import budget, deroulement, equipe, importation, llm, moteur, store
+from datatym import budget, deroulement, equipe, importation, llm, moteur, paiement, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -207,6 +207,17 @@ def deroulement_fichier(slug, fmt):
     chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, "Deroulement_Etude", 1, fmt).replace("_v1.", ".")
     chemin.parent.mkdir(parents=True, exist_ok=True)
     (deroulement.docx if fmt == "docx" else deroulement.pptx)(chemin, p)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
+@app.get("/api/projets/<slug>/paiements")
+def etat_paiement(slug):
+    """État de paiement des enquêteurs à partir des questionnaires validés à ce jour."""
+    p = _projet(slug)
+    chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, "Etat_Paiement_Enqueteurs", 1, "xlsx").replace("_v1.", ".")
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    if not paiement.xlsx(chemin, p):
+        raise moteur.ErreurChaine("Générez d'abord le plan d'échantillonnage.")
     return send_file(chemin, as_attachment=True, download_name=chemin.name)
 
 

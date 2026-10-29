@@ -10,7 +10,8 @@ from ..outils import aujourdhui, date_courte, date_fr, debut_collecte, fcfa, fmt
 
 DOCS = {
     "note_echantillonnage": ("NoteEchantillonnage", "Note d'échantillonnage des enquêteurs"),
-    "note_recrutement": ("NoteRecrutement", "Note de recrutement des enquêteurs"),
+    "note_recrutement": ("AnnonceRecrutement", "Annonce de recrutement des enquêteurs"),
+    "demande_rh": ("DemandeRecrutementRH", "Demande de recrutement aux RH"),
     "budget_collecte": ("BudgetCollecte", "Budget de collecte"),
 }
 
@@ -34,15 +35,19 @@ def formation_texte(hyp):
 
 
 def recrutement_defaut(projet, n_enq, jours, n_res=0, hyp=None):
+    """Annonce publiée sur le site d'emploi (lue par les candidats et l'ATS) ; la demande aux RH est construite à part."""
     fiche = projet["fiche"]
     params = charger_parametres()
+    nom = nom_barometre(fiche["theme"])
     return {
-        "intitule": f"Recrutement des enquêteurs — {nom_barometre(fiche['theme'])}",
-        "mission": (f"Dans le cadre {du_barometre(fiche['theme'])}, Datatym demande au service des ressources humaines de recruter "
-                    f"{n_enq} enquêteurs et enquêtrices{f', ainsi que {n_res} en réserve,' if n_res else ''} chargés d'administrer un questionnaire auprès de {fiche['cible']}, dans "
+        "intitule": f"Enquêteurs et enquêtrices — {nom}",
+        "presentation": params.get("presentation_datatym", ""),
+        "mission": (f"Dans le cadre {du_barometre(fiche['theme'])}, Datatym recrute {n_enq} enquêteurs et enquêtrices "
+                    f"pour administrer un questionnaire auprès de {fiche['cible']}, dans "
                     f"{'les pays suivants' if sont_des_pays(fiche['zones']) else 'les zones suivantes'} : {', '.join(decouper(fiche['zones']))}. "
-                    f"La collecte se déroule sur {len(jours)} jours, du {date_fr(jours[0])} au {date_fr(jours[-1])}, "
-                    f"précédée d'une formation obligatoire {formation_texte(hyp)}."),
+                    f"La collecte se déroule du {date_fr(jours[0])} au {date_fr(jours[-1])}, "
+                    f"précédée d'une formation obligatoire {formation_texte(hyp)}."
+                    + (" Une liste de réserve est également constituée." if n_res else "")),
         "taches": [
             "Identifier et contacter les répondants éligibles selon les quotas attribués.",
             "Présenter l'étude, recueillir le consentement et administrer le questionnaire sur smartphone ou tablette.",
@@ -56,16 +61,46 @@ def recrutement_defaut(projet, n_enq, jours, n_res=0, hyp=None):
             "Maîtrise d'un outil de collecte mobile (KoboCollect, ODK, QuestionPro ou équivalent).",
             "Aisance relationnelle, sens de l'écoute et présentation soignée.",
             "Rigueur, ponctualité et respect de la confidentialité.",
-            "Bonne capacité de communication.",
-            "Parler et lire couramment le français ; la pratique d'une langue locale est un atout.",
+            "Parler et lire couramment le français.",
+            "Disposer d'un smartphone Android et d'une connexion internet.",
         ],
+        "atouts": [
+            "Certificat ou attestation de participation à une mission de collecte de données.",
+            "Pratique d'une langue locale du pays de résidence.",
+        ],
+        "remuneration": "Rémunération au questionnaire validé, versée par Mobile Money à la fin de la collecte.",
+        "dossier": [
+            "CV à jour, indiquant le pays et la ville de résidence, les missions de collecte réalisées et les outils utilisés.",
+            "Lettre de motivation.",
+            "Certificat ou attestation de collecte, si vous en disposez (atout).",
+        ],
+        "objet": f"Candidature – Enquêteur – {nom}",
+        "contact": params.get("contact_recrutement", ""),
+        "date_candidature": (jours[0] - timedelta(days=12)).isoformat(),
         "date_limite": (jours[0] - timedelta(days=7)).isoformat(),
         "retour": params.get("mail_rh", ""),
     }
 
 
 # champs tirés de la fiche et du plan (thème, cible, zones, dates, nombre d'enquêteurs)
-CHAMPS_CALCULES = ("intitule", "mission", "date_limite")
+CHAMPS_CALCULES = ("intitule", "mission", "date_limite", "date_candidature", "objet")
+
+# anciens textes par défaut : une étude qui les a gardés tels quels reçoit les nouveaux (annonce publiée, ATS)
+ANCIENS_DEFAUTS = {
+    "dossier": [["CV à jour", "Lettre de motivation", "Copie du dernier diplôme",
+                 "Références de missions d'enquête antérieures (facultatif, constituent un atout)"]],
+    "taches": [["Identifier et contacter les répondants éligibles selon les quotas attribués.",
+                "Présenter l'étude, recueillir le consentement et administrer le questionnaire sur smartphone ou tablette.",
+                "Saisir les réponses avec rigueur et envoyer les formulaires chaque jour.",
+                "Respecter le calendrier, les quotas et les consignes du superviseur.",
+                "Signaler sans délai toute difficulté rencontrée sur le terrain."]],
+    "competences": [["Expérience d'enquête quantitative, idéalement auprès d'entreprises ou de professionnels.",
+                     "Maîtrise d'un outil de collecte mobile (KoboCollect, ODK, QuestionPro ou équivalent).",
+                     "Aisance relationnelle, sens de l'écoute et présentation soignée.",
+                     "Rigueur, ponctualité et respect de la confidentialité.",
+                     "Bonne capacité de communication.",
+                     "Parler et lire couramment le français ; la pratique d'une langue locale est un atout."]],
+}
 
 
 def actualiser_recrutement(prec, defaut):
@@ -75,7 +110,7 @@ def actualiser_recrutement(prec, defaut):
     ancien_defaut = prec.get("_defaut")
     rec = {}
     for k, v in defaut.items():
-        if k not in prec:
+        if k not in prec or prec[k] in ANCIENS_DEFAUTS.get(k, []):
             rec[k] = v
         elif ancien_defaut is None:
             # note créée avant ce suivi : les champs calculés sont repris de la fiche, les autres conservés
@@ -144,7 +179,7 @@ def calculer(projet, quest, params, recrutement=None):
                 nom = e.get("nom_complet") or (f"Enq{k}" if not liste_rh else f"{code} (à pourvoir)")
             m = {"code": code, "nom": nom, "zone": z, "par_profil": {}, "objectif": 0}
             if e.get("telephone") or e.get("mail"):
-                m["contact"] = {c: e.get(c, "") for c in ("nom", "prenom", "ville", "telephone", "mail")}
+                m["contact"] = {c: e.get(c, "") for c in ("nom", "prenom", "ville", "telephone", "mail", "paiement", "num_paiement")}
             membres.append(m)
         nb = len(membres)
         for j, pr in enumerate(profils):
@@ -171,7 +206,7 @@ def calculer(projet, quest, params, recrutement=None):
         # réserves du pays : identifiants à la suite des titulaires (ENQML03…), sans quotas tant qu'elles ne remplacent personne
         for r, e in enumerate([m for m in tout_rh if m["pays"] == z and m.get("role") == "reserve"], nb + 1):
             reserves.append({"code": equipe.identifiant(code_zone[z], r), "nom": f"{e.get('prenom', '')} {e.get('nom', '')}".strip(),
-                             "zone": z, "contact": {c: e.get(c, "") for c in ("nom", "prenom", "ville", "telephone", "mail")}})
+                             "zone": z, "contact": {c: e.get(c, "") for c in ("nom", "prenom", "ville", "telephone", "mail", "paiement", "num_paiement")}})
     n_enq = len(enqueteurs)
 
     calendrier = []
@@ -272,7 +307,7 @@ def construire_docs(projet, data, quest):
     rec = data["recrutement"]
     sections.append(section("profils_enq", f"{len(sections) + 1}. Profils d'enquêteurs à rechercher", [
         liste([f"Diplôme minimum : {rec['diplome']}.", f"Expérience d'enquête : {rec['experience']} minimum."] + rec["competences"]),
-        p("La note de recrutement jointe reprend ces critères pour diffusion."),
+        p("L'annonce de recrutement reprend ces critères pour publication."),
     ]))
     note = {
         "titre": "Note d'échantillonnage des enquêteurs", "surtitre": "Baromètre Datatym", "sous_titre": fiche["theme"],
@@ -283,50 +318,96 @@ def construire_docs(projet, data, quest):
     reserve = data.get("reserve") or {}
     n_res = sum(reserve.values())
     retour = rec.get("retour") or "l'équipe projet Datatym"
+    hyp = data["params"].get("hypotheses") or {}
+    en_ligne = hyp.get("formation", "en_ligne") == "en_ligne"
+    formation = date_fr(jours[0] - timedelta(days=1))
+    # ---------- annonce publiée sur le site d'emploi : lue par les candidats et par l'ATS (pas de chiffres internes)
+    lieu = (rec.get("contact") or "").strip()
     recrut = {
-        "titre": "Note de recrutement", "surtitre": "À l'attention du service des ressources humaines", "sous_titre": rec["intitule"],
-        "meta": [f"{sum(besoin.values())} enquêteurs{f' + {n_res} réserves' if n_res else ''} · {len(data['zones'])} {Z.lower()}{'s' if len(data['zones']) > 1 else ''}",
-                 f"Liste à retourner au plus tard le {date_fr(rec['date_limite'])}"],
-        "en_tete": "Datatym — Note de recrutement",
+        "titre": "Annonce de recrutement", "surtitre": "Datatym recrute", "sous_titre": rec["intitule"],
+        "meta": [f"Date limite de candidature : {date_fr(rec['date_candidature'])}"] + ([f"Candidature : {lieu}"] if lieu else []),
+        "en_tete": "Datatym — Annonce de recrutement",
+        "sections": [x for x in [
+            section("datatym", "À propos de Datatym", [p(rec["presentation"])]) if rec.get("presentation") else None,
+            section("mission", "La mission", [p(rec["mission"]), p("Tâches principales :"), liste(rec["taches"])]),
+            section("postes", "Postes à pourvoir", [
+                tableau([Z, "Postes"], [[z, str(besoin.get(z, 0))] for z in data["zones"]] + [["**Total**", f"**{sum(besoin.values())}**"]],
+                        f"Postes par {Z.lower()}"),
+                p("Chaque enquêteur travaille dans son pays de résidence." + (" Une liste de réserve est également constituée." if n_res else "")),
+            ], source="auto"),
+            section("profil", "Le profil recherché", [
+                liste([f"Diplôme : {rec['diplome']} minimum.", f"Expérience d'enquête : {rec['experience']} minimum."] + rec["competences"]),
+                p("Atouts :"), liste(rec.get("atouts") or [])]),
+            section("conditions", "Conditions", [liste([
+                f"Période de collecte : du {date_fr(jours[0])} au {date_fr(jours[-1])}.",
+                f"Formation obligatoire le {formation}, {formation_texte(hyp)}" + (" : prévoir une connexion internet stable." if en_ligne else "."),
+                rec.get("remuneration") or "Rémunération au questionnaire validé.",
+            ])], source="auto"),
+            section("candidature", "Comment postuler", [
+                p("Pièces à joindre :"), liste(rec.get("dossier") or []),
+                p((f"Candidature à déposer sur **{lieu}** " if lieu else "Candidature à déposer ")
+                  + f"au plus tard le **{date_fr(rec['date_candidature'])}**, avec pour objet : **{rec['objet']} – votre pays de résidence**."),
+                p("Les candidatures sont présélectionnées automatiquement : indiquez clairement dans votre CV votre pays et votre ville de résidence, "
+                  "vos missions de collecte et les outils utilisés (KoboCollect, ODK, QuestionPro…). "
+                  "Les justificatifs seront demandés aux seuls candidats retenus.", "note"),
+            ]),
+        ] if x],
+    }
+    # ---------- demande interne aux RH : besoin, rémunération, calendrier, liste à retourner
+    u = {c["cle"]: c for c in data["budget"].get("couts") or []}
+    postes = {l["cle"] for l in data["budget"]["lignes"]}
+    remu = (u.get("remu_questionnaire") or {}).get("valeur")
+    par_jour = [(u[k]["libelle"].split(" (")[0].lower(), u[k]["valeur"]) for k in ("transport_jour", "communication_jour") if k in postes and u.get(k)]
+    paie = [f"Tarif : **{fcfa(remu)} par questionnaire validé** ; un questionnaire écarté au contrôle qualité n'est pas payé."] if remu and "remu_questionnaire" in postes else []
+    paie += [f"Forfait de {' et '.join(f'{l} ({fcfa(v)})' for l, v in par_jour)} par jour de collecte effectivement travaillé."] if par_jour else []
+    paie += ["Paiement par Mobile Money (ou virement) à la fin de la collecte, sur le moyen et le numéro indiqués dans la liste.",
+             "Les réserves sont rémunérées aux mêmes conditions, seulement si elles remplacent un enquêteur."]
+    demande = {
+        "titre": "Demande de recrutement", "surtitre": "À l'attention du service des ressources humaines", "sous_titre": rec["intitule"],
+        "meta": [f"Date limite : liste à retourner le {date_fr(rec['date_limite'])}"],
+        "en_tete": "Datatym — Demande de recrutement",
         "sections": [
-            section("objet", "1. Objet de la demande", [p(rec["mission"])]),
+            section("objet", "1. Objet de la demande", [p(
+                "Datatym demande au service des ressources humaines de publier l'annonce de recrutement jointe, de sélectionner "
+                f"{sum(besoin.values())} enquêteurs titulaires{f' et {n_res} réserves' if n_res else ''}, "
+                "puis de retourner la liste des enquêteurs retenus dans le fichier Excel joint.")], source="auto"),
             section("besoin", f"2. Besoin par {Z.lower()}", [
                 tableau([Z, "Titulaires", "Réserves", "Questionnaires à réaliser"],
                         [[z, str(besoin.get(z, 0)), str(reserve.get(z, 0)), str(data["tot_zone"][z])] for z in data["zones"]]
                         + [["**Total**", f"**{sum(besoin.values())}**", f"**{n_res}**", f"**{n}**"]], "Enquêteurs à recruter"),
                 p("Chaque enquêteur travaille dans son pays de résidence ; il est recruté pour toute la durée de la collecte."
-                  + (" Les réserves suivent la même formation que les titulaires. Elles ne sont mobilisées que pour remplacer un abandon "
-                     "et sont, comme les titulaires, rémunérées au questionnaire validé." if n_res else "")),
+                  + (" Les réserves suivent la même formation que les titulaires et ne sont mobilisées que pour remplacer un abandon." if n_res else "")),
             ], source="auto"),
-            section("profil", "3. Profil recherché", [liste([f"Diplôme : {rec['diplome']} minimum.", f"Expérience d'enquête : {rec['experience']} minimum."] + rec["competences"])]),
-            section("mission", "4. Mission confiée aux enquêteurs", [liste(rec["taches"])]),
-            section("calendrier", "5. Calendrier", [tableau(["Échéance", "Étape"], [
+            section("remuneration", "3. Rémunération et paiement", [liste(paie),
+                p("Ces conditions sont à présenter aux candidats retenus ; l'annonce publiée n'en donne pas le détail.", "note")], source="auto"),
+            section("calendrier", "4. Calendrier", [tableau(["Échéance", "Étape"], [
+                [date_fr(rec["date_candidature"]), "Clôture des candidatures sur le site d'emploi"],
                 [date_fr(rec["date_limite"]), "Retour de la liste des enquêteurs retenus à Datatym"],
-                [date_fr(jours[0] - timedelta(days=1)), f"Formation obligatoire des titulaires et des réserves, {formation_texte(data['params'].get('hypotheses'))}"
-                 + (" (lien communiqué aux enquêteurs retenus)" if (data["params"].get("hypotheses") or {}).get("formation", "en_ligne") == "en_ligne" else "")],
+                [formation, f"Formation obligatoire des titulaires et des réserves, {formation_texte(hyp)}"
+                 + (" (lien communiqué aux enquêteurs retenus)" if en_ligne else "")],
                 [f"Du {date_fr(jours[0])} au {date_fr(jours[-1])}", "Collecte sur le terrain"],
             ], "Calendrier du recrutement et du terrain")], source="auto"),
-            section("livrable", "6. Livrable attendu : la liste des enquêteurs retenus", [
-                p("La liste est renseignée dans le fichier Excel joint à cette note (feuille « Enquêteurs »), "
-                  "à raison d'une ligne par enquêteur retenu. Elle sert à affecter les quotas, organiser la formation "
-                  "et envoyer à chacun son contrat, son ordre de mission et les notes de suivi."),
+            section("livrable", "5. Livrable attendu : la liste des enquêteurs retenus", [
+                p("La liste est renseignée dans le fichier Excel joint (feuille « Enquêteurs »), à raison d'une ligne par enquêteur retenu. "
+                  "Elle sert à affecter les quotas, organiser la formation, envoyer à chacun son contrat, son ordre de mission "
+                  "et les notes de suivi, puis à le payer."),
                 tableau(["Colonne", "Consigne de remplissage"], [[c, t] for c, _, t in equipe.COLONNES], "Colonnes à renseigner", [1.6, 4.6]),
                 p("Exemple de remplissage (personnes fictives) :"),
                 tableau([c for c, _, _ in equipe.COLONNES], [[e[k] for _, k, _ in equipe.COLONNES] for e in equipe.exemples(data["zones"])],
-                        "Exemple", [0.9, 0.9, 1.0, 0.9, 1.3, 1.6, 0.8], 8),
+                        "Exemple", [0.85, 0.85, 0.95, 0.8, 1.2, 1.45, 0.75, 0.9, 1.2], 7.5),
                 liste(["Une ligne par enquêteur, sans ligne vide ni cellule fusionnée ; ne pas renommer les colonnes.",
-                       "Le pays de résidence est choisi dans la liste déroulante du fichier.",
-                       "Le téléphone commence par l'indicatif du pays, saisi avec une apostrophe devant : **'+221 771234567**. "
+                       "Le pays de résidence, le rôle et le moyen de paiement sont choisis dans les listes déroulantes du fichier.",
+                       "Les numéros commencent par l'indicatif du pays, saisi avec une apostrophe devant : **'+221 771234567**. "
                        "Sans l'apostrophe, Excel considère le numéro comme un nombre et supprime le « + ».",
                        "Ne pas ajouter d'identifiant : Datatym l'attribue à chaque enquêteur à la réception de la liste "
                        f"(ENQ, code du pays et numéro d'ordre : {', '.join(equipe.identifiant(c, 1) for c in list(equipe.codes_zones(data['zones']).values())[:3])}…)."]),
             ]),
-            section("retour", "7. Retour de la liste", [
+            section("retour", "6. Retour de la liste", [
                 p(f"Le fichier renseigné est à retourner à **{retour}** au plus tard le **{date_fr(rec['date_limite'])}**, "
                   f"en précisant « {rec['intitule']} ».")]),
         ],
     }
-    return {"note_echantillonnage": note, "note_recrutement": recrut,
+    return {"note_echantillonnage": note, "note_recrutement": recrut, "demande_rh": demande,
             "budget_collecte": doc_budget(projet, data, jours)}
 
 
