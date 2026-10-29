@@ -306,7 +306,10 @@ class DocDatatym:
             for i in range(n):
                 val = ligne[i] if i < len(ligne) else ""
                 c = cells[i]
-                if k % 2 == 1:
+                if str(val).startswith("{{fond:"):  # case colorée sans texte (diagramme de Gantt)
+                    _ombrer(c, str(val)[7:13])
+                    val = ""
+                elif k % 2 == 1:
                     _ombrer(c, GRIS)
                 p = c.paragraphs[0]
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT

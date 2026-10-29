@@ -375,9 +375,6 @@ async function blocDeroulement() {
   const dt = (x) => new Date(x + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const fc = (x) => `${nf(x)} FCFA`;
   const prob = d.scenarios.find((s) => s.cle === "central");
-  const t0 = new Date(d.phases[0].debut), t1 = new Date(d.phases[d.phases.length - 1].fin);
-  const span = (t1 - t0) / 864e5 + 1;
-  const pos = (x) => (100 * (new Date(x) - t0) / 864e5) / span;
   // --pal5 : bleu profond en clair, bleu pâle en sombre (les barres restent visibles dans les deux thèmes)
   const couleurs = ["var(--bleu)", "var(--pal5)", "var(--bleu)", "var(--ambre)", "var(--pal5)", "var(--bleu)", "var(--pal5)"];
   const zone = d.Z === "pays" ? "pays" : "zone";
@@ -391,12 +388,15 @@ async function blocDeroulement() {
       ${[["Début de la collecte", dt(d.debut)], ["Remise du rapport", dt(prob.rapport)], ["Coût probable", fc(prob.total)], ["Équipe", `${prob.enqueteurs} + ${prob.reserves} réserves`]]
         .map(([t, v]) => `<div class="carte kpi"><div class="t">${t}</div><div class="v" style="font-size:18px">${v}</div></div>`).join("")}
     </div>
-    <div class="lib" style="margin:18px 0 8px">Calendrier</div>
-    <div style="display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:6px 14px;align-items:center">
-      ${d.phases.map((p, i) => `<div><b style="font-size:13px">${esc(p.nom)}</b><div class="aide" style="font-size:11.5px">${p.debut === p.fin ? dt(p.debut) : `${dt(p.debut)} → ${dt(p.fin)}`}</div></div>
-        <div style="position:relative;height:18px;background:var(--bleu-50);border-radius:9px" title="${esc(p.detail)}">
-          <div style="position:absolute;top:0;bottom:0;left:${pos(p.debut)}%;width:max(${100 * ((new Date(p.fin) - new Date(p.debut)) / 864e5 + 1) / span}%,8px);background:${couleurs[i % couleurs.length]};border-radius:9px"></div></div>`).join("")}
-    </div>
+    <div class="lib" style="margin:18px 0 8px">Calendrier <span class="ex">une colonne par ${d.unite === "semaine" ? "semaine (date du lundi)" : "mois"}${d.periodes.some((x) => x.courante) ? ", en jaune la période en cours" : ""}</span></div>
+    <div style="overflow-x:auto"><div style="display:grid;grid-template-columns:minmax(170px,220px) repeat(${d.periodes.length},minmax(46px,1fr));row-gap:4px;align-items:center;min-width:${220 + 46 * d.periodes.length}px">
+      <div></div>
+      ${d.periodes.map((x) => `<div style="text-align:center;font-size:11.5px;font-weight:700;padding:6px 2px;border-radius:6px;margin:0 1px;${x.courante ? "background:var(--ambre);color:#1b1b1b" : "background:var(--marine);color:#fff"}">${esc(x.libelle)}</div>`).join("")}
+      ${d.phases.map((p, i) => `
+        <div style="grid-column:1;grid-row:${i + 2};padding-right:10px"><b style="font-size:13px">${esc(p.nom)}</b><div class="aide" style="font-size:11.5px">${p.debut === p.fin ? dt(p.debut) : `${dt(p.debut)} → ${dt(p.fin)}`}</div></div>
+        ${d.periodes.map((_, j) => `<div style="grid-column:${j + 2};grid-row:${i + 2};align-self:stretch;${j % 2 ? "" : "background:var(--bleu-50);"}"></div>`).join("")}
+        <div title="${esc(p.detail)}" style="grid-column:${p.cols[0] + 2} / ${p.cols[1] + 3};grid-row:${i + 2};height:20px;margin:0 3px;border-radius:10px;background:${couleurs[i % couleurs.length]};z-index:1"></div>`).join("")}
+    </div></div>
     <div class="lib" style="margin:22px 0 8px">Trois scénarios de déroulement <span class="ex">la fin de collecte reste fixe : l'équipe s'adapte au rythme du terrain</span></div>
     <div class="grille-3">${d.scenarios.map((s) => `
       <div class="carte" style="padding:16px;${s.cle === "central" ? "border:2px solid var(--bleu)" : ""}">

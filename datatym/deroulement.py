@@ -87,6 +87,8 @@ def presenter(projet):
         ("Restitution et clôture", rapport, ouvres(rapport, 3), "Présentation des résultats, archivage de l'étude"),
     ]
 
+    periodes = decouper_periodes(phases[0][1], phases[-1][2])
+
     # ---------------- scénarios de déroulement
     scenarios = []
     for s in est["scenarios"]:
@@ -143,10 +145,36 @@ def presenter(projet):
     return {
         "titre": nom_barometre(fiche.get("theme", "")), "n": n, "zones": zones, "Z": Z, "jours": len(jours),
         "debut": debut.isoformat(), "fin": fin.isoformat(), "rapport": rapport.isoformat(),
-        "phases": [{"nom": a, "debut": b.isoformat(), "fin": c.isoformat(), "detail": d} for a, b, c, d in phases],
+        "phases": [{"nom": a, "debut": b.isoformat(), "fin": c.isoformat(), "detail": d, "cols": _colonnes(b, c, periodes)}
+                   for a, b, c, d in phases],
+        "unite": "semaine" if (periodes[0][1] - periodes[0][0]).days == 6 else "mois",
+        "periodes": [{"debut": a.isoformat(), "fin": b.isoformat(), "libelle": l, "courante": a <= today <= b} for a, b, l in periodes],
         "scenarios": scenarios, "options": options, "vigilance": vigilance, "plafond": plafond,
         "decisions": [{"date": d.isoformat(), "titre": t, "detail": x} for d, t, x in decisions],
     }
+
+
+def decouper_periodes(t0, t1):
+    """Colonnes du diagramme : semaines (du lundi au dimanche), ou mois si l'étude dure plus de 16 semaines."""
+    lundi = t0 - timedelta(days=t0.weekday())
+    if (t1 - lundi).days < 16 * 7:
+        sem, d = [], lundi
+        while d <= t1:
+            sem.append((d, d + timedelta(days=6), f"{d.day} {MOIS_COURTS[d.month - 1]}"))
+            d += timedelta(days=7)
+        return sem
+    mois, m = [], date(t0.year, t0.month, 1)
+    while m <= t1:
+        suivant = date(m.year + (m.month == 12), m.month % 12 + 1, 1)
+        mois.append((m, suivant - timedelta(days=1), f"{MOIS_COURTS[m.month - 1]} {str(m.year)[2:]}"))
+        m = suivant
+    return mois
+
+
+def _colonnes(a, b, periodes):
+    """Première et dernière colonne couvertes par une étape."""
+    i = [k for k, (x, y, _) in enumerate(periodes) if x <= b and y >= a]
+    return [i[0], i[-1]] if i else [0, 0]
 
 
 def _periode(a, b):
@@ -177,6 +205,12 @@ def docx(chemin, projet, d=None):
                   "La formation des enquêteurs se fait en ligne et le terrain est suivi à distance par Datatym."),
             ], source="auto"),
             section("calendrier", "2. Calendrier", [
+                tableau(["Étape", *[x["libelle"] for x in d["periodes"]]],
+                        [[x["nom"], *[("{{fond:" + ("E0B61F" if "Formation" in x["nom"] else "0087E0" if i % 2 == 0 else "19243E") + "}}")
+                                      if x["cols"][0] <= j <= x["cols"][1] else "" for j in range(len(d["periodes"]))]]
+                         for i, x in enumerate(d["phases"])],
+                        "Calendrier par " + ("semaine (date du lundi)" if d["unite"] == "semaine" else "mois"),
+                        [2.4] + [1] * len(d["periodes"]), 8),
                 tableau(["Période", "Étape", "Contenu"], [[_periode(x["debut"], x["fin"]), x["nom"], x["detail"]] for x in d["phases"]],
                         "Calendrier de l'étude", [1.6, 1.5, 3.1], 9.5)], source="auto"),
             section("scenarios", "3. Trois scénarios de déroulement", [
@@ -232,29 +266,27 @@ def pptx(chemin, projet, d=None):
     k.texte(s, 0.9, 4.7, 11.5, 1.5, [[(f"{d['n']} répondants", {"gras": True}), (f" dans {len(d['zones'])} {d['Z']} : {', '.join(d['zones'])}.", {})],
                                      "Formation des enquêteurs en ligne (Teams), terrain suivi à distance par Datatym."], 15, couleur=TEXTE, interligne=6)
 
-    # Calendrier (diagramme de Gantt)
+    # Calendrier : une colonne par période (semaine ou mois), une ligne par étape
     s = k.contenu("Calendrier de l'étude")
-    t0 = date.fromisoformat(d["phases"][0]["debut"])
-    t1 = date.fromisoformat(d["phases"][-1]["fin"])
-    span = max((t1 - t0).days + 1, 1)
-    x0, w, y0, hl = 3.9, 8.8, 1.75, 0.62
-    mois, m = [], date(t0.year, t0.month, 1)
-    while m <= t1:
-        mois.append(m)
-        m = date(m.year + (m.month == 12), m.month % 12 + 1, 1)
-    for m in mois:
-        xm = x0 + w * max((m - t0).days, 0) / span
-        k.texte(s, xm + 0.05, 1.3, 1.6, 0.3, MOIS[m.month - 1].capitalize(), 11, True, GRIS)
-        k.forme(s, xm, 1.6, 0.012, hl * len(d["phases"]) + 0.2, BLEU_PALE, arrondi=0)
+    per = d["periodes"]
+    x0, w, y0, hl = 3.7, 9.0, 1.85, 0.6
+    cw = w / len(per)
+    taille = 11 if len(per) <= 10 else 9 if len(per) <= 14 else 8
+    for j, pe in enumerate(per):
+        x = x0 + j * cw
+        k.forme(s, x + 0.02, 1.35, cw - 0.04, 0.38, OR if pe["courante"] else MARINE, arrondi=0.15)
+        k.texte(s, x, 1.35, cw, 0.38, pe["libelle"], taille, True, MARINE if pe["courante"] else "FFFFFF", PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+        if j % 2 == 0:
+            k.forme(s, x, 1.78, cw, hl * len(d["phases"]) + 0.05, CLAIR, arrondi=0)
     couleurs = [BLEU, MARINE, BLEU, OR, MARINE, BLEU, MARINE]
     for i, ph in enumerate(d["phases"]):
-        a, b = date.fromisoformat(ph["debut"]), date.fromisoformat(ph["fin"])
         y = y0 + i * hl
-        k.texte(s, 0.6, y + 0.02, 3.2, 0.3, ph["nom"], 13, True, MARINE)
-        k.texte(s, 0.6, y + 0.3, 3.2, 0.25, _periode(ph["debut"], ph["fin"]), 9.5, couleur=GRIS)
-        xa = x0 + w * (a - t0).days / span
-        k.forme(s, xa, y + 0.1, max(w * ((b - a).days + 1) / span, 0.12), 0.36, couleurs[i % len(couleurs)], arrondi=0.3)
-    k.texte(s, 0.6, 6.25, 12.1, 0.4, f"Remise du rapport prévue le {date_fr(prob['rapport'])} (scénario probable).", 13, True, BLEU)
+        k.texte(s, 0.6, y + 0.0, 3.0, 0.3, ph["nom"], 13, True, MARINE)
+        k.texte(s, 0.6, y + 0.28, 3.0, 0.25, _periode(ph["debut"], ph["fin"]), 9.5, couleur=GRIS)
+        c0, c1 = ph["cols"]
+        k.forme(s, x0 + c0 * cw + 0.05, y + 0.1, (c1 - c0 + 1) * cw - 0.1, 0.34, couleurs[i % len(couleurs)], arrondi=0.3)
+    k.texte(s, 0.6, 6.3, 12.1, 0.4, f"Remise du rapport prévue le {date_fr(prob['rapport'])} (scénario probable)."
+            + ("  ·  En jaune : la période en cours." if any(p_["courante"] for p_ in per) else ""), 13, True, BLEU)
 
     # Scénarios
     s = k.contenu("Trois scénarios de déroulement")
