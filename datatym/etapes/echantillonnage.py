@@ -74,7 +74,7 @@ def recrutement_defaut(projet, n_enq, jours, n_res=0, hyp=None):
             "Lettre de motivation.",
             "Certificat ou attestation de collecte, si vous en disposez (atout).",
         ],
-        "objet": f"Candidature – Enquêteur – {nom}",
+        "objet": f"Candidature au poste d'Enquêteur pour le {nom}",
         "contact": params.get("contact_recrutement", ""),
         "date_candidature": (jours[0] - timedelta(days=12)).isoformat(),
         "date_limite": (jours[0] - timedelta(days=7)).isoformat(),
@@ -348,7 +348,7 @@ def construire_docs(projet, data, quest):
             section("candidature", "Comment postuler", [
                 p("Pièces à joindre :"), liste(rec.get("dossier") or []),
                 p((f"Candidature à déposer sur **{lieu}** " if lieu else "Candidature à déposer ")
-                  + f"au plus tard le **{date_fr(rec['date_candidature'])}**, avec pour objet : **{rec['objet']} – votre pays de résidence**."),
+                  + f"au plus tard le **{date_fr(rec['date_candidature'])}**, avec pour objet : **{rec['objet']}**."),
                 p("Les candidatures sont présélectionnées automatiquement : indiquez clairement dans votre CV votre pays et votre ville de résidence, "
                   "vos missions de collecte et les outils utilisés (KoboCollect, ODK, QuestionPro…). "
                   "Les justificatifs seront demandés aux seuls candidats retenus.", "note"),

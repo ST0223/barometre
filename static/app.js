@@ -1146,7 +1146,7 @@ function editeurRecrutement(z, e) {
     <p class="aide plein" style="margin-top:0">Annonce publiée sur le site d'emploi (lue par les candidats et par l'ATS). La demande aux RH, avec le besoin par pays, la rémunération et le fichier Excel, est produite à part à partir du plan.</p>
     ${champ("intitule", "Intitulé de l'annonce", "input", true)}
     ${champ("experience", "Expérience d'enquête minimale")}${champ("diplome", "Diplôme minimum")}
-    ${champ("contact", "Site de dépôt des candidatures")}${champ("objet", "Objet de la candidature (complété par le pays du candidat)")}
+    ${champ("contact", "Site de dépôt des candidatures")}${champ("objet", "Objet de la candidature")}
     ${champ("date_candidature", "Date limite de candidature", "date")}${champ("date_limite", "Retour de la liste par les RH", "date")}
     ${champ("retour", "Adresse de retour de la liste (RH)")}${champ("remuneration", "Rémunération annoncée")}
     ${champ("presentation", "Présentation de Datatym", "area", true)}
