@@ -37,7 +37,7 @@ const ETAPES_INFO = {
   echantillonnage: { court: "Échantillonnage", desc: "Quotas zone × profil, répartition par enquêteur, calendrier jour par jour, budget de collecte, annonce de recrutement, demande aux RH et formation.", produit: ["Note d'échantillonnage", "Annonce de recrutement", "Demande aux RH", "Budget de collecte (interne)", "Calendrier et quotas (Excel)", "PowerPoint de formation", "Fichier enquêteurs pour les RH", "Liste Kobo de l'équipe (après import)"] },
   methodologie: { court: "Méthodologie", desc: "Assemblage automatique des étapes précédentes : méthode, échantillonnage, questionnaire, indicateurs et modes de calcul, outils, traitement.", produit: ["Note méthodologique"] },
   collecte: { court: "Collecte", desc: "Import des soumissions (fichier Kobo/QuestionPro ou API Kobo) et tableau de bord : avancement par enquêteur, zone et quota, écarts au calendrier.", produit: ["Tableau de bord", "Base des soumissions"] },
-  suivi: { court: "Note de suivi", desc: "Bilan de la collecte à partir du tableau de bord : réalisé contre prévu, taux de complétion, incidents, qualité des données, bilan financier.", produit: ["Note de suivi des enquêtes"] },
+  suivi: { court: "Note de suivi", desc: "Bilan de la collecte à partir du tableau de bord : réalisé contre prévu, questionnaires reçus et valides, incidents, qualité des données, bilan financier.", produit: ["Note de suivi des enquêtes"] },
   rapport: { court: "Rapport", desc: "Calcul des indicateurs, graphiques, lecture par profil et par zone, messages clés et enseignements.", produit: ["Rapport d'analyse (Word, PDF)"] },
   cloture: { court: "Clôture", desc: "Historique de l'étude et archive complète de tous ses fichiers.", produit: ["Dossier complet (ZIP)"] },
 };
@@ -1315,7 +1315,7 @@ function ongletTableau(z, e) {
       <div class="carte kpi"><div class="t">Questionnaires reçus</div><div class="v" data-compte="${s.brut}">0</div><div class="s">${[qc && s.hors_cible && `${s.hors_cible} hors cible`, s.refus && `${s.refus} refus`, qc && s.rapides && `${s.rapides} trop rapides`].filter(Boolean).join(" · ") || "tous exploitables"}</div></div>
       <div class="carte kpi"><div class="t">${qc ? "Questionnaires valides" : "Questionnaires renseignés"}</div><div class="v"><span data-compte="${s.realise}">0</span><span style="font-size:15px;color:var(--texte-3)"> / ${s.objectif}</span></div><div class="s">${nf(s.taux, 1)} % de l'objectif</div></div>
       <div class="carte kpi"><div class="t">Écart au calendrier</div><div class="v" data-compte="${ecart}" data-prefixe="${ecart > 0 ? "+" : ""}">0</div><div class="s ${ecart >= 0 ? "pos" : "neg"}">${s.prevu_a_date} prévus à date</div></div>
-      <div class="carte kpi"><div class="t">Taux de complétion</div><div class="v" data-compte="${s.taux_completion}" data-dec="1" data-suffixe=" %">0</div><div class="s">${s.brut} reçus · ${s.refus} refus${qc ? ` · ${s.rapides} rapides` : ""}</div></div>
+      <div class="carte kpi"><div class="t">Taux de validité</div><div class="v" data-compte="${s.taux_completion}" data-dec="1" data-suffixe=" %">0</div><div class="s">${s.realise} valides sur ${s.brut} reçus</div></div>
       <div class="carte kpi"><div class="t">Durée médiane</div><div class="v" ${s.duree_mediane != null ? `data-compte="${s.duree_mediane}" data-dec="1" data-suffixe=" min"` : ""}>–</div><div class="s">plafond 15 min</div></div>
     </div>
     <div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>Avancement cumulé</h3>

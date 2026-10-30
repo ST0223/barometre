@@ -55,15 +55,16 @@ def construire_docs(projet, data, stats):
     ecart = s["realise"] - s["objectif"]
     sections = [
         section("synthese", "1. Synthèse", [
-            chiffres([{"valeur": str(s["realise"]), "libelle": f"questionnaires valides sur {s['objectif']} visés"},
+            chiffres([{"valeur": str(s["brut"]), "libelle": "questionnaires reçus" + (f", dont {s['hors_cible']} hors cible" if s["hors_cible"] else "")},
+                      {"valeur": str(s["realise"]), "libelle": f"questionnaires valides sur {s['objectif']} visés"},
                       {"valeur": pct(s["taux"]), "libelle": "taux de réalisation"},
-                      {"valeur": pct(s["taux_completion"]), "libelle": "taux de complétion"},
                       {"valeur": str(max(s["objectif"] - s["realise"], 0)), "libelle": "questionnaires restants"}]),
             p(f"La collecte s'est déroulée du {date_fr(j0)} au {date_fr(j1)}. **{s['realise']} questionnaires valides** ont été recueillis "
               f"pour un objectif de {s['objectif']}, soit un taux de réalisation de {pct(s['taux'])}"
               + (f" ({ecart:+d} questionnaires)." if ecart else ".")),
             p(f"Sur {s['brut']} formulaires reçus, {s['refus']} correspondent à des refus de participation, {s['hors_cible']} à des répondants hors cible "
-              f"et {s['rapides']} à des entretiens trop rapides, écartés de l'analyse."
+              f"et {s['rapides']} à des entretiens trop rapides, écartés de l'analyse : "
+              f"{pct(s['taux_completion'])} des questionnaires reçus sont donc valides."
               + (f" La durée médiane d'un entretien est de {nombre(s['duree_mediane'], 1)} minutes." if s["duree_mediane"] else "")),
         ], source="auto"),
         section("realise", "2. Réalisé contre prévu", [
