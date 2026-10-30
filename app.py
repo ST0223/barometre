@@ -15,7 +15,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import budget, deroulement, equipe, importation, llm, moteur, paiement, restitution, store
+from datatym import budget, deroulement, equipe, importation, llm, moteur, paiement, rappels, restitution, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -183,6 +183,45 @@ def import_creer():
 @app.post("/api/projets/<slug>/boucler")
 def boucler(slug):
     return ok(moteur.boucler(_projet(slug)))
+
+
+@app.post("/api/projets/<slug>/rappels/tirer")
+def rappels_tirer(slug):
+    """Tire les entretiens à rappeler (part prévue au budget, au moins un par enquêteur)."""
+    p = _projet(slug)
+    try:
+        nouveaux = rappels.tirer(p)
+    except ValueError as exc:
+        return jsonify({"erreur": str(exc)}), 400
+    store.journaliser(p, f"Rappels de contrôle : {len(nouveaux)} entretien(s) tiré(s).")
+    store.sauver(p)
+    return ok(p)
+
+
+@app.put("/api/projets/<slug>/rappels/<ident>")
+def rappels_maj(slug, ident):
+    """Résultat d'un rappel ; un entretien non réalisé sort de la base (tableau de bord, suivi, paie recalculés)."""
+    p = _projet(slug)
+    c = request.get_json(force=True)
+    try:
+        base_change = rappels.maj(p, ident, c.get("statut", "a_faire"), c.get("commentaire"))
+    except ValueError as exc:
+        return jsonify({"erreur": str(exc)}), 400
+    if base_change:
+        store.journaliser(p, f"Rappel {ident} : {rappels.STATUTS[c.get('statut')]}.")
+        moteur.rafraichir_collecte(p)
+    else:
+        store.sauver(p)
+    return ok(p)
+
+
+@app.get("/api/projets/<slug>/rappels.xlsx")
+def rappels_fiche(slug):
+    p = _projet(slug)
+    chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, "Fiche_Rappels", 1, "xlsx").replace("_v1.", ".")
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    rappels.xlsx(chemin, p)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
 
 
 @app.post("/api/projets/<slug>/restitution")

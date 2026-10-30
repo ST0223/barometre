@@ -47,7 +47,7 @@ const ONGLETS = {
   questionnaire: [["apercu", "Aperçu", "eye"], ["parametres", "Questions", "edit"], ["redaction", "Rédaction", "file"]],
   echantillonnage: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["recrutement", "Recrutement", "users"], ["redaction", "Rédaction", "edit"]],
   methodologie: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["redaction", "Rédaction", "edit"]],
-  collecte: [["tableau", "Tableau de bord", "chart"], ["indicateurs", "Indicateurs", "target"], ["import", "Données", "upload"]],
+  collecte: [["tableau", "Tableau de bord", "chart"], ["indicateurs", "Indicateurs", "target"], ["rappels", "Rappels", "check"], ["import", "Données", "upload"]],
   suivi: [["apercu", "Aperçu", "eye"], ["parametres", "Observations", "edit"], ["bilan", "Bilan financier", "coin"], ["redaction", "Rédaction", "file"]],
   rapport: [["apercu", "Aperçu", "eye"], ["redaction", "Rédaction", "edit"], ["parametres", "Paramètres", "settings"]],
 };
@@ -597,7 +597,7 @@ function panneauEtape(cle) {
   }
   const prec = ORDRE[num - 1];
   const redac = e.data && e.data.redaction;
-  const large = genere && ["parametres", "redaction", "recrutement", "tableau"].includes(S.onglet);
+  const large = genere && ["parametres", "redaction", "recrutement", "tableau", "rappels"].includes(S.onglet);
   const titre = `<div style="display:flex;align-items:center;gap:10px;margin-top:3px;flex-wrap:wrap"><h2>${esc(e.libelle)}</h2><span class="statut ${st}">${STATUTS[st]}</span>
     ${redac && IA_VISIBLE ? `<span class="tag ${redac === "ia" ? "ia" : ""}">${redac === "ia" ? "Rédigé avec Claude" : "Rédaction par règles"}</span>` : ""}</div>
     ${e.valide_le && st === "valide" ? `<div class="aide" style="font-size:12px;margin-top:2px">Validée le ${heureFr(e.valide_le)}</div>` : ""}`;
@@ -742,7 +742,7 @@ function contenuOnglet(cle) {
   if (o === "redaction") return ongletRedaction(z, cle, e);
   const f = {
     cadrage: editeurIndicateurs, questionnaire: editeurQuestions, echantillonnage: o === "recrutement" ? editeurRecrutement : editeurEchantillonnage,
-    methodologie: editeurMethodo, suivi: o === "bilan" ? editeurBilan : editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : o === "indicateurs" ? ongletIndicateurs : ongletTableau,
+    methodologie: editeurMethodo, suivi: o === "bilan" ? editeurBilan : editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : o === "indicateurs" ? ongletIndicateurs : o === "rappels" ? ongletRappels : ongletTableau,
   }[cle];
   const div = document.createElement("div");
   z.appendChild(div);
@@ -1474,6 +1474,72 @@ function ongletTableau(z, e) {
       if (nouveaux > 0) majProjet(r, `${nouveaux} nouvelle(s) soumission(s) reçue(s).`);
     } catch (err) { /* nouvel essai au prochain passage */ }
   }, 5 * 60 * 1000);
+}
+
+/** Rappels de contrôle : tirage par enquêteur, résultats, enquêteurs à surveiller. */
+const STATUTS_RAPPEL = { a_faire: "À faire", confirme: "Confirmé", ecart: "Confirmé avec écarts", injoignable: "Injoignable", refus: "Refuse le rappel", non_realise: "Entretien non réalisé" };
+function ongletRappels(z, e) {
+  const p = S.projet;
+  const sy = e.rappels_synthese || { lignes: [], total: {}, part: 10, contact: true, alertes: [] };
+  const rs = (e.data && e.data.rappels) || [];
+  const t = sy.total || {};
+  const filtre = S.filtreRappels || "a_faire";
+  const vus = rs.filter((r) => filtre === "tous" || (filtre === "a_faire" ? r.statut === "a_faire" : r.statut !== "a_faire"));
+  const court = (q) => (q.length > 60 ? q.slice(0, 58) + "…" : q);
+  z.className = "carte-corps";
+  z.innerHTML = `
+    ${sy.contact ? "" : `<div class="bandeau alerte">${ico("alert")}<div><b>Le questionnaire de cette étude ne recueille pas de contact pour le rappel.</b>
+      Rouvrez l'étape Questionnaire et mettez-la à jour : trois questions sont ajoutées en fin de questionnaire (accord pour être rappelé, entreprise, téléphone).
+      En attendant, demandez les coordonnées du répondant à l'enquêteur concerné, à partir de l'identifiant de la réponse.</div></div>`}
+    <div class="bandeau info">${ico("info")}<div>Datatym rappelle <b>${nf(sy.part)} %</b> des répondants (part prévue au budget), au moins un par enquêteur, pour vérifier que l'entretien a bien eu lieu.
+      Un entretien déclaré <b>non réalisé</b> est retiré de la base : il ne compte plus dans les résultats ni dans la paie.</div></div>
+    <div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
+      ${[["Rappels tirés", t.tires || 0, ""], ["Rappels réalisés", t.faits || 0, `${(t.tires || 0) - (t.faits || 0)} à faire`],
+         ["Taux de confirmation", t.taux_confirmation == null ? "–" : `${nf(t.taux_confirmation, 1)} %`, "parmi les répondants joints"],
+         ["Entretiens non réalisés", t.non_realise || 0, "retirés de la base"]]
+        .map(([l, v, s_]) => `<div class="carte kpi"><div class="t">${l}</div><div class="v" style="font-size:22px">${v}</div>${s_ ? `<div class="s">${s_}</div>` : ""}</div>`).join("")}
+    </div>
+    <div class="actions" style="margin:0 0 16px;flex-wrap:wrap;align-items:center;gap:10px">
+      <button class="btn btn-primaire" id="tirer-rappels">${ico("refresh")} ${rs.length ? "Tirer les rappels des nouvelles réponses" : "Tirer les rappels"}</button>
+      ${rs.length ? `<a class="btn" href="/api/projets/${p.slug}/rappels.xlsx">${ico("download")} Fiche de rappel (Excel)</a>` : ""}
+    </div>
+    ${sy.lignes.length ? `<div class="lib" style="margin-bottom:6px">Par enquêteur ${sy.alertes.length ? `<span class="tag" style="color:var(--rouge)">${sy.alertes.length} à surveiller</span>` : ""}</div>
+    <div class="grille-tab" style="margin-bottom:18px"><table><thead><tr><th>Enquêteur</th><th>Tirés</th><th>Faits</th><th>Confirmés</th><th>Écarts</th><th>Non réalisés</th><th>Injoignables / refus</th><th>Confirmation</th></tr></thead><tbody>
+      ${sy.lignes.map((l) => `<tr${l.alerte ? ' style="background:var(--rouge-50)"' : ""}><td><b>${esc(l.collecteur)}</b>${l.alerte ? ` <span class="tag" style="color:var(--rouge)">À surveiller</span>` : ""}</td>
+        <td>${l.tires}</td><td>${l.faits}</td><td>${l.confirme}</td><td>${l.ecart}</td><td>${l.non_realise ? `<b style="color:var(--rouge)">${l.non_realise}</b>` : 0}</td>
+        <td>${l.injoignable + l.refus}</td><td>${l.taux_confirmation == null ? "–" : `${nf(l.taux_confirmation, 0)} %`}</td></tr>`).join("")}
+    </tbody></table></div>` : ""}
+    ${rs.length ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px;flex-wrap:wrap">
+      <div class="lib">Rappels</div>
+      <select class="saisie petite" id="filtre-rappels" style="width:auto">${[["a_faire", "À faire"], ["faits", "Réalisés"], ["tous", "Tous"]].map(([k, l]) => `<option value="${k}" ${filtre === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    <div class="grille-tab"><table><thead><tr><th>Réponse</th><th>Enquêteur</th><th>Contact</th><th>À revérifier</th><th>Résultat</th><th>Commentaire</th></tr></thead><tbody>
+      ${vus.map((r) => `<tr>
+        <td><b>${esc(r.id)}</b><div class="aide" style="font-size:11.5px">${r.date ? esc(r.date) : ""}${r.duree ? ` · ${esc(r.duree)} min` : ""}</div></td>
+        <td>${esc(r.collecteur)}<div class="aide" style="font-size:11.5px">${esc(r.zone)} · ${esc(r.profil)}</div></td>
+        <td>${r.contact.telephone ? `<a href="tel:${esc(r.contact.telephone.split(" ").join(""))}">${esc(r.contact.telephone)}</a>` : `<span class="aide">${r.contact.accord === "non" ? "a refusé le rappel" : "à demander à l'enquêteur"}</span>`}
+          ${r.contact.entreprise ? `<div class="aide" style="font-size:11.5px">${esc(r.contact.entreprise)}</div>` : ""}</td>
+        <td style="font-size:12px;max-width:320px">${r.verifs.map((v) => `<div><span class="aide">${esc(court(v.question))}</span> <b>${esc(v.reponse)}</b></div>`).join("")}</td>
+        <td><select class="saisie petite" data-rap="${esc(r.id)}" style="width:auto">${Object.entries(STATUTS_RAPPEL).map(([k, l]) => `<option value="${k}" ${r.statut === k ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+        <td><input class="saisie petite" data-com="${esc(r.id)}" value="${esc(r.commentaire || "")}" placeholder="Remarque…"></td></tr>`).join("")
+        || `<tr><td colspan="6" class="aide">Aucun rappel dans cette liste.</td></tr>`}
+    </tbody></table></div>` : `<div class="vide">${ico("check")}<div>Aucun rappel tiré pour l'instant.</div></div>`}`;
+  $("#tirer-rappels").onclick = (ev) => occupe(ev.currentTarget, async () => {
+    const n = rs.length;
+    const r = await api("POST", `/api/projets/${p.slug}/rappels/tirer`);
+    const ajout = ((r.etapes.collecte.data || {}).rappels || []).length - n;
+    majProjet(r, ajout ? `${ajout} entretien(s) à rappeler.` : "Aucun nouvel entretien à tirer : la part prévue est déjà atteinte pour chaque enquêteur.");
+  });
+  const f = $("#filtre-rappels");
+  if (f) f.onchange = () => { S.filtreRappels = f.value; ongletRappels(z, S.projet.etapes.collecte); };
+  const enregistrer = async (id, statut, commentaire) => {
+    try {
+      const r = await api("PUT", `/api/projets/${p.slug}/rappels/${encodeURIComponent(id)}`, { statut, commentaire });
+      majProjet(r, statut === "non_realise" ? "Entretien non réalisé : il est retiré de la base, le tableau de bord est recalculé." : "Rappel enregistré.");
+    } catch (err) { toast(err.message, "erreur"); }
+  };
+  const champ = (attr, id) => [...z.querySelectorAll(`[${attr}]`)].find((x) => x.getAttribute(attr) === id);
+  z.querySelectorAll("[data-rap]").forEach((sel) => (sel.onchange = () => enregistrer(sel.dataset.rap, sel.value, champ("data-com", sel.dataset.rap).value)));
+  z.querySelectorAll("[data-com]").forEach((inp) => (inp.onchange = () => enregistrer(inp.dataset.com, champ("data-rap", inp.dataset.com).value, inp.value)));
 }
 
 // Carte de suivi : part de l'objectif atteinte par pays, une seule teinte du clair au foncé

@@ -144,6 +144,19 @@ def analyser(projet, s):
         if part >= 35:
             obs.append(f"Un collecteur concentre {nombre(part, 0)} % des questionnaires valides ({top['nom']}, {top['valides']}).")
             reco.append("Mieux répartir la charge entre collecteurs pour limiter la dépendance à une seule personne.")
+    # rappels de contrôle
+    from ..rappels import synthese
+    rap = synthese(projet)
+    t = rap["total"]
+    if t["faits"]:
+        obs.append(f"{_pluriel(t['faits'], 'rappel de contrôle réalisé', 'rappels de contrôle réalisés')} sur {t['tires']} tirés"
+                   + (f" : {nombre(t['taux_confirmation'], 0)} % des répondants joints confirment l'entretien" if t["taux_confirmation"] is not None else "")
+                   + (f", {_pluriel(t['non_realise'], 'entretien non réalisé retiré', 'entretiens non réalisés retirés')} de la base." if t["non_realise"] else "."))
+    if rap["alertes"]:
+        obs.append("Enquêteur(s) à surveiller après les rappels : " + ", ".join(rap["alertes"]) + ".")
+        reco.append("Vérifier l'ensemble des questionnaires des enquêteurs signalés au rappel, et suspendre leur paiement jusqu'à vérification.")
+    elif t["tires"] > t["faits"] and en_cours:
+        reco.append(f"Terminer les {t['tires'] - t['faits']} rappels de contrôle restants avant la fin de la collecte.")
     if s.get("donnees_perimees"):
         obs.append("Une partie des données provient d'une version antérieure du questionnaire.")
 

@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import budget, equipe, formulaires, formation, paiement, store
+from . import budget, equipe, formulaires, formation, paiement, rappels, store
 from .banque import nom_court, profils_depuis_cible
 from .charte import rendre_modele
 from .etapes import cadrage, collecte, echantillonnage, methodologie, questionnaire, rapport, suivi
@@ -49,6 +49,8 @@ def vue(projet):
         e["statut"] = statut(projet, cle)
         e["libelle"] = LIBELLES[cle]
         v["etapes"][cle] = e
+    if (_data(projet, "collecte") or {}).get("rappels") is not None or (_data(projet, "collecte") or {}).get("stats"):
+        v["etapes"]["collecte"]["rappels_synthese"] = rappels.synthese(projet)
     # situation financière estimée à date (onglet Bilan financier), recalculée à chaque affichage
     if (_data(projet, "collecte") or {}).get("stats") and (_data(projet, "echantillonnage") or {}).get("budget"):
         try:

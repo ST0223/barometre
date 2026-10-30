@@ -108,6 +108,15 @@ def construire_questions(projet, cadrage, precedentes=None):
         qs += [a for a in anciennes.values() if a.get("ajoutee") and a.get("bloc") == bloc]
         sections.append({"lettre": lettres[k], "titre": bloc, "ids": qs})
     sections.append({"lettre": lettres[len(blocs)], "titre": "Clôture", "ids": [
+        # contrôle qualité : un échantillon de répondants est rappelé pour vérifier que l'entretien a bien eu lieu
+        garder(_q("cl_rappel", "Datatym rappelle quelques répondants pour vérifier la bonne réalisation de l'enquête. "
+                  "Acceptez-vous d'être recontacté brièvement à ce sujet ?", "select_one",
+                  [{"code": "oui", "label": "Oui"}, {"code": "non", "label": "Non"}], fixe=True,
+                  consigne="Lire la question. Le rappel dure moins de deux minutes.")),
+        garder(_q("cl_entreprise", "Quel est le nom de votre entreprise ou de votre structure ?", "text", fixe=True,
+                  condition_sur=("cl_rappel", "oui"), consigne="Utilisé uniquement pour le rappel de contrôle, jamais publié.")),
+        garder(_q("cl_telephone", "À quel numéro de téléphone pouvons-nous vous joindre pour ce rappel ?", "text", fixe=True,
+                  condition_sur=("cl_rappel", "oui"), consigne="Noter le numéro avec l'indicatif du pays (+221…).")),
         # une seule question pour la restitution : l'adresse laissée vaut accord pour recevoir les résultats
         garder(_q("cl_email", "Pour recevoir les principaux résultats du baromètre, indiquez votre adresse e-mail (facultatif).",
                   "email", fixe=True, obligatoire=False)),

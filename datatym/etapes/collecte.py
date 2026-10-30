@@ -54,7 +54,12 @@ def lire(projet):
     f = chemin_donnees(projet)
     if not f.exists():
         return None
-    return pd.read_csv(f, dtype=str, keep_default_na=False)
+    df = pd.read_csv(f, dtype=str, keep_default_na=False)
+    # entretiens déclarés non réalisés au rappel de contrôle : retirés de la base (résultats, suivi, paie)
+    faux = {r["id"] for r in (projet["etapes"]["collecte"].get("data") or {}).get("rappels") or [] if r.get("statut") == "non_realise"}
+    if faux and "_id" in df:
+        df = df[~df["_id"].astype(str).isin(faux)]
+    return df
 
 
 def importer_fichier(projet, chemin):
@@ -337,7 +342,9 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                         elif q.get("conditions") and not condition_remplie(q, l, par_id):
                             l[var] = ""
                         elif q.get("condition_sur"):
-                            l[var] = "contact@exemple.com" if l.get(next((x["var"] for x in quest["questions_plates"] if x["id"] == q["condition_sur"][0]), ""), "") == q["condition_sur"][1] else ""
+                            ok = l.get(next((x["var"] for x in quest["questions_plates"] if x["id"] == q["condition_sur"][0]), ""), "") == q["condition_sur"][1]
+                            fictif = {"cl_entreprise": f"Entreprise {rnd.randint(100, 999)}", "cl_telephone": f"+221 77{rnd.randint(1000000, 9999999)}"}
+                            l[var] = (fictif.get(q["id"]) or "contact@exemple.com") if ok else ""
                         elif q["type"] in ("select_one", "select_multiple"):
                             mods = [mm for mm in q["modalites"] if mm["code"] != "autre_hors" and mm["code"] not in (q.get("exclut") or [])]
                             poids = biais[var][:len(mods)]
@@ -510,6 +517,7 @@ def tableau_de_bord(projet, quest, ech):
         "objectif": objectif, "realise": n, "taux": round(100 * n / objectif, 1) if objectif else 0,
         "prevu_a_date": par_jour[idx_ref]["cumul_prevu"] if idx_ref >= 0 else 0,
         "brut": total_brut, "refus": refus, "hors_cible": hors, "rapides": rapides,
+        "invalides_rappel": sum(1 for r in projet["etapes"]["collecte"]["data"].get("rappels") or [] if r.get("statut") == "non_realise"),
         "taux_completion": round(100 * n / total_brut, 1) if total_brut else 0,
         "duree_mediane": round(med, 1) if med else None,
         "par_enqueteur": par_enq if plan_suivi else [], "par_zone": par_zone, "par_profil": par_profil, "par_secteur": par_secteur,
@@ -530,6 +538,8 @@ def generer(projet, precedent=None):
         data["questionpro"] = prec["questionpro"]
     if "controle_qualite" in prec:
         data["controle_qualite"] = prec["controle_qualite"]  # enquête et centre de données : la resynchronisation en dépend
+    if prec.get("rappels"):
+        data["rappels"] = prec["rappels"]  # rappels de contrôle déjà tirés et leurs résultats
     return data
 
 
