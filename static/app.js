@@ -1129,7 +1129,23 @@ function editeurBilan(z) {
   const D = S.travail.depenses;
   const postes = [...b.lignes, { cle: "imprevus", poste: "Imprévus", montant: b.imprevus }];
   const saisi = (c) => D[c] !== undefined && D[c] !== "";
-  z.innerHTML = `
+  const sit = S.projet.etapes.suivi.situation;
+  const estimation = sit ? `
+    <div class="lib" style="margin-bottom:6px">Situation estimée ${sit.finie ? "en fin de collecte" : `au jour ${sit.jour} sur ${sit.nb_jours}`} <span class="ex">calculée à partir du budget et de l'avancement de la collecte</span></div>
+    <div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
+      ${[["Budget de collecte", `${nf(sit.budget)} FCFA`, ""], ["Engagé estimé", `${nf(sit.engage)} FCFA`, `${nf(sit.taux, 1)} % du budget`],
+         ["Reste disponible", `${nf(sit.reste)} FCFA`, "pour la suite de la collecte et l'analyse"],
+         ["Dû aux enquêteurs", `${nf(sit.a_payer_enqueteurs)} FCFA`, "à payer en fin de collecte"]]
+        .map(([t, v, s_]) => `<div class="carte kpi"><div class="t">${t}</div><div class="v" style="font-size:19px">${v}</div>${s_ ? `<div class="s">${s_}</div>` : ""}</div>`).join("")}
+    </div>
+    <div class="grille-tab" style="margin-bottom:10px"><table><thead><tr><th>Poste</th><th>Budget</th><th>Engagé estimé</th><th>Reste</th><th>Base de l'estimation</th></tr></thead><tbody>
+      ${sit.lignes.map((l) => `<tr><td>${esc(l.poste)}</td><td>${nf(l.prevu)}</td><td>${nf(l.engage)}</td><td style="${l.reste < 0 ? "color:var(--rouge)" : ""}">${nf(l.reste)}</td><td class="aide">${esc(l.base)}</td></tr>`).join("")}
+      <tr><td><b>Total</b></td><td><b>${nf(sit.budget)}</b></td><td><b>${nf(sit.engage)}</b></td><td><b>${nf(sit.reste)}</b></td><td></td></tr>
+    </tbody></table></div>
+    ${!sit.finie && sit.jour ? `<p class="aide" style="margin:0 0 6px">Au rythme actuel, la collecte finirait avec environ <b>${sit.proj_valides}</b> questionnaires validés sur ${sit.objectif},
+      pour un coût d'environ <b>${nf(sit.proj_total)} FCFA</b>, soit ${sit.proj_par_questionnaire ? `<b>${nf(sit.proj_par_questionnaire)} FCFA</b> par questionnaire (prévu : ${nf(sit.prevu_par_questionnaire)} FCFA)` : "un coût par questionnaire non calculable"}.</p>` : ""}
+    <div class="bandeau alerte" style="margin-bottom:22px">${ico("alert")}<div>Estimation à ajuster : les enquêteurs sont payés à la fin de la collecte, sur les seuls questionnaires validés au contrôle qualité. Les dépenses réelles se saisissent ci-dessous.</div></div>` : "";
+  z.innerHTML = `${estimation}
     <div class="bandeau info">${ico("info")}<div>Saisissez les dépenses réellement engagées, poste par poste. Le bilan financier de la note de suivi compare le réalisé au budget de collecte ; un poste laissé vide n'entre pas dans le calcul.</div></div>
     <div class="actions" style="margin:0 0 12px;align-items:center;gap:12px;flex-wrap:wrap">
       <a class="btn" href="/api/projets/${S.projet.slug}/paiements">${ico("download")} État de paiement des enquêteurs (Excel)</a>

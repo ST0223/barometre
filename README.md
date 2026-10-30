@@ -64,7 +64,7 @@ Le coût de revient est construit poste par poste (quantité tirée du plan × c
 |---|---|
 | Note de cadrage | Fourchette basse, centrale, haute calculée à partir de la fiche ; figée à la génération, c'est la référence annoncée |
 | Échantillonnage | Budget de collecte détaillé (document interne), à partir des quotas, enquêteurs, superviseurs, jours et zones ; coûts unitaires et hypothèses modifiables dans l'onglet Paramètres ; chaque poste peut être décoché (exclu du budget) et des postes forfaitaires peuvent être ajoutés ; par défaut, formation en ligne (Teams, sans salle ni per diem) et supervision à distance par Datatym (sans superviseur payé), le présentiel et les superviseurs terrain restant des options |
-| Note de suivi | Dépenses réelles saisies dans l'onglet « Bilan financier » ; écarts par poste, coût réel par questionnaire validé, coût des questionnaires écartés |
+| Note de suivi | Pendant la collecte : engagé estimé à date poste par poste (questionnaires validés × tarif, jours travaillés × forfaits, postes déjà engagés), reste disponible et projection en fin de collecte au rythme actuel, à ajuster puisque les enquêteurs sont payés à la fin ; puis dépenses réelles saisies dans l'onglet « Bilan financier » ; écarts par poste, coût réel par questionnaire validé, coût des questionnaires écartés |
 
 Le plafond budgétaire de la fiche ne sert qu'à vérifier que l'estimation reste dans l'enveloppe. Aucun montant
 ne figure dans la note d'échantillonnage, la note de recrutement ni la formation, qui peuvent circuler hors de Datatym.

@@ -1,6 +1,8 @@
 """État de paiement des enquêteurs en fin de collecte : questionnaires validés × tarif, plus les forfaits journaliers
 du budget (transport, communication) pour chaque jour travaillé, avec le moyen et le numéro de paiement donnés par les RH.
 """
+import math
+
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -8,6 +10,7 @@ from openpyxl.styles import Font
 from .etapes import collecte
 from .formulaires import _feuille
 from .config import auteur_fichiers
+from .outils import fcfa, nombre
 
 
 def calculer(projet):
@@ -48,6 +51,63 @@ def calculer(projet):
         })
     return {"lignes": lignes, "tarif": tarif, "forfait": forfait, "total": sum(l["total"] for l in lignes),
             "a_completer": [l["id"] for l in lignes if l["total"] and not (l["moyen"] and l["numero"])]}
+
+
+def situation(projet):
+    """Montant engagé à date, poste par poste, et reste disponible : estimation tirée du budget et de l'avancement de la
+    collecte. Les enquêteurs n'étant payés qu'en fin de collecte, sur les questionnaires validés, le montant reste à ajuster."""
+    ech = projet["etapes"]["echantillonnage"].get("data") or {}
+    b = ech.get("budget")
+    s = (projet["etapes"]["collecte"].get("data") or {}).get("stats")
+    if not b or not s:
+        return None
+    h = b["hypotheses"]
+    jour = max(min(s["jour_index"], s["nb_jours"]), 0)          # jours de collecte écoulés
+    valides = s["realise"]
+    commencee, finie = jour > 0, jour >= s["nb_jours"]
+    rapport_fait = projet["etapes"]["rapport"]["statut"] == "valide"
+    # jours réellement travaillés par enquêteur quand les réponses portent son identifiant, sinon équipe complète × jours écoulés
+    etat = calculer(projet) if valides else None
+    jours_trav = sum(l["jours"] for l in (etat or {}).get("lignes", []))
+    if not jours_trav:
+        jours_trav = b["nb_enqueteurs"] * jour
+    jf = h.get("jours_formation", 1)
+    lignes = []
+    for l in b["lignes"]:
+        cle, u, prevu = l["cle"], l["unitaire"], l["montant"]
+        if cle == "remu_questionnaire":
+            engage, base = valides * u, f"{valides} questionnaires validés × {fcfa(u)} (payés en fin de collecte)"
+        elif cle in ("transport_jour", "communication_jour"):
+            engage, base = jours_trav * u, f"{jours_trav} jours d'enquêteur travaillés × {fcfa(u)}"
+        elif cle in ("formation_enqueteur", "formation_zone"):
+            engage, base = (prevu, "formation réalisée") if commencee else (0, "formation à venir")
+        elif cle == "supervision_jour":
+            part = (jour + jf) / (s["nb_jours"] + jf) if commencee else 0
+            engage, base = prevu * part, f"{jour} jours de collecte écoulés sur {s['nb_jours']}"
+        elif cle == "controle_rappel":
+            n = math.ceil(valides * h.get("part_rappels", 10) / 100)
+            engage, base = n * u, f"{n} rappels ({nombre(h.get('part_rappels', 10), 0)} % des questionnaires validés)"
+        elif cle == "analyse_jour":
+            engage, base = (prevu, "rapport validé") if rapport_fait else (0, "après la collecte")
+        else:  # outils, conception et coordination, forfaits ajoutés : engagés avant le terrain
+            engage, base = prevu, "engagé avant la collecte"
+        lignes.append({"cle": cle, "poste": l["poste"], "prevu": prevu, "engage": round(engage), "reste": round(prevu - engage), "base": base})
+    imp = b["imprevus"]
+    lignes.append({"cle": "imprevus", "poste": "Imprévus", "prevu": imp, "engage": 0, "reste": imp, "base": "provision non utilisée"})
+    engage = sum(l["engage"] for l in lignes)
+    a_payer = sum(l["engage"] for l in lignes if l["cle"] in ("remu_questionnaire", "transport_jour", "communication_jour"))
+    # projection en fin de collecte au rythme actuel : les forfaits journaliers courent jusqu'au bout, la rémunération suit les validés
+    tarif = next((l["unitaire"] for l in b["lignes"] if l["cle"] == "remu_questionnaire"), 0)
+    proj_valides = min(s["objectif"], round(valides / jour * s["nb_jours"])) if jour and not finie else valides
+    proj_total = b["total"] - (s["objectif"] - proj_valides) * tarif * (1 + b["taux_imprevus"] / 100)
+    return {"lignes": lignes, "budget": b["total"], "engage": engage, "reste": b["total"] - engage,
+            "proj_valides": proj_valides, "proj_total": round(proj_total),
+            "proj_par_questionnaire": round(proj_total / proj_valides) if proj_valides else None,
+            "prevu_par_questionnaire": round(b["par_questionnaire"]),
+            "taux": round(100 * engage / b["total"], 1) if b["total"] else 0, "a_payer_enqueteurs": a_payer,
+            "jour": jour, "nb_jours": s["nb_jours"], "valides": valides, "objectif": s["objectif"], "finie": finie,
+            # à ce rythme, la rémunération finale suit le nombre de questionnaires validés atteint en fin de collecte
+            "remu_si_objectif": next((l["prevu"] for l in lignes if l["cle"] == "remu_questionnaire"), 0)}
 
 
 def xlsx(chemin, projet):

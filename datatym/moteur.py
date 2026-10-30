@@ -1,4 +1,5 @@
 """Moteur de la chaîne de production : génération, édition, validation, propagation, exports."""
+import logging
 import shutil
 import subprocess
 from pathlib import Path
@@ -48,6 +49,12 @@ def vue(projet):
         e["statut"] = statut(projet, cle)
         e["libelle"] = LIBELLES[cle]
         v["etapes"][cle] = e
+    # situation financière estimée à date (onglet Bilan financier), recalculée à chaque affichage
+    if (_data(projet, "collecte") or {}).get("stats") and (_data(projet, "echantillonnage") or {}).get("budget"):
+        try:
+            v["etapes"]["suivi"]["situation"] = paiement.situation(projet)
+        except Exception:  # estimation indicative : son échec ne doit pas bloquer l'affichage de l'étude
+            logging.exception("Situation financière")
     # note de suivi produite avant les textes tirés des données : anciens textes standard présentés comme automatiques
     s, stats = v["etapes"]["suivi"], (_data(projet, "collecte") or {}).get("stats")
     if s.get("data") and stats and not s["data"].get("auto"):

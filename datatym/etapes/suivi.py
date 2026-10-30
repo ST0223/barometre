@@ -241,8 +241,29 @@ def construire_docs(projet, data, stats):
                 [liste(data.get("recommandations") or auto_reco)], source="texte" if data.get("recommandations") else "auto"),
     ]
     bil = budget.bilan(projet["etapes"]["echantillonnage"]["data"].get("budget"), data.get("depenses"), s)
-    if bil:
-        sections.append(section("bilan_financier", "8. Bilan financier", blocs_bilan(bil), source="auto"))
+    if bil and bil["saisi"]:
+        sections.append(section("bilan_financier", f"{len(sections) + 1}. Bilan financier", blocs_bilan(bil), source="auto"))
+    else:
+        # tant qu'aucune dépense réelle n'est saisie : estimation tirée du budget et de l'avancement
+        from ..paiement import situation
+        sit = situation(projet)
+        if sit:
+            sections.append(section("situation_financiere", f"{len(sections) + 1}. Situation financière estimée", [
+                chiffres([{"valeur": fcfa(sit["budget"]), "libelle": "budget de collecte"},
+                          {"valeur": fcfa(sit["engage"]), "libelle": f"engagé estimé ({pct(sit['taux'])})"},
+                          {"valeur": fcfa(sit["reste"]), "libelle": "reste disponible"},
+                          {"valeur": fcfa(sit["a_payer_enqueteurs"]), "libelle": "dû aux enquêteurs en fin de collecte"}]),
+                tableau(["Poste", "Budget", "Engagé estimé", "Reste", "Base de l'estimation"],
+                        [[l["poste"], fcfa(l["prevu"]), fcfa(l["engage"]), fcfa(l["reste"]), l["base"]] for l in sit["lignes"]]
+                        + [["**Total**", f"**{fcfa(sit['budget'])}**", f"**{fcfa(sit['engage'])}**", f"**{fcfa(sit['reste'])}**", ""]],
+                        "Engagé et reste par poste", [1.7, 1.1, 1.1, 1.1, 2.4], 8.5),
+            ] + ([p(f"Au rythme actuel, la collecte finirait avec environ {sit['proj_valides']} questionnaires validés sur {sit['objectif']}, "
+                    f"pour un coût d'environ {fcfa(sit['proj_total'])}"
+                    + (f", soit {fcfa(sit['proj_par_questionnaire'])} par questionnaire contre {fcfa(sit['prevu_par_questionnaire'])} prévus." if sit["proj_par_questionnaire"] else "."))]
+                 if not sit["finie"] and sit["jour"] else []) + [
+                p("Estimation à ajuster : les enquêteurs sont payés à la fin de la collecte, sur les seuls questionnaires validés au contrôle "
+                  "qualité ; le bilan définitif est établi à partir des dépenses réelles saisies dans l'onglet Bilan financier.", "note"),
+            ], source="auto"))
     return {"note_suivi": {
         "titre": "Note de suivi des enquêtes", "surtitre": "Baromètre Datatym", "sous_titre": fiche["theme"],
         "meta": [f"Collecte du {date_fr(j0)} au {date_fr(j1)}", f"Version du {aujourdhui()}"],
