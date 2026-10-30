@@ -1190,7 +1190,7 @@ function editeurRecrutement(z, e) {
   piedEnregistrer(z, "echantillonnage", () => ({ recrutement: R }));
 }
 
-function editeurListes(z, cle, champs) {
+function editeurListes(z, cle, champs, construire = (W) => W) {
   const d = S.projet.etapes[cle].data;
   if (!S.travail) S.travail = clone(Object.fromEntries(champs.map(([k]) => [k, d[k]])));
   const W = S.travail;
@@ -1205,11 +1205,32 @@ function editeurListes(z, cle, champs) {
     S.sale = true;
     W[t.dataset.w] = t.dataset.liste ? t.value.split("\n").filter((x) => x.trim()) : t.value;
   };
-  piedEnregistrer(z, cle, () => W);
+  piedEnregistrer(z, cle, () => construire(W));
 }
 
 const editeurMethodo = (z) => editeurListes(z, "methodologie", [["logiciel", "Logiciel de traitement et d'analyse", "select", ["Python (VS Code)", "R (RStudio ou VS Code)", "Stata"]], ["limites", "Limites de l'étude", "liste"]]);
-const editeurSuivi = (z) => editeurListes(z, "suivi", [["observations", "Observations de terrain", "liste"], ["recommandations", "Recommandations pour la prochaine édition", "liste"]]);
+/** Observations et recommandations : rédigées à partir des données tant qu'on ne les modifie pas à la main. */
+function editeurSuivi(z) {
+  const d = S.projet.etapes.suivi.data;
+  const auto = d.auto || {};
+  const manuel = !!(d.observations || d.recommandations);
+  if (!S.travail) S.travail = { observations: d.observations || auto.observations || [], recommandations: d.recommandations || auto.recommandations || [] };
+  const pareil = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+  // un texte identique au texte automatique reste automatique : il continuera de suivre les données
+  editeurListes(z, "suivi", [["observations", "Observations de terrain", "liste"], ["recommandations", "Recommandations", "liste"]],
+    (W) => ({ observations: pareil(W.observations, auto.observations) ? null : W.observations,
+              recommandations: pareil(W.recommandations, auto.recommandations) ? null : W.recommandations }));
+  z.insertAdjacentHTML("afterbegin", manuel
+    ? `<div class="bandeau alerte">${ico("edit")}<div>Textes modifiés à la main : ils ne suivent plus les données de collecte.
+        <button class="btn btn-ed btn-petit" id="suivi-auto" style="margin-left:8px">${ico("refresh")} Revenir aux textes automatiques</button></div></div>`
+    : `<div class="bandeau info">${ico("info")}<div>Rédigés automatiquement à partir des données de collecte (rythme, pays, profils, hors cible, durée, collecteurs) et mis à jour à chaque synchronisation. Modifiez-les si besoin : ils ne suivront alors plus les données.</div></div>`);
+  const b = $("#suivi-auto");
+  if (b) b.onclick = (ev) => occupe(ev.currentTarget, async () => {
+    const r = await api("PUT", `/api/projets/${S.projet.slug}/etapes/suivi/data`, { observations: null, recommandations: null });
+    S.travail = null; S.sale = false;
+    majProjet(r, "Observations et recommandations de nouveau rédigées à partir des données.");
+  });
+}
 function editeurRapport(z, e) {
   editeurListes(z, "rapport", [["titre", "Titre du rapport", "input"], ["sous_titre", "Sous-titre", "input"]]);
   z.insertAdjacentHTML("afterbegin", `<div class="bandeau info">${ico("info")}<div>Pour recalculer les indicateurs après un nouvel import de données, utilisez <b>Mettre à jour</b> (ou <b>Régénérer</b> pour réécrire aussi les textes).</div></div>`);

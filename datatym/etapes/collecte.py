@@ -499,7 +499,7 @@ def tableau_de_bord(projet, quest, ech):
             incidents.append(f"{e['nom']} ({e['zone']}) : {e['realise']} réalisés pour {e['prevu']} prévus à date ({e['ecart']:+d}).")
     for q in quotas:
         if q["realise"] > q["objectif"] * 1.1 and q["objectif"]:
-            incidents.append(f"Quota dépassé : {q['profil']} à {q['zone']} ({q['realise']} pour {q['objectif']}).")
+            incidents.append(f"Quota dépassé : {q['profil']}, {q['zone']} ({q['realise']} pour {q['objectif']}).")
     if rapides:
         incidents.append(f"{rapides} questionnaire(s) d'une durée inférieure à 40 % de la médiane, exclus de l'analyse.")
     if refus:

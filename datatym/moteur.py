@@ -48,6 +48,16 @@ def vue(projet):
         e["statut"] = statut(projet, cle)
         e["libelle"] = LIBELLES[cle]
         v["etapes"][cle] = e
+    # note de suivi produite avant les textes tirés des données : anciens textes standard présentés comme automatiques
+    s, stats = v["etapes"]["suivi"], (_data(projet, "collecte") or {}).get("stats")
+    if s.get("data") and stats and not s["data"].get("auto"):
+        d = dict(s["data"])
+        for k in suivi.ANCIENS_DEFAUTS:
+            if d.get(k) in suivi.ANCIENS_DEFAUTS[k]:
+                d[k] = None
+        obs, reco = suivi.analyser(projet, stats)
+        d["auto"] = {"observations": obs, "recommandations": reco}
+        s["data"] = d
     v["ordre"] = [{"cle": c, "libelle": l} for c, l in ETAPES]
     return v
 
