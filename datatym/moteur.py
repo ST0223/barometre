@@ -406,10 +406,21 @@ def maj_fiche(projet, fiche):
 
 def rafraichir_collecte(projet):
     e = projet["etapes"]["collecte"]
+    avant = e["data"].get("stats")
     e["data"]["stats"] = propre(collecte.tableau_de_bord(projet, _data(projet, "questionnaire"), _data(projet, "echantillonnage")))
     e["maj"] = store.maintenant()
-    if e["statut"] == "valide":
+    # l'horodatage du calcul change à chaque passage : seuls les chiffres comptent
+    sans_heure = lambda st: {k: v for k, v in (st or {}).items() if k != "maj"}
+    change = sans_heure(e["data"]["stats"]) != sans_heure(avant)
+    if e["statut"] == "valide" and change:
         _marquer_aval(projet, "collecte")
+        # la note de suivi déjà produite suit la collecte d'elle-même (rédactions manuelles conservées) ;
+        # une version validée reste archivée, la nouvelle repart en brouillon
+        s = projet["etapes"]["suivi"]
+        if s.get("data") and s["statut"] in ("brouillon", "obsolete"):
+            s["statut"] = "brouillon"
+            s["version"] = s["version"] or 1
+            _apres_maj(projet, "suivi")
     exporter(projet, "collecte")
     store.sauver(projet)
     return e["data"]["stats"]

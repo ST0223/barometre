@@ -559,6 +559,31 @@ function panneauEtape(cle) {
   lierColonne();
   if (genere) contenuOnglet(cle);
   A.reveler($("#zone-etape"));
+  suiviAuto(cle);
+}
+
+/** Note de suivi : reprend les nouvelles soumissions toutes les 5 minutes, comme le tableau de bord de la collecte. */
+function suiviAuto(cle) {
+  clearInterval(S.minuterieSuivi);
+  const c = S.projet.etapes.collecte;
+  const d = c.data || {};
+  const auto = (d.source === "API KoboToolbox" && S.params.kobo_jeton_defini) || (d.source === "API QuestionPro" && S.params.questionpro_cle_definie);
+  if (cle !== "suivi" || !auto || c.statut !== "valide" || !S.projet.etapes.suivi.data) return;
+  const slug = S.projet.slug;
+  const tirer = async () => {
+    if (S.etape !== "suivi" || !S.projet || S.projet.slug !== slug) return clearInterval(S.minuterieSuivi);
+    if (document.hidden || S.sale) return;
+    try {
+      const avant = S.projet.etapes.suivi.maj;
+      const r = await api("POST", `/api/projets/${slug}/collecte/actualiser`);
+      if (S.etape !== "suivi" || S.projet.slug !== slug) return;
+      // le serveur ne refait la note que si les chiffres de la collecte ont changé
+      if (r.etapes.suivi.maj !== avant) majProjet(r, "Nouvelles données de collecte : note de suivi mise à jour.");
+      else S.projet = r;
+    } catch (err) { /* nouvel essai au prochain passage */ }
+  };
+  if (Date.now() - Date.parse(c.maj || 0) > 5 * 60 * 1000) tirer();
+  S.minuterieSuivi = setInterval(tirer, 5 * 60 * 1000);
 }
 
 function placerCurseurOnglet() {
