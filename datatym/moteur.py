@@ -490,6 +490,15 @@ def historique_texte(projet, archives=()):
                       + (f", validée le {e['valide_le'].replace('T', ' à ')}" if e.get("valide_le") else "") + ")")
         lignes += [f"  - {x['fichier']}  ({x['nom']})" for x in e["fichiers"]]
         lignes.append("")
+    res = projet.get("restitution")
+    if res and res.get("fichiers"):
+        lignes.append(f"RESTITUTION (d'après le rapport v{res.get('rapport_version')}, produite le {res['date'].replace('T', ' à ')})")
+        lignes += [f"  - {x['fichier']}  ({x['nom']})" for x in res["fichiers"]]
+        lignes.append("")
+    lignes += ["PILOTAGE (dossier 4_Pilotage)", "  - Déroulement de l'étude présenté au dirigeant (Word, PowerPoint)"]
+    if (_data(projet, "collecte") or {}).get("rappels"):
+        lignes.append("  - Fiche des rappels de contrôle et leurs résultats (Excel)")
+    lignes.append("")
     if archives:
         lignes.append("VERSIONS VALIDÉES ARCHIVÉES")
         lignes += [f"  - {a}" for a in archives]
@@ -512,6 +521,22 @@ def boucler(projet):
                 if f.is_file() and not (dossier_src == "donnees" and f.suffix != ".csv"):
                     z.write(f, f"{dossier_zip}/{f.relative_to(src).as_posix()}")
                     nb += 1
+        # pilotage : documents produits à la demande (déroulement présenté au dirigeant, fiche des rappels de contrôle)
+        import tempfile
+        from . import deroulement
+        with tempfile.TemporaryDirectory() as tmp:
+            nom = lambda code, ext: store.nom_fichier(projet, code, 1, ext).replace("_v1.", ".")  # noqa: E731
+            pilotage = [(nom("Deroulement_Etude", ext), fn) for ext, fn in (("docx", deroulement.docx), ("pptx", deroulement.pptx))]
+            if (_data(projet, "collecte") or {}).get("rappels"):
+                pilotage.append((nom("Fiche_Rappels", "xlsx"), rappels.xlsx))
+            for nom_f, fn in pilotage:
+                try:
+                    fn(Path(tmp) / nom_f, projet)
+                except Exception:  # un document de pilotage manquant ne doit pas empêcher l'archivage
+                    logging.exception("Archive : %s", nom_f)
+                    continue
+                z.write(Path(tmp) / nom_f, f"4_Pilotage/{nom_f}")
+                nb += 1
         archives = sorted(n for n in z.namelist() if n.startswith("2_Versions_validees/"))
         z.writestr("Historique.txt", historique_texte(projet, archives))
         nb += 1

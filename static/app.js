@@ -479,8 +479,8 @@ function panneauCloture() {
       <div class="carte-corps">${onglet === "restitution" ? ongletRestitution(p) : `
         <div class="cl-boucle">
           <div><h3 style="margin:0 0 6px">${c ? "Archive de l'étude" : "Boucler l'étude"}</h3>
-            <p class="aide" style="margin:0">Une seule archive ZIP rassemble tous les fichiers de l'étude : les livrables en cours, toutes les versions validées,
-              la base des soumissions et l'historique complet.</p>
+            <p class="aide" style="margin:0">Une seule archive ZIP rassemble tous les fichiers de l'étude : les livrables en cours (supports de restitution compris),
+              toutes les versions validées, la base des soumissions, les documents de pilotage (déroulement, rappels) et l'historique complet.</p>
             ${!c && enCours.length ? `<p class="aide" style="margin:8px 0 0;color:var(--ambre)">${ico("alert")} Étape(s) non validée(s) : ${enCours.map((x) => esc(x.libelle)).join(", ")}. Elles seront archivées dans leur état actuel.</p>` : ""}
             ${c ? `<p style="margin:10px 0 0"><b>${esc(c.fichier)}</b> · ${c.nb} fichiers · ${mo(c.taille)} · constituée le ${heureFr(c.date)}</p>` : ""}</div>
           <div class="cl-actions">
