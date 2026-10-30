@@ -231,6 +231,7 @@ def nettoyer_livrables(projet):
     Les versions validées restent archivées dans versions/ ; seuls les fichiers produits par la plateforme sont visés."""
     out = store.dossier(projet["slug"]) / "livrables"
     courants = {f["fichier"] for c in CLES for f in projet["etapes"][c].get("fichiers") or []}
+    courants |= {f["fichier"] for f in (projet.get("restitution") or {}).get("fichiers") or []}
     for f in out.glob("*"):
         genere = f.name.startswith("Barometre_") or (f.name.startswith("baro_") and f.suffix == ".xlsx") or f.name == formulaires.FICHIER_ENQUETEURS
         actuel = f.name in courants or (f.suffix == ".pdf" and f.with_suffix(".docx").name in courants)

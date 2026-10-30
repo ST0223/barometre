@@ -188,6 +188,7 @@ select.saisie { padding-right: 28px; }
 .ico-fichier.xlsx, .ico-fichier.csv { background: #1E8E50; }
 .ico-fichier.pptx { background: #D2552C; }
 .ico-fichier.txt { background: #6B7280; }
+.ico-fichier.png { background: #7C3AED; }
 .livrable .nom { font-size: 13px; font-weight: 600; line-height: 1.3; }
 .livrable .fic { font-size: 11px; color: var(--texte-3); word-break: break-all; }
 .livrable .acts { margin-left: auto; display: flex; gap: 4px; }

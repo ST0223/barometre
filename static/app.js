@@ -470,10 +470,13 @@ function panneauCloture() {
   const mo = (o) => (o >= 1048576 ? `${nf(o / 1048576, 1)} Mo` : `${nf(o / 1024)} Ko`);
   const produits = etapes.filter((x) => (x.e.fichiers || []).length);
   const nbFichiers = produits.reduce((a, x) => a + x.e.fichiers.length, 0);
+  const onglet = S.ongletCloture === "restitution" ? "restitution" : "archive";
   $("#zone-etape").innerHTML = `
     <div class="panneau large"><div class="carte carte-etape">
       ${enteteEtape(8, "<h2>Clôture de l'étude</h2>", c ? `<span class="tag ok">Bouclée le ${dateFr(c.date)}</span>` : "")}
-      <div class="carte-corps">
+      <div class="onglets">${[["archive", "Archive et bilan", "check"], ["restitution", "Restitution", "sparkle"]].map(([k, l, ic]) =>
+        `<button class="onglet ${onglet === k ? "actif" : ""}" data-oc="${k}">${ico(ic)}${l}</button>`).join("")}<span class="onglet-curseur" id="onglet-curseur"></span></div>
+      <div class="carte-corps">${onglet === "restitution" ? ongletRestitution(p) : `
         <div class="cl-boucle">
           <div><h3 style="margin:0 0 6px">${c ? "Archive de l'étude" : "Boucler l'étude"}</h3>
             <p class="aide" style="margin:0">Une seule archive ZIP rassemble tous les fichiers de l'étude : les livrables en cours, toutes les versions validées,
@@ -496,9 +499,19 @@ function panneauCloture() {
           ${x.e.fichiers.map((f) => `<div class="livrable"><div class="ico-fichier ${f.type}">${esc(f.type.toUpperCase())}</div>
             <div style="min-width:0"><div class="nom">${esc(f.nom)}</div><div class="fic">${esc(f.fichier)}</div></div>
             <div class="acts"><a class="btn btn-fantome btn-petit" title="Télécharger" href="/api/projets/${p.slug}/fichiers/${encodeURIComponent(f.fichier)}">${ico("download")}</a></div></div>`).join("")}</div>`).join("")
-          || `<span class="aide">Aucun fichier généré pour l'instant.</span>`}</div>
+          || `<span class="aide">Aucun fichier généré pour l'instant.</span>`}</div>`}
       </div></div></div>`;
-  $("#boucler").onclick = async (ev) => {
+  document.querySelectorAll("[data-oc]").forEach((b) => (b.onclick = () => { S.ongletCloture = b.dataset.oc; panneauCloture(); }));
+  placerCurseurOnglet();
+  const prod = $("#produire-restitution");
+  if (prod) prod.onclick = (ev) => occupe(ev.currentTarget, async () => {
+    toast("Préparation des supports : présentation, note de synthèse, infographie, communiqué… (quelques secondes)");
+    const r = await api("POST", `/api/projets/${p.slug}/restitution`);
+    majProjet(r, "Supports de restitution prêts.");
+  });
+  const versRapport = $("#vers-rapport");
+  if (versRapport) versRapport.onclick = () => aller("rapport");
+  if ($("#boucler")) $("#boucler").onclick = async (ev) => {
     const btn = ev.currentTarget;
     if (!(await confirmer(c ? "Mettre à jour l'archive ?" : "Boucler l'étude ?",
       c ? `L'archive de **${p.fiche.theme}** sera refaite avec les fichiers actuels ; le bilan et l'historique seront actualisés. Elle reste à télécharger avec le bouton « Télécharger le dossier ».`
@@ -513,6 +526,54 @@ function panneauCloture() {
     });
   };
   A.reveler($("#zone-etape"));
+}
+
+/** Onglet Restitution : supports tirés du rapport d'analyse pour présenter les résultats. */
+const SUPPORTS_RESTITUTION = [
+  ["pptx", "Présentation des résultats", "Support de la réunion de restitution : messages clés, chiffres, résultats commentés, méthode et limites."],
+  ["docx", "Note de synthèse", "L'essentiel en deux pages pour le dirigeant ou le client."],
+  ["png", "Infographie", "Format portrait 1080 × 1350 pour LinkedIn, WhatsApp ou une newsletter."],
+  ["docx", "Communiqué de presse", "Annonce publique des résultats, à relire et compléter (citation, contact) avant diffusion."],
+];
+function ongletRestitution(p) {
+  const rap = p.etapes.rapport;
+  if (!(rap.data && rap.data.analyse)) {
+    return `<div class="vide">${ico("sparkle")}<div>La restitution reprend les résultats du rapport d'analyse : générez-le d'abord.</div><br>
+      <button class="btn btn-primaire" id="vers-rapport">${ico("play")} Aller au rapport d'analyse</button></div>`;
+  }
+  const r = p.restitution;
+  const perime = r && r.rapport_maj !== rap.maj;
+  const fichiers = (r && r.fichiers) || [];
+  const lien = (f, voir) => `/api/projets/${p.slug}/fichiers/${encodeURIComponent(f.fichier)}${voir ? "?voir=1" : ""}`;
+  const rapportDoc = (rap.fichiers || []).find((f) => f.type === "docx");
+  const info = (k, nom, desc) => {
+    const f = fichiers[k];
+    return `<div class="livrable" style="align-items:center">
+      <div class="ico-fichier ${SUPPORTS_RESTITUTION[k][0]}">${SUPPORTS_RESTITUTION[k][0].toUpperCase()}</div>
+      <div style="min-width:0;flex:1"><div class="nom">${esc(nom)}</div><div class="aide" style="font-size:12.5px">${esc(desc)}</div>${f ? `<div class="fic">${esc(f.fichier)}</div>` : ""}</div>
+      <div class="acts">${f ? `<a class="btn btn-petit" href="${lien(f)}">${ico("download")} Télécharger</a>` : `<span class="aide" style="font-size:12px">à produire</span>`}</div></div>`;
+  };
+  const infog = fichiers.find((f) => f.type === "png");
+  return `
+    <div class="cl-boucle">
+      <div><h3 style="margin:0 0 6px">Restitution des résultats</h3>
+        <p class="aide" style="margin:0">Des supports prêts à présenter et à diffuser, tirés du rapport d'analyse (messages clés, chiffres à retenir,
+          résultats commentés${rap.data.analyse.indice_hc ? ", Indice H&C" : ""}) et aux couleurs de Datatym.</p>
+        ${r ? `<p style="margin:10px 0 0">Produits le <b>${heureFr(r.date)}</b> d'après le rapport v${r.rapport_version}.</p>` : ""}
+        ${perime ? `<p class="aide" style="margin:6px 0 0;color:var(--ambre)">${ico("alert")} Le rapport a changé depuis : mettez les supports à jour.</p>` : ""}
+        ${rap.statut !== "valide" ? `<p class="aide" style="margin:6px 0 0">Le rapport n'est pas encore validé : les supports reprennent sa version actuelle.</p>` : ""}</div>
+      <div class="cl-actions"><button class="btn btn-primaire" id="produire-restitution">${ico(r ? "refresh" : "sparkle")} ${r ? "Mettre à jour les supports" : "Produire les supports"}</button></div>
+    </div>
+    <div class="grille-2" style="align-items:start;gap:22px">
+      <div><h3 class="cl-titre" style="margin-top:0">Supports</h3>
+        ${SUPPORTS_RESTITUTION.map(([, nom, desc], k) => info(k, nom, desc)).join("")}
+        ${rapportDoc ? `<div class="livrable" style="align-items:center"><div class="ico-fichier docx">DOCX</div>
+          <div style="min-width:0;flex:1"><div class="nom">Rapport d'analyse complet</div><div class="aide" style="font-size:12.5px">À remettre avec la présentation.</div></div>
+          <div class="acts"><a class="btn btn-petit" href="${lien(rapportDoc)}">${ico("download")} Télécharger</a></div></div>` : ""}</div>
+      <div><h3 class="cl-titre" style="margin-top:0">Aperçu de l'infographie</h3>
+        ${infog ? `<a href="${lien(infog, true)}" target="_blank" rel="noopener"><img src="${lien(infog, true)}&t=${encodeURIComponent(r.date)}" alt="Infographie"
+          style="width:100%;max-width:360px;border-radius:12px;box-shadow:var(--ombre)"></a>` : `<div class="aide">L'aperçu apparaît une fois les supports produits.</div>`}</div>
+    </div>`;
 }
 
 // ------------------------------------------------------------------ panneau d'étape

@@ -15,7 +15,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import budget, deroulement, equipe, importation, llm, moteur, paiement, store
+from datatym import budget, deroulement, equipe, importation, llm, moteur, paiement, restitution, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -183,6 +183,19 @@ def import_creer():
 @app.post("/api/projets/<slug>/boucler")
 def boucler(slug):
     return ok(moteur.boucler(_projet(slug)))
+
+
+@app.post("/api/projets/<slug>/restitution")
+def restitution_generer(slug):
+    """Supports de restitution (PowerPoint, note de synthèse, infographie, communiqué) tirés du rapport d'analyse."""
+    p = _projet(slug)
+    try:
+        r = restitution.generer(p)
+    except ValueError as exc:
+        return jsonify({"erreur": str(exc)}), 400
+    store.journaliser(p, f"Supports de restitution produits ({len(r['fichiers'])} fichiers, d'après le rapport v{r['rapport_version']}).")
+    store.sauver(p)
+    return ok(p)
 
 
 @app.get("/api/projets/<slug>/archive")

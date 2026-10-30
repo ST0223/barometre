@@ -44,7 +44,7 @@ Thème clair ou sombre : Paramètres › Apparence, ou bouton dans le menu (Auto
 | 5. Collecte | Tableau de bord alimenté par l'API KoboToolbox, l'API QuestionPro, un fichier CSV/Excel, ou des données de test simulées : avancement cumulé, carte des pays, suivi par pays, par secteur, par profil et par collecteur, quotas, incidents |
 | 6. Note de suivi | Mise à jour avec la collecte ; réalisé contre prévu, questionnaires reçus et valides, observations et recommandations rédigées à partir des données (rythme, pays, profils, secteurs, hors cible, durée, collecteurs), incidents, qualité, bilan financier prévu contre réalisé ; état de paiement des enquêteurs (questionnaires validés × tarif, forfaits par jour travaillé, moyen et numéro de paiement) |
 | 7. Rapport d'analyse | Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés |
-| 8. Clôture | Bilan des étapes, historique complet ; bouton BOUCLER : une archive ZIP (livrables, versions validées, base des soumissions, historique) à télécharger |
+| 8. Clôture | Onglet Restitution : présentation PowerPoint des résultats, note de synthèse, infographie (1080 × 1350) et communiqué de presse, tirés du rapport d'analyse (mention « résultats provisoires » tant que la collecte est en cours) ; onglet Archive : bilan des étapes, historique complet ; bouton BOUCLER : une archive ZIP (livrables, versions validées, base des soumissions, historique) à télécharger |
 
 Chaque étape propose : **Aperçu** (rendu fidèle du document), **Paramètres** (indicateurs, questions, quotas…),
 **Rédaction** (édition libre des sections rédigées), téléchargement Word et export PDF (via Microsoft Word).
@@ -129,6 +129,7 @@ datatym/
   deroulement.py       déroulement de l'étude présenté au dirigeant (calendrier, scénarios, vigilance), Word et PowerPoint
   equipe.py            liste des enquêteurs des RH : fichier à renseigner, lecture, contrôles, identifiants
   paiement.py          état de paiement des enquêteurs en fin de collecte
+  restitution.py       supports de restitution : PowerPoint, note de synthèse, infographie, communiqué de presse
   indice_hc.py         Indice H&C de Maturité IA : barème validé, 5 piliers, 5 niveaux, score par entreprise
   formulaires.py       dictionnaire, XLSForm, import QuestionPro
   formation.py         PowerPoint de formation des enquêteurs
