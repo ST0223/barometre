@@ -1837,6 +1837,16 @@ async function ongletIndicateurs(z, e, cle, filtre = S.filtreInd || "") {
   const avec = inds.filter((i) => i.n);
   const blocs = [...new Set(avec.map((i) => i.bloc))];
   const carte = (i) => {
+    if (i.type === "numerique") {
+      const v = (x) => nf(x, Math.abs(x) >= 100 || Number.isInteger(x) ? 0 : 1);
+      return `<div class="ind-carte">
+      <div class="ind-tete"><span class="ind-num">${esc(i.num)}</span><div><b>${esc(i.libelle)}</b><small>${esc(i.question)}</small></div>
+        <span class="ind-n ${i.n < 30 ? "faible" : ""}">n = ${i.n}</span></div>
+      ${i.mediane != null ? `<div class="ind-solde">Médiane <b>${v(i.mediane)}</b> · moyenne ${v(i.moyenne)}</div>
+      <div class="ind-barres">${[["Moitié centrale", `${v(i.q1)} à ${v(i.q3)}`], ["Étendue", `${v(i.min)} à ${v(i.max)}`]].map(([l, t]) => `<div class="ind-l"><span class="lbl">${l}</span><span class="v" style="grid-column:span 2;text-align:left">${t}</span></div>`).join("")}</div>
+      <small class="aide">Valeurs après apurement : la médiane est peu sensible aux valeurs extrêmes.</small>` : ""}
+    </div>`;
+    }
     const mods = i.type === "multiple" ? [...i.modalites].sort((a, b) => b.pct - a.pct) : i.modalites;
     const max = Math.max(...mods.map((m) => m.pct), 1);
     return `<div class="ind-carte">

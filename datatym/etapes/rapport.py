@@ -8,7 +8,7 @@ import pandas as pd  # noqa: E402
 from .. import llm  # noqa: E402
 from ..banque import NSP_CODE, TYPES, code_zone, du_barometre, slug, sont_des_pays  # noqa: E402
 from ..charte import chiffres, image, liste, p, section, tableau  # noqa: E402
-from ..outils import aujourdhui, fmt_marge, nombre, pct, solde_txt  # noqa: E402
+from ..outils import aujourdhui, en_nombre, fmt_marge, nombre, pct, solde_txt  # noqa: E402
 from ..store import dossier  # noqa: E402
 from .collecte import _norm, indice_entreprises, lire, valides, variables_cles  # noqa: E402
 
@@ -46,6 +46,20 @@ def stats_echelle(s, ind, mods):
     return r
 
 
+def stats_numerique(s):
+    """Valeur numérique : médiane, moyenne, quartiles et étendue des valeurs déclarées (déjà apurées)."""
+    v = pd.Series([x for x in s.map(en_nombre) if x is not None], dtype=float)
+    if v.empty:
+        return {"n": 0}
+    return {"n": len(v), "mediane": float(v.median()), "moyenne": float(v.mean()), "q1": float(v.quantile(0.25)),
+            "q3": float(v.quantile(0.75)), "min": float(v.min()), "max": float(v.max())}
+
+
+def _val(x):
+    """Nombre lisible : décimales seulement pour les petites valeurs."""
+    return nombre(x, 0 if abs(x) >= 100 or float(x).is_integer() else 1)
+
+
 def stats_multiple(s, mods):
     s = s[s != ""]
     n = len(s)
@@ -64,7 +78,7 @@ def stats_unique(s, mods):
 def calculer(df, ind, q, groupes):
     var, mods = q["var"], q["modalites"]
     f = stats_multiple if ind["type"] == "multiple" else (stats_unique if ind["type"] == "unique" else None)
-    calc = (lambda s: f(s, mods)) if f else (lambda s: stats_echelle(s, ind, mods))
+    calc = (lambda s: f(s, mods)) if f else (stats_numerique if ind["type"] == "numerique" else (lambda s: stats_echelle(s, ind, mods)))
     res = {"global": calc(_serie(df, var))}
     for nom, (col, valeurs) in groupes.items():
         res[nom] = {code: calc(_serie(df[df[col] == code], var)) for code in valeurs} if col in df else {}
@@ -150,6 +164,23 @@ def graphique(r, an, dossier_g):
         ax.set_xlabel("Indice (0 à 100) — 50 = équilibre des opinions")
         ax.grid(axis="x", color=GRILLE, lw=0.6)
         ax.set_axisbelow(True)
+        return _sauver(fig, chemin)
+    if r["type"] == "numerique":
+        # médiane par groupe (la moyenne en clair à côté) : lecture comparable d'un groupe à l'autre
+        lignes = [("Ensemble", r["global"])] + [(lp[c], v) for c, v in r["par_profil"].items() if v.get("n", 0) >= SEUIL]
+        lignes += [(lz[c], v) for c, v in r["par_zone"].items() if v.get("n", 0) >= SEUIL]
+        fig, ax = plt.subplots(figsize=(6.4, 0.42 * len(lignes) + 0.9))
+        noms = [a for a, _ in lignes][::-1]
+        vals = [st["mediane"] for _, st in lignes][::-1]
+        moy = [st["moyenne"] for _, st in lignes][::-1]
+        ax.barh(noms, vals, color=[ENCRE if n == "Ensemble" else BLEU for n in noms], height=0.6)
+        haut = max(vals + [1])
+        for y, (v, m) in enumerate(zip(vals, moy)):
+            ax.text(v + haut * 0.015, y, f"{_val(v)}  (moyenne {_val(m)})", va="center", color=ENCRE, fontsize=8.5)
+        ax.set_xlim(0, haut * 1.45)
+        ax.xaxis.set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.set_title("Valeur médiane déclarée, par groupe (moyenne entre parenthèses)", fontsize=7.5, color=ENCRE2, loc="left")
         return _sauver(fig, chemin)
     if r["type"] in ("multiple", "unique"):
         cle = "citations" if r["type"] == "multiple" else "dist"
@@ -259,6 +290,8 @@ def lecture(r, an):
         return txt
     if r["type"] in ("multiple", "unique"):
         return lecture_choix(r, an)
+    if r["type"] == "numerique":
+        return lecture_numerique(r, an)
     txt = (f"Le solde d'opinion s'établit à **{solde_txt(g['solde'])} points** : {pct(g['positif'])} de réponses favorables "
            f"contre {pct(g['negatif'])} de réponses défavorables (base : {g['n']} répondants).")
     if r["type"] == "satisfaction" and g.get("moyenne") == g.get("moyenne"):
@@ -320,6 +353,26 @@ def lecture_choix(r, an):
     return txt + f" Base : {g['n']} répondants concernés."
 
 
+def lecture_numerique(r, an):
+    """Commentaire d'une valeur numérique : médiane, moyenne, dispersion, écarts entre groupes."""
+    g = r["global"]
+    txt = (f"La valeur médiane déclarée est de **{_val(g['mediane'])}** : la moitié des répondants se situent en dessous, l'autre moitié "
+           f"au-dessus. La moyenne s'établit à {_val(g['moyenne'])}")
+    if g["mediane"] and g["moyenne"] > 1.3 * g["mediane"]:
+        txt += ", tirée vers le haut par quelques valeurs élevées : la médiane reflète mieux la situation la plus courante"
+    txt += f". Un répondant sur deux déclare entre {_val(g['q1'])} et {_val(g['q3'])} (étendue : {_val(g['min'])} à {_val(g['max'])})."
+    for grp, libs, nom in (("par_profil", an["lib_profil"], "fonction"), ("par_zone", an["lib_zone"], "pays"),
+                           ("par_secteur", an.get("lib_secteur", {}), "secteur")):
+        vals = [(libs.get(c, c), st["mediane"]) for c, st in (r.get(grp) or {}).items() if st.get("n", 0) >= SEUIL]
+        if len(vals) >= 2:
+            hi, lo = max(vals, key=lambda x: x[1]), min(vals, key=lambda x: x[1])
+            if lo[1] and hi[1] >= 1.25 * lo[1]:
+                txt += f" Par {nom}, la médiane va de {_val(lo[1])} ({lo[0]}) à {_val(hi[1])} ({hi[0]})."
+    if g["n"] < SEUIL:
+        return txt + f" Base limitée ({g['n']} répondants) : résultat à lire comme une tendance."
+    return txt + f" Base : {g['n']} répondants ayant donné une valeur."
+
+
 def chiffre_cle(r):
     g = r["global"]
     if not g.get("n"):
@@ -329,6 +382,8 @@ def chiffre_cle(r):
     if r["type"] in ("multiple", "unique"):
         label, code, v = _classement(g, r)[0]
         return [pct(v), f"{r['libelle']} : « {label} »"]
+    if r["type"] == "numerique":
+        return [_val(g["mediane"]), f"{r['libelle']} (médiane)"]
     if r["type"] == "intention":
         return [pct(g["positif"]), f"{r['libelle']} (taux d'intention)"]
     if r["type"] == "satisfaction":
@@ -566,6 +621,16 @@ def construire_docs(projet, data, ech):
                         elif x.get("n"):
                             lignes.append([labels[c], x["n"], "effectif insuffisant", "", ""])
                 blocs_doc.append(tableau(["Groupe", "Base", "Favorables", "Défavorables", "Solde"], lignes, f"{r['libelle']} selon le profil et {'le pays' if Z == 'Pays' else 'la zone'}", taille=9))
+            elif r["type"] == "numerique":
+                ligne_n = lambda nom, x: [nom, x["n"], _val(x["mediane"]), _val(x["moyenne"]), f"{_val(x['q1'])} à {_val(x['q3'])}"]  # noqa: E731
+                lignes = [ligne_n("Ensemble", r["global"])]
+                for grp, labels in (("par_profil", lp), ("par_zone", lz)):
+                    for c, x in r[grp].items():
+                        if x.get("n", 0) >= SEUIL:
+                            lignes.append(ligne_n(labels[c], x))
+                        elif x.get("n"):
+                            lignes.append([labels[c], x["n"], "effectif insuffisant", "", ""])
+                blocs_doc.append(tableau(["Groupe", "Base", "Médiane", "Moyenne", "Moitié centrale"], lignes, f"{r['libelle']} selon le profil et {'le pays' if Z == 'Pays' else 'la zone'}", taille=9))
         sections.append(section(f"ch_{slug(bloc)}", f"{ROMAINS[chap - 1]}. {bloc}", blocs_doc, source="auto"))
     sections += [
         section("enseignements", f"{ROMAINS[chap]}. Enseignements", [liste(data.get("enseignements", []))]),

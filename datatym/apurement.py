@@ -6,6 +6,7 @@ dans l'ordre du journal. La base figée (donnees/base_finale.csv) est celle du r
 de la collecte et la paie restent sur les données du moment.
 """
 import html
+import math
 import re
 from datetime import date
 
@@ -14,7 +15,7 @@ from openpyxl import Workbook
 
 from .config import auteur_fichiers
 from .formulaires import _feuille
-from .outils import date_fr, nombre
+from .outils import date_fr, en_nombre, nombre
 from .store import dossier, maintenant
 
 AUTRES = ("autre", "autre_hors")   # modalités « Autre (préciser) » et « Autre fonction » (hors cible)
@@ -212,7 +213,7 @@ def corriger(projet, ident, var, valeur, motif):
             inconnus = [c for c in apres.split() if c not in codes]
             if inconnus or (q["type"] == "select_one" and len(apres.split()) > 1):
                 raise ValueError("Valeur hors des modalités de la question.")
-        if q["type"] == "integer" and apres and _nombre(apres) is None:
+        if q["type"] == "integer" and apres and en_nombre(apres) is None:
             raise ValueError("Cette question attend un nombre.")
         courant = appliquer(projet, brut, exclure=False)
         ligne = courant[courant["_id"].astype(str) == ident]
@@ -388,11 +389,17 @@ def xlsx(chemin, projet):
 SEUIL_COMPLETUDE = 80   # % des questions attendues : en dessous, le questionnaire est signalé comme incomplet
 
 
-def _nombre(x):
-    try:
-        return float(str(x).replace(",", ".").replace(" ", "").replace(" ", ""))
-    except ValueError:
-        return None
+def bornes(nums):
+    """Bornes au-delà desquelles une valeur est très éloignée des autres : 3 écarts interquartiles. Pour des montants
+    positifs très étalés (revenus, chiffres d'affaires), l'écart se mesure en ordre de grandeur (échelle logarithmique),
+    sans quoi les valeurs élevées mais plausibles seraient toutes signalées."""
+    nums = sorted(nums)
+    q1, q3 = nums[len(nums) // 4], nums[(3 * len(nums)) // 4]
+    if nums[0] > 0 and q1 > 0 and q3 / q1 >= 2:
+        l1, l3 = math.log(q1), math.log(q3)
+        return math.exp(l1 - 3 * (l3 - l1)), math.exp(l3 + 3 * (l3 - l1))
+    ecart = (q3 - q1) or max(abs(q3), 1) * 0.5
+    return q1 - 3 * ecart, q3 + 3 * ecart
 
 
 def _base_controle(projet):
@@ -440,13 +447,12 @@ def controles(projet):
     for q in qs:
         var = q["var"]
         if q["type"] == "integer":
-            valeurs = [(l, _nombre(l.get(var, ""))) for l in lignes if str(l.get(var, "")).strip()]
+            valeurs = [(l, en_nombre(l.get(var, ""))) for l in lignes if str(l.get(var, "")).strip()]
             nums = sorted(v for _, v in valeurs if v is not None)
             bas = haut = None
             if len(nums) >= 8:
+                bas, haut = bornes(nums)
                 q1, q3 = nums[len(nums) // 4], nums[(3 * len(nums)) // 4]
-                ecart = (q3 - q1) or max(abs(q3), 1) * 0.5
-                bas, haut = q1 - 3 * ecart, q3 + 3 * ecart
             for l, v in valeurs:
                 if (l["_id"], var) in confirmees:
                     continue

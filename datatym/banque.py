@@ -165,7 +165,7 @@ TYPES = {
     },
     "numerique": {
         "libelle": "Valeur numérique",
-        "calcul": "Moyenne et médiane des valeurs déclarées, après exclusion des valeurs aberrantes (au-delà de 3 écarts interquartiles).",
+        "calcul": "Médiane (valeur de référence, peu sensible aux valeurs extrêmes) et moyenne des valeurs déclarées, après apurement : les valeurs aberrantes sont corrigées, mises en manquant ou confirmées.",
         "secondes": 15,
     },
     "indice": {

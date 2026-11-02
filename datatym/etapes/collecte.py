@@ -373,6 +373,9 @@ def simuler(projet, quest, ech, taux=1.0, graine=7):
                                 l[var] = " ".join(sorted(choix))
                                 if "autre" in choix:
                                     l[f"{var}_autre"] = "Autre réponse"
+                        elif q["type"] == "integer":
+                            # distribution étalée vers le haut (effectifs, montants) et 1 % de saisies extrêmes à repérer à l'apurement
+                            l[var] = str(int(rnd.lognormvariate(4, 0.8) * (100 if rnd.random() < 0.01 else 1)))
                         elif q["type"] == "text":
                             l[var] = "" if rnd.random() < 0.7 else "Remarque libre du répondant."
                         elif q["type"] == "email":
@@ -601,6 +604,7 @@ def indicateurs(projet, filtre=""):
         res.append({"id": ind["id"], "libelle": ind["libelle"], "type": ind["type"], "bloc": ind.get("bloc", ""),
                     "num": q["num"], "question": q["texte"], "condition": q.get("condition", ""), "n": g.get("n", 0),
                     "solde": g.get("solde"), "moyenne": g.get("moyenne"),
+                    **({k: g.get(k) for k in ("mediane", "q1", "q3", "min", "max")} if ind["type"] == "numerique" else {}),
                     "modalites": [{"code": m["code"], "label": m["label"], "pct": pct.get(m["code"], 0)} for m in q["modalites"]
                                   if m["code"] != "autre_hors"]})
     # indice composite : moyenne des soldes de ses composantes ramenée sur 0–100 (comme le rapport)

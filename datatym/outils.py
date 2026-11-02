@@ -85,6 +85,15 @@ def nombre(x, dec=0):
     return s
 
 
+def en_nombre(x):
+    """Nombre saisi dans un questionnaire (« 1 500 », « 2,5 ») ; None si la saisie n'est pas un nombre."""
+    t = str(x if x is not None else "").replace(" ", "").replace(" ", "").replace(" ", "").replace(",", ".")
+    try:
+        return float(t) if t else None
+    except ValueError:
+        return None
+
+
 def pct(x, dec=0):
     return "–" if x is None else f"{nombre(x, dec)} %"
 

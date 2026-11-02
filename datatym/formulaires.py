@@ -195,6 +195,9 @@ def xlsform(chemin, projet, quest, cadrage=None, enqueteurs=None):
             messages.append("Adresse e-mail invalide.")
         else:
             type_ = q["type"]
+        if q["type"] == "integer":
+            contraintes.append(". >= 0")
+            messages.append("Saisir un nombre positif, en chiffres.")
         if q["type"] == "select_multiple":
             if q.get("max_choix"):
                 contraintes.append(f"count-selected(.) <= {q['max_choix']}")
@@ -274,6 +277,8 @@ def questionpro(chemin, quest):
             entete = f"{q['num']}. {q['texte']}"
             if q["type"] == "select_multiple":
                 entete += f" (plusieurs réponses possibles, {q.get('max_choix', 3)} maximum)"
+            elif q["type"] == "integer":
+                entete += " (réponse en chiffres)"
             lignes.append(entete)
             for m in q.get("modalites", []):
                 lignes.append(m["label"])
