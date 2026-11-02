@@ -203,6 +203,9 @@ def construire_docs(projet, data, cadrage, quest, ech):
             liste([
                 f"**Logiciel :** traitement et analyse sous {data.get('logiciel', 'Python (VS Code)')} ; scripts reproductibles d'une édition à l'autre.",
                 "**Nettoyage :** suppression des doublons, des refus et des hors-cible ; application des règles de contrôle qualité.",
+                "**Contrôles :** valeurs inhabituelles (nombres très éloignés des autres réponses, codes hors des modalités), réponses données "
+                "à une question qui ne concernait pas le répondant, questions obligatoires restées vides et questionnaires renseignés à moins "
+                "de 80 % ; les valeurs manquantes ne sont pas remplacées : chaque indicateur est calculé sur les répondants renseignés.",
                 "**Apurement :** chaque correction (valeur modifiée, réponse écartée) est tracée dans un journal avec son motif ; les réponses "
                 "« Autre (préciser) » sont recodées dans les modalités existantes lorsqu'elles y correspondent ; la base finale est ensuite "
                 "figée et datée, et c'est sur elle que portent le rapport et la restitution.",

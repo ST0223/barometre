@@ -1,4 +1,5 @@
-"""Apurement des données : corrections tracées, recodage des « Autre (préciser) », doublons, base finale figée.
+"""Apurement des données : corrections tracées, recodage des « Autre (préciser) », doublons, contrôles (valeurs
+inhabituelles, incohérences entre questions, valeurs manquantes, questionnaires incomplets), base finale figée.
 
 Les corrections ne touchent jamais la base des soumissions (donnees/collecte.csv) : elles sont rejouées à chaque lecture,
 dans l'ordre du journal. La base figée (donnees/base_finale.csv) est celle du rapport et de la restitution ; le suivi
@@ -13,7 +14,7 @@ from openpyxl import Workbook
 
 from .config import auteur_fichiers
 from .formulaires import _feuille
-from .outils import date_fr
+from .outils import date_fr, nombre
 from .store import dossier, maintenant
 
 AUTRES = ("autre", "autre_hors")   # modalités « Autre (préciser) » et « Autre fonction » (hors cible)
@@ -60,7 +61,7 @@ def appliquer(projet, df, exclure=True, recoder=True):
         if ecartees:
             df, ids = df[~ids.isin(ecartees)], ids[~ids.isin(ecartees)]
     for c in corrections:
-        if c["var"] != EXCLURE:
+        if c["var"] != EXCLURE and c.get("type") != "confirmation":
             if c["var"] not in df:
                 df[c["var"]] = ""
             df.loc[ids == c["id"], c["var"]] = c["apres"]
@@ -211,6 +212,8 @@ def corriger(projet, ident, var, valeur, motif):
             inconnus = [c for c in apres.split() if c not in codes]
             if inconnus or (q["type"] == "select_one" and len(apres.split()) > 1):
                 raise ValueError("Valeur hors des modalités de la question.")
+        if q["type"] == "integer" and apres and _nombre(apres) is None:
+            raise ValueError("Cette question attend un nombre.")
         courant = appliquer(projet, brut, exclure=False)
         ligne = courant[courant["_id"].astype(str) == ident]
         avant = str(ligne.iloc[0].get(var, "")) if len(ligne) else ""
@@ -219,6 +222,34 @@ def corriger(projet, ident, var, valeur, motif):
     journal = donnees(projet)["corrections"]
     c = {"n": max((x["n"] for x in journal), default=0) + 1, "date": maintenant(), "type": "exclusion" if var == EXCLURE else "correction",
          "id": ident, "var": var, "avant": avant, "apres": apres, "motif": motif[:300]}
+    journal.append(c)
+    return c
+
+
+def corriger_lot(projet, ids, var, valeur, motif):
+    """Même correction sur plusieurs réponses (ex. vider une question qui ne concernait pas ces répondants)."""
+    faites = []
+    for ident in ids:
+        try:
+            faites.append(corriger(projet, ident, var, valeur, motif))
+        except ValueError:
+            continue  # déjà corrigée ou écartée entre-temps
+    if not faites:
+        raise ValueError("Aucune réponse à corriger.")
+    return faites
+
+
+def confirmer(projet, ident, var, motif):
+    """Valeur signalée comme aberrante mais vérifiée et juste : elle reste telle quelle et n'est plus signalée."""
+    from .etapes import collecte
+    df = collecte.lire(projet)
+    ligne = df[df["_id"].astype(str) == str(ident)] if df is not None else None
+    if ligne is None or ligne.empty:
+        raise ValueError(f"Aucune réponse avec l'identifiant « {ident} ».")
+    v = str(ligne.iloc[0].get(var, ""))
+    journal = donnees(projet)["corrections"]
+    c = {"n": max((x["n"] for x in journal), default=0) + 1, "date": maintenant(), "type": "confirmation",
+         "id": str(ident), "var": var, "avant": v, "apres": v, "motif": str(motif or "Valeur vérifiée et confirmée")[:300]}
     journal.append(c)
     return c
 
@@ -247,7 +278,7 @@ def figer(projet):
     valides = len(collecte.valides(df, _quest(projet))) if controle else int(cons.sum())
     a["figee"] = {"date": maintenant(), "version": len(a.get("gels") or []) + 1,
                   "brut": len(brut), "lignes": len(df), "valides": valides,
-                  "corrections": len([c for c in actives(projet) if c["var"] != EXCLURE]),
+                  "corrections": len([c for c in actives(projet) if c.get("type") == "correction"]),
                   "exclusions": len([c for c in actives(projet) if c["var"] == EXCLURE]),
                   "recodages": sum(1 for t in a["recodages"].values() for v in t.values() if v and v != GARDER)}
     a.setdefault("gels", []).append(dict(a["figee"]))
@@ -266,7 +297,7 @@ def synthese(projet):
     a = ((projet["etapes"]["collecte"].get("data") or {}).get("apurement")) or {}
     act = [c for c in a.get("corrections") or [] if not c.get("annulee")]
     fig = a.get("figee")
-    res = {"corrections": sum(c["var"] != EXCLURE for c in act), "exclusions": sum(c["var"] == EXCLURE for c in act),
+    res = {"corrections": sum(c.get("type") == "correction" for c in act), "exclusions": sum(c["var"] == EXCLURE for c in act),
            "recodages": sum(1 for t in (a.get("recodages") or {}).values() for v in t.values() if v and v != GARDER), "figee": fig}
     if fig:
         brut = _base_brute(projet)
@@ -318,7 +349,8 @@ def xlsx(chemin, projet):
     fig = a.get("figee")
     _feuille(ws, ["Élément", "Valeur"], [
         ["Soumissions reçues", len(base)], *[[f"Écartées : {k.lower()}" if k != "Valide" else "Réponses valides", int(v)] for k, v in compte.items()],
-        ["Corrections de valeurs", sum(c["var"] != EXCLURE for c in actives(projet))],
+        ["Corrections de valeurs", sum(c.get("type") == "correction" for c in actives(projet))],
+        ["Valeurs inhabituelles confirmées", sum(c.get("type") == "confirmation" for c in actives(projet))],
         ["Réponses « Autre » recodées (textes distincts)", sum(1 for t in a["recodages"].values() for v in t.values() if v and v != GARDER)],
         ["Base finale", f"figée le {date_fr(date.fromisoformat(fig['date'][:10]))} (version {fig['version']})" if fig else "non figée : données du moment"],
     ], {"Élément": 48, "Valeur": 34})
@@ -327,7 +359,7 @@ def xlsx(chemin, projet):
     _feuille(ws, cols, base[cols].astype(str).values.tolist())
     ws = wb.create_sheet("Journal des corrections")
     _feuille(ws, ["N°", "Date", "Type", "ID réponse", "Variable", "Question", "Avant", "Après", "Motif", "Annulée le"], [
-        [c["n"], c["date"].replace("T", " ")[:16], "Réponse écartée" if c["var"] == EXCLURE else "Correction", c["id"],
+        [c["n"], c["date"].replace("T", " ")[:16], {"exclusion": "Réponse écartée", "confirmation": "Valeur confirmée"}.get(c.get("type"), "Correction"), c["id"],
          "" if c["var"] == EXCLURE else c["var"], lib_var.get(c["var"], ""), c["avant"], c["apres"], c["motif"],
          (c.get("annulee") or "").replace("T", " ")[:16]] for c in a["corrections"]], {"Question": 50, "Motif": 45})
     ws = wb.create_sheet("Recodages Autre")
@@ -338,6 +370,139 @@ def xlsx(chemin, projet):
             lignes.append([f"{q['num']}. {q['question']}", it["texte"], it["n"],
                            "à traiter" if not it["code"] else ("laissée en « Autre »" if it["code"] == GARDER else mods.get(it["code"], it["code"]))])
     _feuille(ws, ["Question", "Texte saisi", "Occurrences", "Recodé en"], lignes, {"Question": 55, "Texte saisi": 40, "Recodé en": 30})
+    ct = controles(projet)
+    ws = wb.create_sheet("Contrôles")
+    lignes = [["Valeur inhabituelle", f"{x['num']}. {x['question']}", x["id"], x["collecteur"], x["valeur"], x["motif"]] for x in ct["aberrantes"]]
+    lignes += [["Incohérence", f"{x['num']}. {x['question']}", r["id"], r["collecteur"], "", x["motif"]] for x in ct["incoherences"] for r in x["reponses"]]
+    lignes += [["Valeur manquante", f"{x['num']}. {x['question']}", r["id"], r["collecteur"], "", f"Question obligatoire restée vide ({x['taux']} % de remplissage)"]
+               for x in ct["manquants"] for r in x["reponses"]]
+    lignes += [["Questionnaire incomplet", "", x["id"], x["collecteur"], f"{x['taux']} %", f"{x['vides']} question(s) vide(s) sur {x['attendues']}"] for x in ct["incomplets"]]
+    lignes += [["Écart de structure", f"{x['num']}. {x['question']}", "", "", "", x["motif"]] for x in ct["structure"]]
+    _feuille(ws, ["Contrôle", "Question", "ID réponse", "Enquêteur", "Valeur", "Constat"], lignes, {"Question": 55, "Constat": 60})
     wb.properties.creator = wb.properties.lastModifiedBy = auteur_fichiers()
     wb.save(chemin)
     return chemin
+
+
+# ------------------------------------------------------------------ contrôles : aberrantes, incohérences, manquants
+SEUIL_COMPLETUDE = 80   # % des questions attendues : en dessous, le questionnaire est signalé comme incomplet
+
+
+def _nombre(x):
+    try:
+        return float(str(x).replace(",", ".").replace(" ", "").replace(" ", ""))
+    except ValueError:
+        return None
+
+
+def _base_controle(projet):
+    """Réponses comptées dans les résultats : valides si le contrôle qualité est actif, sinon toutes celles avec consentement."""
+    from .etapes import collecte
+    df = collecte.lire(projet)
+    if df is None or df.empty:
+        return None
+    cons = df.get("consentement", pd.Series(["oui"] * len(df), index=df.index)).astype(str).str.lower().isin(["oui", "1", "yes"])
+    return collecte.valides(df, _quest(projet)) if projet["etapes"]["collecte"]["data"].get("controle_qualite", True) else df[cons]
+
+
+def _concernee(q, ligne, par_id, v_prof):
+    """La question devait-elle être posée à ce répondant (profil, conditions d'affichage) ?"""
+    from .etapes.collecte import condition_remplie
+    if q.get("profils") and str(ligne.get(v_prof, "")) not in q["profils"]:
+        return False
+    if q.get("conditions") and not condition_remplie(q, ligne, par_id):
+        return False
+    if q.get("condition_sur"):
+        cible = par_id.get(q["condition_sur"][0])
+        if cible and str(ligne.get(cible["var"], "")) != str(q["condition_sur"][1]):
+            return False
+    return True
+
+
+def controles(projet):
+    """Valeurs aberrantes (nombres hors norme, codes inconnus), réponses données à une question qui ne concernait pas
+    le répondant, questions obligatoires restées vides, questionnaires trop incomplets."""
+    from .etapes import collecte
+    df = _base_controle(projet)
+    vide = {"aberrantes": [], "incoherences": [], "manquants": [], "incomplets": [], "structure": [], "n": 0, "seuil": SEUIL_COMPLETUDE}
+    if df is None or df.empty:
+        return vide
+    quest = _quest(projet)
+    qs = [q for q in quest.get("questions_plates") or [] if q["var"] in df and q["type"] != "note"]
+    par_id = {q["id"]: q for q in quest.get("questions_plates") or []}
+    v_enq, _, v_prof = collecte.variables_cles(quest)
+    col_enq = "enqueteur" if "enqueteur" in df else v_enq
+    confirmees = {(c["id"], c["var"]) for c in actives(projet) if c.get("type") == "confirmation"}
+    lignes = df.astype(str).to_dict("records")
+    info = lambda l: {"id": l["_id"], "collecteur": l.get(col_enq, "") or ""}  # noqa: E731
+
+    aberrantes = []
+    for q in qs:
+        var = q["var"]
+        if q["type"] == "integer":
+            valeurs = [(l, _nombre(l.get(var, ""))) for l in lignes if str(l.get(var, "")).strip()]
+            nums = sorted(v for _, v in valeurs if v is not None)
+            bas = haut = None
+            if len(nums) >= 8:
+                q1, q3 = nums[len(nums) // 4], nums[(3 * len(nums)) // 4]
+                ecart = (q3 - q1) or max(abs(q3), 1) * 0.5
+                bas, haut = q1 - 3 * ecart, q3 + 3 * ecart
+            for l, v in valeurs:
+                if (l["_id"], var) in confirmees:
+                    continue
+                motif = ("Valeur non numérique" if v is None else "Valeur négative" if v < 0 else
+                         f"Très éloignée des autres réponses (habituellement entre {nombre(max(q1, 0), 0)} et {nombre(q3, 0)})"
+                         if bas is not None and not bas <= v <= haut else "")
+                if motif:
+                    aberrantes.append({**info(l), "var": var, "num": q["num"], "question": q["texte"], "valeur": l[var], "motif": motif})
+        elif q["type"] in ("select_one", "select_multiple") and q.get("modalites") and q["id"] != "id_enqueteur":
+            codes = {m["code"] for m in q["modalites"]}
+            for l in lignes:
+                jetons = str(l.get(var, "")).split()
+                inconnus = [j for j in jetons if j not in codes]
+                if (inconnus or (q["type"] == "select_one" and len(jetons) > 1)) and (l["_id"], var) not in confirmees:
+                    aberrantes.append({**info(l), "var": var, "num": q["num"], "question": q["texte"], "valeur": l[var],
+                                       "motif": "Code hors des modalités de la question" if inconnus else "Plusieurs réponses à une question à choix unique"})
+
+    # écarts de structure : question jamais renseignée, ou renseignée par la plupart des répondants qu'elle ne concernait pas ;
+    # le formulaire de collecte diffère alors du questionnaire de la plateforme (à réaligner), pas une erreur de saisie
+    incoherences, manquants, structure = [], [], []
+    attendues, remplies = {l["_id"]: 0 for l in lignes}, {l["_id"]: 0 for l in lignes}
+    for q in qs:
+        if q["id"] in ("id_enqueteur",):
+            continue
+        hors, vides, comptees = [], [], []
+        for l in lignes:
+            rempli = bool(str(l.get(q["var"], "")).strip())
+            if _concernee(q, l, par_id, v_prof):
+                if q.get("obligatoire", True) and q["type"] not in ("text", "email"):
+                    comptees.append((l["_id"], rempli))
+                    if not rempli:
+                        vides.append(info(l))
+            elif rempli:
+                hors.append(info(l))
+        att = len(comptees)
+        base_q = {"var": q["var"], "num": q["num"], "question": q["texte"]}
+        if att and len(vides) == att:
+            structure.append({**base_q, "motif": f"Jamais renseignée ({att} répondants concernés) : absente du formulaire de collecte ?"})
+            continue
+        if hors and len(hors) >= 0.5 * len(lignes):
+            structure.append({**base_q, "motif": f"Renseignée par {len(hors)} répondants qu'elle ne concernait pas : condition d'affichage différente dans le formulaire de collecte ?"})
+        elif hors:
+            incoherences.append({**base_q, "reponses": hors,
+                                 "motif": "Réponse donnée alors que la question ne concernait pas le répondant (profil ou condition d'affichage)"})
+        for ident, rempli in comptees:
+            attendues[ident] += 1
+            remplies[ident] += rempli
+        if vides:
+            manquants.append({**base_q, "attendues": att, "vides": len(vides), "taux": round(100 * (att - len(vides)) / att, 1), "reponses": vides})
+    manquants.sort(key=lambda m: -m["vides"])
+    incomplets = []
+    for l in lignes:
+        a = attendues[l["_id"]]
+        taux = 100 * remplies[l["_id"]] / a if a else 100
+        if taux < SEUIL_COMPLETUDE:
+            incomplets.append({**info(l), "taux": round(taux, 1), "vides": a - remplies[l["_id"]], "attendues": a})
+    incomplets.sort(key=lambda x: x["taux"])
+    return {"aberrantes": aberrantes[:200], "incoherences": incoherences, "manquants": manquants, "incomplets": incomplets, "structure": structure,
+            "n": len(lignes), "seuil": SEUIL_COMPLETUDE}

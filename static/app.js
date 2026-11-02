@@ -1626,6 +1626,45 @@ function editeurPretest(z, e) {
   });
 }
 
+/** Contrôles de l'apurement : chaque constat renvoie vers une action tracée au journal, aucune valeur n'est inventée. */
+function blocControles(c, parVar) {
+  if (!c || !c.n) return "";
+  const ids = (l) => l.map((r) => `<span class="tag" title="${esc(r.collecteur)}">${esc(r.id)}</span>`).join(" ");
+  const replie = (l, n = 8) => (l.length <= n ? ids(l) : `${ids(l.slice(0, n))} <details style="display:inline"><summary class="aide" style="display:inline;cursor:pointer">et ${l.length - n} autre(s)</summary>${ids(l.slice(n))}</details>`);
+  const total = c.aberrantes.length + c.incoherences.reduce((s, x) => s + x.reponses.length, 0) + c.manquants.reduce((s, x) => s + x.vides, 0) + c.incomplets.length;
+  return `
+    <div class="lib" style="margin:8px 0 6px">Contrôles des réponses ${total ? `<span class="tag" style="color:var(--ambre)">${total} constat(s)</span>` : `<span class="tag" style="color:var(--vert)">aucun constat</span>`}</div>
+    <div class="aide" style="margin-bottom:10px;font-size:12.5px">Sur les ${c.n} réponses comptées dans les résultats. Aucune valeur n'est inventée : une valeur manquante reste manquante (l'indicateur se calcule sur les répondants renseignés) ; relancez l'enquêteur si la réponse peut être retrouvée.</div>
+    ${c.structure.length ? `<div class="bandeau alerte">${ico("alert")}<div><b>${c.structure.length} question(s) ne correspondent pas au formulaire de collecte</b> : ce n'est pas une erreur de saisie mais un écart entre le questionnaire de la plateforme et l'outil (question absente ou filtre différent). Réalignez le questionnaire ; ces questions ne sont pas comptées dans les contrôles ci-dessous.
+      <details style="margin-top:6px"><summary style="cursor:pointer">Voir les questions</summary>${c.structure.map((x) => `<div style="margin-top:3px"><b>${esc(x.num)}</b> ${esc(x.question.length > 70 ? x.question.slice(0, 68) + "…" : x.question)} — <span class="aide">${esc(x.motif)}</span></div>`).join("")}</details></div></div>` : ""}
+
+    <div style="font-weight:600;font-size:13px;margin:10px 0 6px">Valeurs inhabituelles (${c.aberrantes.length})</div>
+    ${c.aberrantes.length ? `<div class="grille-tab" style="margin-bottom:14px"><table><thead><tr><th>Réponse</th><th>Question</th><th>Valeur</th><th>Constat</th><th></th></tr></thead><tbody>
+      ${c.aberrantes.map((x) => `<tr><td><b>${esc(x.id)}</b><div class="aide" style="font-size:11.5px">${esc(x.collecteur)}</div></td><td>${esc(x.num)}</td><td><b>${esc(x.valeur)}</b></td><td>${esc(x.motif)}</td>
+        <td style="white-space:nowrap"><button class="btn btn-petit" data-ab-corr="${esc(x.var)}" data-id="${esc(x.id)}">Corriger</button>
+        <button class="btn btn-petit" data-ab-vide="${esc(x.var)}" data-id="${esc(x.id)}">Mettre en manquant</button>
+        <button class="btn btn-petit" data-ab-ok="${esc(x.var)}" data-id="${esc(x.id)}">Confirmer</button></td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="aide" style="margin-bottom:14px">Aucune : nombres dans la norme, codes conformes aux modalités.</div>`}
+
+    <div style="font-weight:600;font-size:13px;margin:10px 0 6px">Incohérences entre questions (${c.incoherences.reduce((s, x) => s + x.reponses.length, 0)})</div>
+    ${c.incoherences.length ? `<div class="grille-tab" style="margin-bottom:14px"><table><thead><tr><th>Question</th><th>Constat</th><th>Réponses</th><th></th></tr></thead><tbody>
+      ${c.incoherences.map((x) => `<tr><td><b>${esc(x.num)}</b></td><td>${esc(x.motif)}</td><td>${replie(x.reponses)}</td>
+        <td><button class="btn btn-petit" data-inc-vider="${esc(x.var)}" data-num="${esc(x.num)}" data-ids="${esc(x.reponses.map((r) => r.id).join(","))}">Retirer ces réponses</button></td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="aide" style="margin-bottom:14px">Aucune : chaque réponse respecte les filtres de profil et les conditions d'affichage.</div>`}
+
+    <div style="font-weight:600;font-size:13px;margin:10px 0 6px">Valeurs manquantes (${c.manquants.reduce((s, x) => s + x.vides, 0)})</div>
+    ${c.manquants.length ? `<div class="grille-tab" style="margin-bottom:14px"><table><thead><tr><th>Question obligatoire</th><th>Vides</th><th>Remplissage</th><th>Réponses concernées</th><th></th></tr></thead><tbody>
+      ${c.manquants.map((x) => `<tr><td><b>${esc(x.num)}</b> ${esc(x.question.length > 60 ? x.question.slice(0, 58) + "…" : x.question)}</td><td>${x.vides} / ${x.attendues}</td><td>${nf(x.taux, 0)} %</td><td>${replie(x.reponses, 6)}</td>
+        <td>${x.vides === 1 ? `<button class="btn btn-petit" data-ab-corr="${esc(x.var)}" data-id="${esc(x.reponses[0].id)}">Renseigner</button>` : ""}</td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="aide" style="margin-bottom:14px">Aucune : toutes les questions obligatoires sont renseignées.</div>`}
+
+    <div style="font-weight:600;font-size:13px;margin:10px 0 6px">Questionnaires incomplets (${c.incomplets.length})</div>
+    ${c.incomplets.length ? `<div class="grille-tab" style="margin-bottom:18px"><table><thead><tr><th>Réponse</th><th>Enquêteur</th><th>Questions renseignées</th><th></th></tr></thead><tbody>
+      ${c.incomplets.map((x) => `<tr><td><b>${esc(x.id)}</b></td><td>${esc(x.collecteur)}</td><td>${nf(x.taux, 0)} % <span class="aide" style="font-size:11.5px">(${x.vides} vide(s) sur ${x.attendues})</span></td>
+        <td><button class="btn btn-petit" data-ecarter-inc="${esc(x.id)}" data-taux="${nf(x.taux, 0)}">${ico("trash")} Écarter</button></td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="aide" style="margin-bottom:18px">Aucun : chaque questionnaire compté renseigne au moins ${c.seuil} % des questions qui le concernent.</div>`}`;
+}
+
 /** Apurement : recodage des « Autre », doublons, corrections tracées, base finale figée pour le rapport. */
 async function ongletApurement(z, e) {
   const p = S.projet;
@@ -1688,7 +1727,9 @@ async function ongletApurement(z, e) {
         <button class="btn btn-petit" data-ecarter="${esc(r.id)}" data-motif="${esc(`Doublon (${g.motif.toLowerCase()})`)}">${ico("trash")} Écarter</button></div>`).join("")}</td></tr>`).join("")}
     </tbody></table></div>` : `<div class="aide" style="margin-bottom:18px">Aucun doublon détecté (même téléphone, même entreprise et même fonction, ou réponses identiques).</div>`}
 
-    <div class="lib" style="margin:8px 0 6px">Corriger ou écarter une réponse</div>
+    ${blocControles(d.controles, parVar)}
+
+    <div class="lib" style="margin:8px 0 6px" id="apu-form">Corriger ou écarter une réponse</div>
     <div class="grille-3" style="margin-bottom:8px;align-items:end">
       <div class="champ"><label>Identifiant de la réponse</label><input class="saisie" id="apu-id" placeholder="Ex. 889299834"></div>
       <div class="champ"><label>Action</label><select class="saisie" id="apu-type"><option value="corriger">Corriger une valeur</option><option value="_exclure">Écarter la réponse</option></select></div>
@@ -1701,7 +1742,7 @@ async function ongletApurement(z, e) {
     <div class="lib" style="margin-bottom:6px">Journal des corrections</div>
     ${d.journal.length ? `<div class="grille-tab"><table><thead><tr><th>N°</th><th>Date</th><th>Réponse</th><th>Modification</th><th>Motif</th><th></th></tr></thead><tbody>
       ${[...d.journal].reverse().map((c) => `<tr${c.annulee ? ' style="opacity:.55;text-decoration:line-through"' : ""}><td>${c.n}</td><td style="white-space:nowrap">${heureFr(c.date)}</td><td><b>${esc(c.id)}</b></td>
-        <td>${c.type === "exclusion" ? "Réponse écartée" : `${esc((parVar[c.var] || {}).num || c.var)} : ${esc(libVal(c.var, c.avant))} → <b>${esc(libVal(c.var, c.apres))}</b>`}</td>
+        <td>${c.type === "exclusion" ? "Réponse écartée" : c.type === "confirmation" ? `${esc((parVar[c.var] || {}).num || c.var)} : ${esc(libVal(c.var, c.apres))} confirmée` : `${esc((parVar[c.var] || {}).num || c.var)} : ${esc(libVal(c.var, c.avant))} → <b>${esc(libVal(c.var, c.apres))}</b>`}</td>
         <td>${esc(c.motif)}</td><td>${c.annulee ? `<span class="aide" style="font-size:11.5px">annulée</span>` : `<button class="btn btn-petit" data-annuler="${c.n}">Annuler</button>`}</td></tr>`).join("")}
     </tbody></table></div>` : `<div class="aide">Aucune correction pour l'instant.</div>`}`;
 
@@ -1730,6 +1771,25 @@ async function ongletApurement(z, e) {
   z.querySelectorAll("[data-ecarter]").forEach((b) => (b.onclick = async () => {
     if (!(await confirmer("Écarter cette réponse ?", `La réponse ${b.dataset.ecarter} sera retirée de la base (résultats et paie). L'opération reste annulable depuis le journal.`, "Écarter", "btn-danger"))) return;
     action("corriger", { id: b.dataset.ecarter, var: "_exclure", motif: b.dataset.motif }, "Réponse écartée.");
+  }));
+  // contrôles : préremplir le formulaire, vider, confirmer, écarter
+  const preremplir = (id, v) => {
+    $("#apu-type").value = "corriger"; $("#apu-type").onchange();
+    $("#apu-id").value = id; $("#apu-var").value = v; champValeur();
+    $("#apu-form").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#apu-motif").focus();
+  };
+  z.querySelectorAll("[data-ab-corr]").forEach((b) => (b.onclick = () => preremplir(b.dataset.id, b.dataset.abCorr)));
+  z.querySelectorAll("[data-ab-vide]").forEach((b) => (b.onclick = () => action("corriger", { id: b.dataset.id, var: b.dataset.abVide, valeur: "", motif: "Valeur aberrante mise en manquant" }, "Valeur mise en manquant.")));
+  z.querySelectorAll("[data-ab-ok]").forEach((b) => (b.onclick = () => action("confirmer", { id: b.dataset.id, var: b.dataset.abOk, motif: "Valeur inhabituelle vérifiée et confirmée" }, "Valeur confirmée : elle n'est plus signalée.")));
+  z.querySelectorAll("[data-inc-vider]").forEach((b) => (b.onclick = async () => {
+    const ids = b.dataset.ids.split(",");
+    if (!(await confirmer("Retirer ces réponses hors filtre ?", `${ids.length} réponse(s) à la question ${b.dataset.num} seront vidées : la question ne concernait pas ces répondants. L'opération reste annulable depuis le journal.`, "Retirer", "btn-primaire"))) return;
+    action("corriger_lot", { ids, var: b.dataset.incVider, valeur: "", motif: "Réponse donnée hors du filtre de la question" }, "Réponses hors filtre retirées.");
+  }));
+  z.querySelectorAll("[data-ecarter-inc]").forEach((b) => (b.onclick = async () => {
+    if (!(await confirmer("Écarter ce questionnaire incomplet ?", `La réponse ${b.dataset.ecarterInc} sera retirée de la base (résultats et paie). L'opération reste annulable depuis le journal.`, "Écarter", "btn-danger"))) return;
+    action("corriger", { id: b.dataset.ecarterInc, var: "_exclure", motif: `Questionnaire incomplet (${b.dataset.taux} % des questions renseignées)` }, "Questionnaire écarté.");
   }));
   z.querySelectorAll("[data-annuler]").forEach((b) => (b.onclick = () => action("annuler", { n: Number(b.dataset.annuler) }, "Correction annulée.")));
   $("#apu-figer").onclick = async (ev) => {

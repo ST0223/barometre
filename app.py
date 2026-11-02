@@ -251,19 +251,25 @@ def pretest_fichier(slug, fmt):
 def apurement_etat(slug):
     """Réponses « Autre » à recoder, doublons à vérifier, journal et état de la base finale."""
     p = _projet(slug)
-    return jsonify(propre({"autres": apurement.autres(p), "doublons": apurement.doublons(p),
+    return jsonify(propre({"autres": apurement.autres(p), "doublons": apurement.doublons(p), "controles": apurement.controles(p),
                            "journal": apurement.donnees(p)["corrections"], "synthese": apurement.synthese(p)}))
 
 
 @app.post("/api/projets/<slug>/apurement/<action>")
 def apurement_agir(slug, action):
-    """corriger · annuler · recoder · figer · defiger : chaque action est journalisée ; la base de collecte est recalculée."""
+    """corriger · corriger_lot · confirmer · annuler · recoder · figer · defiger : chaque action est journalisée ; la base de collecte est recalculée."""
     p = _projet(slug)
     c = request.get_json(silent=True) or {}
     try:
         if action == "corriger":
             x = apurement.corriger(p, c.get("id"), c.get("var"), c.get("valeur"), c.get("motif"))
             store.journaliser(p, f"Apurement : réponse {x['id']} " + ("écartée" if x["type"] == "exclusion" else f"corrigée ({x['var']})") + f" — {x['motif']}.")
+        elif action == "corriger_lot":
+            x = apurement.corriger_lot(p, c.get("ids") or [], c.get("var"), c.get("valeur"), c.get("motif"))
+            store.journaliser(p, f"Apurement : {len(x)} réponse(s) corrigée(s) ({c.get('var')}) — {c.get('motif')}.")
+        elif action == "confirmer":
+            x = apurement.confirmer(p, c.get("id"), c.get("var"), c.get("motif"))
+            store.journaliser(p, f"Apurement : valeur de {x['var']} confirmée pour la réponse {x['id']}.")
         elif action == "annuler":
             x = apurement.annuler(p, c.get("n"))
             store.journaliser(p, f"Apurement : correction n° {x['n']} annulée.")
