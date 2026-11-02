@@ -53,6 +53,9 @@ def construire_docs(projet, data, cadrage, quest, ech):
     rec = ech.get("recrutement") or {}
     poids = ech["params"].get("poids_zones") or {}
     egal = len(set(poids.values())) <= 1
+    poids_prof = ech["params"].get("poids_profils") or {}
+    egal_prof = len(set(poids_prof.values())) <= 1
+    detail = lambda d, noms=None: ", ".join(f"{(noms or {}).get(k, k)} {nombre(v, 0) if float(v).is_integer() else nombre(v, 1)}" for k, v in d.items())
     conditionnelles = [x for x in quest["questions_plates"] if x.get("conditions")]
     exclusions = [x for x in quest["questions_plates"] if x.get("exclut")]
     controle = (projet["etapes"]["collecte"].get("data") or {}).get("controle_qualite", True)
@@ -81,11 +84,17 @@ def construire_docs(projet, data, cadrage, quest, ech):
             tableau(["Élément", "Valeur"], [
                 ["Population cible", fiche["cible"]], ["Champ géographique", ", ".join(zones)],
                 ["Secteur", fiche.get("secteur") or "Secteur formel"], ["Taille de l'échantillon", f"{n} répondants"],
-                ["Répartition entre " + ("pays" if pays else "zones"), "à parts égales" if egal else "pondérée selon les poids retenus"],
+                ["Répartition entre " + ("pays" if pays else "zones"), "à parts égales" if egal else f"selon les poids retenus ({detail(poids)})"],
+                ["Répartition entre profils", "à parts égales" if egal_prof else f"selon les poids retenus ({detail(poids_prof, lib)})"],
                 ["Enquêteurs", f"{ech['nb_enqueteurs']} titulaires" + (f" et {n_res} réserves" if n_res else "")],
                 ["Productivité retenue", f"{ech['params']['rendement']} questionnaires par enquêteur et par jour"],
                 ["Taux de réalisation attendu", f"{round(float(ech['params'].get('marge', 0.9)) * 100)} % (marge pour les refus et rendez-vous manqués)"],
             ], "Paramètres d'échantillonnage", [1.3, 2.5]),
+            p(f"**Calcul des quotas :** chaque {'pays' if pays else 'zone'} et chaque profil reçoit un poids (1 par défaut). Le quota d'une case "
+              f"{'pays' if pays else 'zone'} × profil est proportionnel au produit des deux poids : un poids de 2 donne deux fois plus de "
+              "questionnaires qu'un poids de 1. Les quotas sont arrondis à l'unité par la méthode du plus fort reste, de sorte que leur "
+              f"somme est exactement égale à la taille de l'échantillon ({n}). Ces poids servent à répartir la collecte ; ils ne sont pas "
+              "appliqués aux résultats."),
             tableau([Z, "Effectif", "Marge d'erreur (IC 95 %)"],
                     [[z, str(t), fmt_marge(t)] for z, t in ech["tot_zone"].items()], f"Effectifs et précision par {Z.lower()}"),
             tableau(["Profil", "Effectif", "Marge d'erreur (IC 95 %)"],
@@ -135,6 +144,14 @@ def construire_docs(projet, data, cadrage, quest, ech):
               "au lieu de compter pour zéro."),
             tableau(["Pilier", "Poids", "Ce qui est mesuré"], [[x["nom"], f"{round(x['w'] * 100)} %", x["d"]] for x in indice_hc.PILIERS],
                     "Piliers de l'indice", [1.4, 0.5, 4], 9),
+            liste([
+                "**Score d'un pilier :** moyenne des notes de ses questions, calculée seulement si l'entreprise a répondu à au moins "
+                "la moitié d'entre elles ; sinon le pilier est considéré comme non renseigné pour cette entreprise.",
+                "**Pilier non renseigné :** l'indice est calculé sur les piliers restants, dont les poids sont ramenés à 100 % entre eux, "
+                "afin qu'une entreprise ne soit pas pénalisée par une absence de réponse.",
+                "**Pondération des piliers :** la digitalisation pèse le plus (30 %), car elle constitue le socle sans lequel l'IA ne peut "
+                "pas être intégrée aux processus.",
+            ]),
             tableau(["Niveau", "Score", "Description"],
                     [[f"{k + 1}. {nom}", f"{k * 20} à {(k + 1) * 20}", indice_hc.NIV_DESC[k]] for k, nom in enumerate(indice_hc.NIVEAUX)],
                     "Niveaux de maturité", [1.4, 0.7, 3.8], 9),
