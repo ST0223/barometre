@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import budget, equipe, formulaires, formation, paiement, rappels, store
+from . import apurement, budget, equipe, formulaires, formation, paiement, pretest, rappels, store, terrain
 from .banque import nom_court, profils_depuis_cible
 from .charte import rendre_modele
 from .etapes import cadrage, collecte, echantillonnage, methodologie, questionnaire, rapport, suivi
@@ -67,6 +67,10 @@ def vue(projet):
         obs, reco = suivi.analyser(projet, stats)
         d["auto"] = {"observations": obs, "recommandations": reco}
         s["data"] = d
+    if (_data(projet, "collecte") or {}).get("stats"):
+        v["etapes"]["collecte"]["apurement_synthese"] = apurement.synthese(projet)
+    if _data(projet, "questionnaire"):
+        v["etapes"]["questionnaire"]["pretest_synthese"] = {**pretest.synthese(projet), "conclusion_auto": pretest.conclusion_auto(projet)}
     v["ordre"] = [{"cle": c, "libelle": l} for c, l in ETAPES]
     return v
 
@@ -212,6 +216,16 @@ def exporter(projet, cle):
             formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, q, e["data"]["enqueteurs"]
                                          + [{**r, "categorie": "reserve"} for r in e["data"].get("reserves") or []])
             ajout("Liste des enquêteurs pour Kobo (équipe définitive)", formulaires.FICHIER_ENQUETEURS)
+        # documents terrain : guide et lettre toujours ; ordres de mission seulement avec la vraie équipe (liste des RH)
+        for code, affiche, fn in terrain.FICHIERS:
+            if code == "Ordres_Mission" and not e["data"].get("equipe_rh"):
+                continue
+            f = store.nom_fichier(projet, code, v, "docx")
+            try:
+                fn(out / f, projet)
+                ajout(affiche + (" (à compléter : liste des RH non importée)" if code == "Lettre_Introduction" and not e["data"].get("equipe_rh") else ""), f)
+            except Exception:  # un document terrain manquant ne bloque pas l'étape
+                logging.exception("Document terrain %s", code)
         f = store.nom_fichier(projet, "Liste_Enqueteurs_A_Renseigner", v, "xlsx")
         equipe.modele_xlsx(out / f, e["data"]["zones"], e["data"].get("besoin") or {}, e["data"].get("reserve") or {})
         ajout("Liste des enquêteurs à renseigner par les RH (jointe à la demande de recrutement)", f)
@@ -223,6 +237,12 @@ def exporter(projet, cle):
         f = store.nom_fichier(projet, "Donnees_Collecte", v, "csv")
         shutil.copy(collecte.chemin_donnees(projet), out / f)
         ajout("Base des soumissions (CSV)", f)
+        f = store.nom_fichier(projet, "Base_Apuree", v, "xlsx")
+        try:
+            if apurement.xlsx(out / f, projet):
+                ajout("Base apurée, journal des corrections et recodages (Excel)", f)
+        except Exception:  # fichier de traçabilité : son échec ne bloque pas la collecte
+            logging.exception("Base apurée")
     e["fichiers"] = fichiers
     nettoyer_livrables(projet)
     return fichiers
@@ -402,6 +422,15 @@ def rouvrir(projet, cle):
     return projet
 
 
+def marquer_rapport(projet):
+    """Base finale figée ou défigée : le rapport déjà produit est à refaire sur la nouvelle base."""
+    e = projet["etapes"]["rapport"]
+    if e["statut"] in ("valide", "brouillon"):
+        if e["statut"] == "valide":
+            e["version"] += 1
+        e["statut"] = "obsolete"
+
+
 def _marquer_aval(projet, cle):
     for c in suivantes(cle):
         e = projet["etapes"][c]
@@ -498,6 +527,8 @@ def historique_texte(projet, archives=()):
     lignes += ["PILOTAGE (dossier 4_Pilotage)", "  - Déroulement de l'étude présenté au dirigeant (Word, PowerPoint)"]
     if (_data(projet, "collecte") or {}).get("rappels"):
         lignes.append("  - Fiche des rappels de contrôle et leurs résultats (Excel)")
+    if (projet.get("pretest") or {}).get("entretiens"):
+        lignes.append("  - Rapport de pré-test du questionnaire (Word)")
     lignes.append("")
     if archives:
         lignes.append("VERSIONS VALIDÉES ARCHIVÉES")
@@ -529,6 +560,8 @@ def boucler(projet):
             pilotage = [(nom("Deroulement_Etude", ext), fn) for ext, fn in (("docx", deroulement.docx), ("pptx", deroulement.pptx))]
             if (_data(projet, "collecte") or {}).get("rappels"):
                 pilotage.append((nom("Fiche_Rappels", "xlsx"), rappels.xlsx))
+            if (projet.get("pretest") or {}).get("entretiens"):
+                pilotage.append((nom("Rapport_Pretest", "docx"), pretest.docx))
             for nom_f, fn in pilotage:
                 try:
                     fn(Path(tmp) / nom_f, projet)

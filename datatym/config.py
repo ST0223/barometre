@@ -35,6 +35,8 @@ PARAMS_DEFAUT = {
     "contact_recrutement": "https://www.intowork.co/offres",
     # adresse à laquelle les RH retournent la liste des enquêteurs retenus (demande de recrutement)
     "mail_rh": "",
+    # contact donné aux répondants (lettre d'introduction, guide de l'enquêteur) pour vérifier l'identité d'un enquêteur
+    "contact_enquete": "",
     # auteur inscrit dans les métadonnées des fichiers produits (Word, Excel, PowerPoint)
     "auteur_fichiers": "DATATYM",
     # jetons des plateformes de collecte, conservés sur ce poste uniquement (parametres.json est exclu de Git)

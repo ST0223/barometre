@@ -3,7 +3,7 @@ import math
 import re
 from datetime import date
 
-from .. import deroulement, indice_hc
+from .. import deroulement, indice_hc, pretest
 from ..banque import TYPES, du_barometre, sont_des_pays
 from ..charte import liste, p, section, tableau
 from ..outils import aujourdhui, date_fr, fmt_marge, nombre
@@ -129,7 +129,7 @@ def construire_docs(projet, data, cadrage, quest, ech):
                 "**Formulations :** simples et directes, avec des échelles identiques d'une édition à l'autre pour permettre le suivi.",
                 "**Consentement :** message propre au baromètre, mentionnant Datatym comme responsable de l'étude et la durée estimée.",
                 "**Dictionnaire :** chaque variable est documentée (nom, libellé, type, modalités, indicateur rattaché).",
-            ]),
+            ] + ([pretest.pour_methodologie(projet)] if pretest.pour_methodologie(projet) else [])),
         ]),
         ("indicateurs", "Indicateurs et mode de calcul", [
             tableau(["Code", "Indicateur", "Questions (variables)", "Mode de calcul"], lignes_ind, "Indicateurs du baromètre", [0.5, 1.6, 1.3, 3], 8.5),
@@ -203,6 +203,9 @@ def construire_docs(projet, data, cadrage, quest, ech):
             liste([
                 f"**Logiciel :** traitement et analyse sous {data.get('logiciel', 'Python (VS Code)')} ; scripts reproductibles d'une édition à l'autre.",
                 "**Nettoyage :** suppression des doublons, des refus et des hors-cible ; application des règles de contrôle qualité.",
+                "**Apurement :** chaque correction (valeur modifiée, réponse écartée) est tracée dans un journal avec son motif ; les réponses "
+                "« Autre (préciser) » sont recodées dans les modalités existantes lorsqu'elles y correspondent ; la base finale est ensuite "
+                "figée et datée, et c'est sur elle que portent le rapport et la restitution.",
                 f"**Calcul :** indicateurs selon les modes de calcul ci-dessus, lecture globale, par profil et par {'pays' if pays else 'zone'}.",
                 "**Pondération :** aucune ; " + ("les pays ayant le même poids dans l'échantillon, le résultat d'ensemble est la moyenne des répondants "
                                                 "et non une estimation régionale." if egal and len(zones) > 1 else

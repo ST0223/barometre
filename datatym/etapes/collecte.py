@@ -50,16 +50,31 @@ def _nettoyer_colonnes(df):
     return df.loc[:, ~df.columns.duplicated()]
 
 
-def lire(projet):
+def avec_identifiants(df):
+    """Chaque soumission a un identifiant (rappels, corrections) ; un fichier importé sans colonne _id reçoit L1, L2…"""
+    if "_id" not in df:
+        df.insert(0, "_id", "")
+    vides = df["_id"].astype(str).str.strip() == ""
+    if vides.any():
+        df.loc[vides, "_id"] = [f"L{i + 1}" for i in range(len(df)) if vides.iloc[i]]
+    return df
+
+
+def lire(projet, finale=False, apurer=True):
+    """Base des réponses. finale : la base figée à l'apurement si elle existe (rapport, restitution) ;
+    apurer : corrections, réponses écartées et recodages du journal d'apurement appliqués."""
+    from .. import apurement
+    if finale and apurement.figee(projet) and apurement.chemin_finale(projet).exists():
+        return pd.read_csv(apurement.chemin_finale(projet), dtype=str, keep_default_na=False)
     f = chemin_donnees(projet)
     if not f.exists():
         return None
-    df = pd.read_csv(f, dtype=str, keep_default_na=False)
+    df = avec_identifiants(pd.read_csv(f, dtype=str, keep_default_na=False))
     # entretiens déclarés non réalisés au rappel de contrôle : retirés de la base (résultats, suivi, paie)
     faux = {r["id"] for r in (projet["etapes"]["collecte"].get("data") or {}).get("rappels") or [] if r.get("statut") == "non_realise"}
-    if faux and "_id" in df:
+    if faux:
         df = df[~df["_id"].astype(str).isin(faux)]
-    return df
+    return apurement.appliquer(projet, df) if apurer else df
 
 
 def importer_fichier(projet, chemin):
@@ -540,6 +555,8 @@ def generer(projet, precedent=None):
         data["controle_qualite"] = prec["controle_qualite"]  # enquête et centre de données : la resynchronisation en dépend
     if prec.get("rappels"):
         data["rappels"] = prec["rappels"]  # rappels de contrôle déjà tirés et leurs résultats
+    if prec.get("apurement"):
+        data["apurement"] = prec["apurement"]  # journal des corrections, recodages, base finale figée
     return data
 
 
@@ -551,7 +568,7 @@ def indicateurs(projet, filtre=""):
     from .rapport import calculer  # import tardif : rapport dépend déjà de ce module
     quest = projet["etapes"]["questionnaire"]["data"]
     cadrage = projet["etapes"]["cadrage"]["data"]
-    df = lire(projet)
+    df = lire(projet, finale=True)
     q_de = {q["indicateur"]: q for q in quest["questions_plates"] if q.get("indicateur")}
     par_id = {q["id"]: q for q in quest["questions_plates"]}
     options = {}
@@ -592,7 +609,9 @@ def indicateurs(projet, filtre=""):
         if r["type"] == "indice" and r["composantes"]:
             vals = [soldes[c] for c in r["composantes"] if soldes.get(c) is not None]
             r["valeur"] = (sum(vals) / len(vals) + 100) / 2 if vals else None
+    from .. import apurement
     return {"n": len(base), "options": options, "filtre": filtre, "controle_qualite": controle, "indicateurs": res,
+            "base_figee": (projet["etapes"]["collecte"]["data"].get("apurement") or {}).get("figee") if apurement.figee(projet) else None,
             "indice": indice_entreprises(projet, base, quest)}
 
 

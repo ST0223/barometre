@@ -72,7 +72,7 @@ def calculer(df, ind, q, groupes):
 
 
 def analyser(projet, cadrage, quest, ech):
-    brut = lire(projet)
+    brut = lire(projet, finale=True)  # base figée à l'apurement si elle existe
     if brut is None or brut.empty:
         return None
     # même base que le suivi : réponses valides si le contrôle qualité est activé, sinon toutes les réponses renseignées

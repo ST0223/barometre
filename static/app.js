@@ -44,10 +44,10 @@ const ETAPES_INFO = {
 const ORDRE = ["fiche", "cadrage", "questionnaire", "echantillonnage", "methodologie", "collecte", "suivi", "rapport", "cloture"];
 const ONGLETS = {
   cadrage: [["apercu", "Aperçu", "eye"], ["parametres", "Indicateurs", "target"], ["redaction", "Rédaction", "edit"]],
-  questionnaire: [["apercu", "Aperçu", "eye"], ["parametres", "Questions", "edit"], ["redaction", "Rédaction", "file"]],
+  questionnaire: [["apercu", "Aperçu", "eye"], ["parametres", "Questions", "edit"], ["pretest", "Pré-test", "check"], ["redaction", "Rédaction", "file"]],
   echantillonnage: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["recrutement", "Recrutement", "users"], ["redaction", "Rédaction", "edit"]],
   methodologie: [["apercu", "Aperçu", "eye"], ["parametres", "Paramètres", "settings"], ["redaction", "Rédaction", "edit"]],
-  collecte: [["tableau", "Tableau de bord", "chart"], ["indicateurs", "Indicateurs", "target"], ["rappels", "Rappels", "check"], ["import", "Données", "upload"]],
+  collecte: [["tableau", "Tableau de bord", "chart"], ["indicateurs", "Indicateurs", "target"], ["rappels", "Rappels", "check"], ["apurement", "Apurement", "base"], ["import", "Données", "upload"]],
   suivi: [["apercu", "Aperçu", "eye"], ["parametres", "Observations", "edit"], ["bilan", "Bilan financier", "coin"], ["redaction", "Rédaction", "file"]],
   rapport: [["apercu", "Aperçu", "eye"], ["redaction", "Rédaction", "edit"], ["parametres", "Paramètres", "settings"]],
 };
@@ -597,7 +597,7 @@ function panneauEtape(cle) {
   }
   const prec = ORDRE[num - 1];
   const redac = e.data && e.data.redaction;
-  const large = genere && ["parametres", "redaction", "recrutement", "tableau", "rappels"].includes(S.onglet);
+  const large = genere && ["parametres", "redaction", "recrutement", "tableau", "rappels", "apurement", "pretest"].includes(S.onglet);
   const titre = `<div style="display:flex;align-items:center;gap:10px;margin-top:3px;flex-wrap:wrap"><h2>${esc(e.libelle)}</h2><span class="statut ${st}">${STATUTS[st]}</span>
     ${redac && IA_VISIBLE ? `<span class="tag ${redac === "ia" ? "ia" : ""}">${redac === "ia" ? "Rédigé avec Claude" : "Rédaction par règles"}</span>` : ""}</div>
     ${e.valide_le && st === "valide" ? `<div class="aide" style="font-size:12px;margin-top:2px">Validée le ${heureFr(e.valide_le)}</div>` : ""}`;
@@ -741,8 +741,8 @@ function contenuOnglet(cle) {
   if (o === "apercu") return ongletApercu(z, e);
   if (o === "redaction") return ongletRedaction(z, cle, e);
   const f = {
-    cadrage: editeurIndicateurs, questionnaire: editeurQuestions, echantillonnage: o === "recrutement" ? editeurRecrutement : editeurEchantillonnage,
-    methodologie: editeurMethodo, suivi: o === "bilan" ? editeurBilan : editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : o === "indicateurs" ? ongletIndicateurs : o === "rappels" ? ongletRappels : ongletTableau,
+    cadrage: editeurIndicateurs, questionnaire: o === "pretest" ? editeurPretest : editeurQuestions, echantillonnage: o === "recrutement" ? editeurRecrutement : editeurEchantillonnage,
+    methodologie: editeurMethodo, suivi: o === "bilan" ? editeurBilan : editeurSuivi, rapport: editeurRapport, collecte: o === "import" ? ongletImport : o === "indicateurs" ? ongletIndicateurs : o === "rappels" ? ongletRappels : o === "apurement" ? ongletApurement : ongletTableau,
   }[cle];
   const div = document.createElement("div");
   z.appendChild(div);
@@ -1542,6 +1542,204 @@ function ongletRappels(z, e) {
   z.querySelectorAll("[data-com]").forEach((inp) => (inp.onchange = () => enregistrer(inp.dataset.com, champ("data-rap", inp.dataset.com).value, inp.value)));
 }
 
+/** Pré-test du questionnaire : entretiens tests, durée observée, problèmes relevés et suite donnée. */
+const PT_TYPES = { comprehension: "Question mal comprise", formulation: "Formulation à revoir", modalite: "Modalité manquante ou inutile", longueur: "Trop long, fatigue", filtre: "Filtre ou enchaînement incorrect", sensible: "Question sensible, refus", technique: "Problème dans l'outil" };
+const PT_ACTIONS = { reformuler: "Reformuler la question", ajouter_modalite: "Ajouter ou retirer une modalité", supprimer: "Supprimer la question", deplacer: "Revoir l'ordre", filtre: "Corriger le filtre", outil: "Corriger le formulaire", aucune: "Aucune modification" };
+const PT_STATUTS = { a_traiter: "À traiter", corrige: "Corrigé", sans_suite: "Sans suite" };
+const PT_MODES = { terrain: "Face à face", telephone: "Téléphone", digital: "En ligne" };
+function editeurPretest(z, e) {
+  const p = S.projet;
+  if (!S.travail) S.travail = clone(p.pretest || { entretiens: [], problemes: [], conclusion: "" });
+  const W = S.travail;
+  const sy = e.pretest_synthese || {};
+  const qs = (e.data || {}).questions_plates || [];
+  const profils = (e.data || {}).profils || [];
+  const opts = (o, v) => Object.entries(o).map(([k, l]) => `<option value="${k}" ${v === k ? "selected" : ""}>${esc(l)}</option>`).join("");
+  const court = (t) => (t.length > 60 ? t.slice(0, 58) + "…" : t);
+  z.className = "carte-corps";
+  z.innerHTML = `
+    <div class="bandeau info">${ico("info")}<div>Avant de valider le questionnaire, faites-le passer à <b>5 à 10 répondants de la cible</b>, dans les conditions réelles (même outil, même mode),
+      en couvrant chaque profil. Notez la durée et chaque difficulté, puis corrigez les questions dans l'onglet <b>Questions</b>.</div></div>
+    ${sy.a_traiter && e.statut !== "valide" ? `<div class="bandeau alerte">${ico("alert")}<div><b>${sy.a_traiter > 1 ? `${sy.a_traiter} ajustements à apporter` : "Un ajustement à apporter"}</b> avant de valider le questionnaire.</div></div>` : ""}
+    ${sy.a_traiter && e.statut === "valide" ? `<div class="bandeau alerte">${ico("alert")}<div>Le questionnaire est validé mais <b>${sy.a_traiter > 1 ? `${sy.a_traiter} ajustements relevés` : "un ajustement relevé"}</b> au pré-test ${sy.a_traiter > 1 ? "restent" : "reste"} à traiter : rouvrez l'étape pour corriger les questions.</div></div>` : ""}
+    <div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
+      ${[["Entretiens tests", sy.entretiens || 0, "5 à 10 recommandés"], ["Durée moyenne", sy.duree_moyenne ? `${nf(sy.duree_moyenne, 1)} min` : "–", sy.duree_estimee ? `estimée : ${sy.duree_estimee} min` : ""],
+         ["Problèmes relevés", sy.problemes || 0, sy.questions > 1 ? `${sy.questions} questions concernées` : `${sy.questions || 0} question concernée`], ["À traiter", sy.a_traiter || 0, sy.corriges > 1 ? `${sy.corriges} corrigés` : `${sy.corriges || 0} corrigé`]]
+        .map(([l, v, s_]) => `<div class="carte kpi"><div class="t">${l}</div><div class="v" style="font-size:22px">${v}</div><div class="s">${s_}</div></div>`).join("")}
+    </div>
+    <div class="actions" style="margin:0 0 18px;gap:10px;flex-wrap:wrap">
+      <a class="btn" href="/api/projets/${p.slug}/pretest/xlsx">${ico("download")} Grille d'observation (Excel)</a>
+      ${sy.entretiens ? `<a class="btn" href="/api/projets/${p.slug}/pretest/docx">${ico("file")} Rapport de pré-test (Word)</a>` : ""}
+    </div>
+
+    <div class="lib" style="margin-bottom:6px">Entretiens réalisés</div>
+    <div class="grille-tab" style="margin-bottom:8px"><table><thead><tr><th>Date</th><th>Profil</th><th>Mode</th><th style="width:90px">Durée (min)</th><th>Enquêteur</th><th>Remarque générale</th><th></th></tr></thead><tbody>
+      ${W.entretiens.map((x, i) => `<tr>
+        <td><input class="saisie petite" type="date" data-e="${i}|date" value="${esc(x.date)}"></td>
+        <td><select class="saisie petite" data-e="${i}|profil"><option value="">—</option>${profils.map((pr) => `<option value="${esc(pr.code)}" ${x.profil === pr.code ? "selected" : ""}>${esc(pr.libelle)}</option>`).join("")}</select></td>
+        <td><select class="saisie petite" data-e="${i}|mode">${opts(PT_MODES, x.mode)}</select></td>
+        <td><input class="saisie petite" type="number" min="0" step="0.5" data-e="${i}|duree" value="${x.duree ?? ""}"></td>
+        <td><input class="saisie petite" data-e="${i}|enqueteur" value="${esc(x.enqueteur)}"></td>
+        <td><input class="saisie petite" data-e="${i}|remarque" value="${esc(x.remarque)}" placeholder="Accueil, difficultés, ressenti…"></td>
+        <td><button class="btn btn-petit" data-suppr-e="${i}" title="Retirer">${ico("trash")}</button></td></tr>`).join("") || `<tr><td colspan="7" class="aide">Aucun entretien saisi.</td></tr>`}
+    </tbody></table></div>
+    <button class="btn btn-petit" id="pt-aj-e" style="margin-bottom:20px">${ico("plus")} Ajouter un entretien</button>
+
+    <div class="lib" style="margin-bottom:6px">Problèmes relevés</div>
+    <div class="grille-tab" style="margin-bottom:8px"><table><thead><tr><th>Question</th><th>Problème</th><th>Observation</th><th>Action</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${W.problemes.map((x, i) => `<tr${x.statut === "a_traiter" ? ' style="background:var(--ambre-50)"' : ""}>
+        <td><select class="saisie petite" data-pb="${i}|var" style="max-width:240px"><option value="">Questionnaire entier</option>${qs.map((q) => `<option value="${esc(q.var)}" ${x.var === q.var ? "selected" : ""}>${esc(q.num)}. ${esc(court(q.texte))}</option>`).join("")}</select></td>
+        <td><select class="saisie petite" data-pb="${i}|type">${opts(PT_TYPES, x.type)}</select></td>
+        <td><input class="saisie petite" data-pb="${i}|description" value="${esc(x.description)}" placeholder="Ce qui s'est passé"></td>
+        <td><select class="saisie petite" data-pb="${i}|action">${opts(PT_ACTIONS, x.action)}</select></td>
+        <td><select class="saisie petite" data-pb="${i}|statut">${opts(PT_STATUTS, x.statut)}</select></td>
+        <td><button class="btn btn-petit" data-suppr-pb="${i}" title="Retirer">${ico("trash")}</button></td></tr>`).join("") || `<tr><td colspan="6" class="aide">Aucun problème relevé.</td></tr>`}
+    </tbody></table></div>
+    <button class="btn btn-petit" id="pt-aj-pb" style="margin-bottom:20px">${ico("plus")} Ajouter un problème</button>
+
+    <div class="champ"><label>Conclusion du pré-test</label>
+      <textarea class="saisie" id="pt-conclusion" rows="3" placeholder="${esc(sy.conclusion_auto || "")}">${esc(W.conclusion || "")}</textarea>
+      <span class="aide" style="font-size:12px">Laissée vide, la conclusion est rédigée automatiquement à partir des entretiens et des problèmes (texte grisé).</span></div>`;
+  const champ = (attr, liste) => z.querySelectorAll(`[${attr}]`).forEach((el) => {
+    el.oninput = el.onchange = () => {
+      const [i, k] = el.getAttribute(attr).split("|");
+      liste[Number(i)][k] = el.value;
+      S.sale = true;
+    };
+  });
+  champ("data-e", W.entretiens);
+  champ("data-pb", W.problemes);
+  $("#pt-conclusion").oninput = (ev) => { W.conclusion = ev.target.value; S.sale = true; };
+  const redessiner = () => { S.sale = true; editeurPretest(z, e); };
+  $("#pt-aj-e").onclick = () => { W.entretiens.push({ date: new Date().toISOString().slice(0, 10), profil: "", mode: "terrain", duree: "", enqueteur: "", remarque: "" }); redessiner(); };
+  $("#pt-aj-pb").onclick = () => { W.problemes.push({ var: "", type: "comprehension", description: "", action: "reformuler", statut: "a_traiter" }); redessiner(); };
+  z.querySelectorAll("[data-suppr-e]").forEach((b) => (b.onclick = () => { W.entretiens.splice(Number(b.dataset.supprE), 1); redessiner(); }));
+  z.querySelectorAll("[data-suppr-pb]").forEach((b) => (b.onclick = () => { W.problemes.splice(Number(b.dataset.supprPb), 1); redessiner(); }));
+  const pied = document.createElement("div");
+  pied.className = "actions";
+  pied.style.marginTop = "18px";
+  pied.innerHTML = `<button class="btn btn-primaire" id="pt-enreg">${ico("check")} Enregistrer le pré-test</button>`;
+  z.appendChild(pied);
+  $("#pt-enreg").onclick = (ev) => occupe(ev.currentTarget, async () => {
+    try { majProjet(await api("PUT", `/api/projets/${p.slug}/pretest`, W), "Pré-test enregistré."); }
+    catch (err) { toast(err.message, "erreur"); }
+  });
+}
+
+/** Apurement : recodage des « Autre », doublons, corrections tracées, base finale figée pour le rapport. */
+async function ongletApurement(z, e) {
+  const p = S.projet;
+  z.className = "carte-corps";
+  z.innerHTML = `<div class="chargement"></div>`;
+  let d;
+  try { d = await api("GET", `/api/projets/${p.slug}/apurement`); }
+  catch (err) { z.innerHTML = `<div class="bandeau alerte">${ico("alert")}<div>${esc(err.message)}</div></div>`; return; }
+  if (!(e.data && e.data.stats)) {
+    z.innerHTML = `<div class="vide">${ico("base")}<div>Aucune réponse importée : l'apurement commence dès la première synchronisation.</div></div>`;
+    return;
+  }
+  const qs = (p.etapes.questionnaire.data || {}).questions_plates || [];
+  const parVar = Object.fromEntries(qs.map((q) => [q.var, q]));
+  const libVal = (v, val) => {
+    const q = parVar[v];
+    if (!val) return "(vide)";
+    if (!q || !(q.modalites || []).length) return val;
+    return String(val).split(" ").map((c) => (q.modalites.find((m) => m.code === c) || { label: c }).label).join(", ");
+  };
+  const sy = d.synthese;
+  const fig = sy.figee;
+  const aTraiter = d.autres.reduce((s, q) => s + q.items.filter((i) => !i.code).length, 0);
+  const totalAutres = d.autres.reduce((s, q) => s + q.items.length, 0);
+  const choixQ = qs.filter((q) => !["id_enqueteur"].includes(q.id));
+  const action = async (act, corps, msg) => {
+    try { majProjet(await api("POST", `/api/projets/${p.slug}/apurement/${act}`, corps), msg); }
+    catch (err) { toast(err.message, "erreur"); }
+  };
+  z.innerHTML = `
+    <div class="bandeau info">${ico("info")}<div>Les corrections ne modifient jamais les réponses reçues : elles sont rejouées à chaque lecture et tracées dans un journal.
+      Une fois l'apurement terminé, <b>figez la base finale</b> : le rapport et la restitution s'appuient sur elle, même si de nouvelles réponses arrivent ensuite.</div></div>
+    ${fig && sy.nouvelles ? `<div class="bandeau alerte">${ico("alert")}<div><b>${sy.nouvelles} nouvelle(s) réponse(s)</b> reçue(s) depuis le gel du ${heureFr(fig.date)} : elles ne figurent pas dans la base finale. Mettez la base figée à jour si elles doivent compter.</div></div>` : ""}
+    <div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
+      ${[["Corrections", sy.corrections, "valeurs modifiées"], ["Réponses écartées", sy.exclusions, "doublons, incohérences"],
+         ["« Autre » recodés", sy.recodages, aTraiter ? `${aTraiter} ${aTraiter > 1 ? "textes" : "texte"} à traiter` : totalAutres ? "tous traités" : "aucun texte saisi"],
+         ["Base finale", fig ? `v${fig.version}` : "Non figée", fig ? `${fig.valides} valides · ${heureFr(fig.date)}` : "le rapport suit les données du moment"]]
+        .map(([l, v, s_]) => `<div class="carte kpi"><div class="t">${l}</div><div class="v" style="font-size:22px">${v}</div><div class="s">${s_}</div></div>`).join("")}
+    </div>
+    <div class="actions" style="margin:0 0 20px;flex-wrap:wrap;gap:10px">
+      <button class="btn btn-primaire" id="apu-figer">${ico("lock")} ${fig ? "Mettre à jour la base figée" : "Figer la base finale"}</button>
+      ${fig ? `<button class="btn" id="apu-defiger">${ico("unlock")} Défiger</button>` : ""}
+      <a class="btn" href="/api/projets/${p.slug}/apurement.xlsx">${ico("download")} Base apurée et journal (Excel)</a>
+    </div>
+
+    <div class="lib" style="margin-bottom:6px">Réponses « Autre (préciser) » à recoder</div>
+    ${d.autres.length ? d.autres.map((q) => `<div class="grille-tab" style="margin-bottom:14px"><table><thead><tr><th colspan="3">${esc(q.num)}. ${esc(q.question)}</th></tr>
+      <tr><th>Texte saisi</th><th style="width:70px">Nombre</th><th style="width:300px">Recoder en</th></tr></thead><tbody>
+      ${q.items.map((i) => `<tr${i.code ? "" : ' style="background:var(--ambre-50)"'}><td>${esc(i.texte)}</td><td>${i.n}</td><td>
+        <select class="saisie petite" data-recode="${esc(q.var)}" data-cle="${esc(i.cle)}">
+          <option value="" ${!i.code ? "selected" : ""}>— À traiter —</option>
+          ${q.modalites.map((m) => `<option value="${esc(m.code)}" ${i.code === m.code ? "selected" : ""}>${esc(m.label)}</option>`).join("")}
+          <option value="autre" ${i.code === "autre" ? "selected" : ""}>Laisser en « Autre »</option></select></td></tr>`).join("")}
+      </tbody></table></div>`).join("") : `<div class="aide" style="margin-bottom:18px">Aucune réponse « Autre » précisée pour l'instant.</div>`}
+
+    <div class="lib" style="margin:8px 0 6px">Doublons possibles ${d.doublons.length ? `<span class="tag" style="color:var(--ambre)">${d.doublons.length} à vérifier</span>` : ""}</div>
+    ${d.doublons.length ? `<div class="grille-tab" style="margin-bottom:18px"><table><thead><tr><th>Motif</th><th>Réponses</th></tr></thead><tbody>
+      ${d.doublons.map((g) => `<tr><td style="width:240px">${esc(g.motif)}</td><td>${g.reponses.map((r) => `<div style="display:flex;gap:10px;align-items:center;margin:2px 0">
+        <b>${esc(r.id)}</b><span class="aide" style="font-size:12px">${esc(r.collecteur)} · ${esc(r.date)}${r.duree ? ` · ${esc(r.duree)} min` : ""}</span>
+        <button class="btn btn-petit" data-ecarter="${esc(r.id)}" data-motif="${esc(`Doublon (${g.motif.toLowerCase()})`)}">${ico("trash")} Écarter</button></div>`).join("")}</td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="aide" style="margin-bottom:18px">Aucun doublon détecté (même téléphone, même entreprise et même fonction, ou réponses identiques).</div>`}
+
+    <div class="lib" style="margin:8px 0 6px">Corriger ou écarter une réponse</div>
+    <div class="grille-3" style="margin-bottom:8px;align-items:end">
+      <div class="champ"><label>Identifiant de la réponse</label><input class="saisie" id="apu-id" placeholder="Ex. 889299834"></div>
+      <div class="champ"><label>Action</label><select class="saisie" id="apu-type"><option value="corriger">Corriger une valeur</option><option value="_exclure">Écarter la réponse</option></select></div>
+      <div class="champ" id="apu-q-champ"><label>Question</label><select class="saisie" id="apu-var">${choixQ.map((q) => `<option value="${esc(q.var)}">${esc(q.num)}. ${esc(q.texte.length > 70 ? q.texte.slice(0, 68) + "…" : q.texte)}</option>`).join("")}</select></div>
+      <div class="champ" id="apu-val-champ"><label>Nouvelle valeur</label><span id="apu-val"></span></div>
+      <div class="champ" style="grid-column:span 2"><label>Motif (inscrit au journal)</label><input class="saisie" id="apu-motif" placeholder="Ex. erreur de saisie confirmée par l'enquêteur"></div>
+    </div>
+    <div class="actions" style="margin:0 0 20px"><button class="btn btn-primaire" id="apu-enreg">${ico("check")} Enregistrer</button></div>
+
+    <div class="lib" style="margin-bottom:6px">Journal des corrections</div>
+    ${d.journal.length ? `<div class="grille-tab"><table><thead><tr><th>N°</th><th>Date</th><th>Réponse</th><th>Modification</th><th>Motif</th><th></th></tr></thead><tbody>
+      ${[...d.journal].reverse().map((c) => `<tr${c.annulee ? ' style="opacity:.55;text-decoration:line-through"' : ""}><td>${c.n}</td><td style="white-space:nowrap">${heureFr(c.date)}</td><td><b>${esc(c.id)}</b></td>
+        <td>${c.type === "exclusion" ? "Réponse écartée" : `${esc((parVar[c.var] || {}).num || c.var)} : ${esc(libVal(c.var, c.avant))} → <b>${esc(libVal(c.var, c.apres))}</b>`}</td>
+        <td>${esc(c.motif)}</td><td>${c.annulee ? `<span class="aide" style="font-size:11.5px">annulée</span>` : `<button class="btn btn-petit" data-annuler="${c.n}">Annuler</button>`}</td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="aide">Aucune correction pour l'instant.</div>`}`;
+
+  // valeur : liste des modalités pour une question fermée, saisie libre sinon
+  const champValeur = () => {
+    const q = parVar[$("#apu-var").value] || {};
+    const mods = q.modalites || [];
+    $("#apu-val").innerHTML = !mods.length ? `<input class="saisie" id="apu-v">`
+      : q.type === "select_multiple" ? `<select class="saisie" id="apu-v" multiple size="${Math.min(mods.length, 5)}">${mods.map((m) => `<option value="${esc(m.code)}">${esc(m.label)}</option>`).join("")}</select>`
+      : `<select class="saisie" id="apu-v">${mods.map((m) => `<option value="${esc(m.code)}">${esc(m.label)}</option>`).join("")}</select>`;
+  };
+  champValeur();
+  $("#apu-var").onchange = champValeur;
+  $("#apu-type").onchange = () => {
+    const ex = $("#apu-type").value === "_exclure";
+    $("#apu-q-champ").style.display = $("#apu-val-champ").style.display = ex ? "none" : "";
+  };
+  $("#apu-enreg").onclick = (ev) => occupe(ev.currentTarget, async () => {
+    const ex = $("#apu-type").value === "_exclure";
+    const v = $("#apu-v");
+    const valeur = v.multiple ? [...v.selectedOptions].map((o) => o.value).join(" ") : v.value;
+    await action("corriger", { id: $("#apu-id").value.trim(), var: ex ? "_exclure" : $("#apu-var").value, valeur, motif: $("#apu-motif").value },
+      ex ? "Réponse écartée : le tableau de bord est recalculé." : "Correction enregistrée au journal.");
+  });
+  z.querySelectorAll("[data-recode]").forEach((s) => (s.onchange = () => action("recoder", { var: s.dataset.recode, cle: s.dataset.cle, code: s.value }, "Recodage enregistré.")));
+  z.querySelectorAll("[data-ecarter]").forEach((b) => (b.onclick = async () => {
+    if (!(await confirmer("Écarter cette réponse ?", `La réponse ${b.dataset.ecarter} sera retirée de la base (résultats et paie). L'opération reste annulable depuis le journal.`, "Écarter", "btn-danger"))) return;
+    action("corriger", { id: b.dataset.ecarter, var: "_exclure", motif: b.dataset.motif }, "Réponse écartée.");
+  }));
+  z.querySelectorAll("[data-annuler]").forEach((b) => (b.onclick = () => action("annuler", { n: Number(b.dataset.annuler) }, "Correction annulée.")));
+  $("#apu-figer").onclick = async (ev) => {
+    if (aTraiter && !(await confirmer("Des « Autre » restent à traiter", `${aTraiter} texte(s) n'ont pas encore été recodés. Figer quand même ?`, "Figer", "btn-primaire"))) return;
+    occupe(ev.currentTarget, () => action("figer", {}, "Base finale figée : le rapport s'appuiera sur elle."));
+  };
+  const df_ = $("#apu-defiger");
+  if (df_) df_.onclick = (ev) => occupe(ev.currentTarget, () => action("defiger", {}, "Base défigée : le rapport suit de nouveau les données du moment."));
+}
+
 // Carte de suivi : part de l'objectif atteinte par pays, une seule teinte du clair au foncé
 const PALIERS_CARTE = [[25, "var(--pal1)"], [50, "var(--pal2)"], [75, "var(--pal3)"], [100, "var(--pal4)"], [Infinity, "var(--pal5)"]];
 function carteSuivi(parZone) {
@@ -1695,6 +1893,7 @@ function vueParametres(app) {
         <div class="champ" style="margin-bottom:14px"><label>Auteur des fichiers <span class="ex">métadonnées Word, Excel et PowerPoint (Fichier › Informations) ; les pages de garde restent signées DATATYM</span></label><input class="saisie" id="p-auteur" value="${esc(P.auteur_fichiers || "DATATYM")}"></div>
         <div class="champ" style="margin-bottom:14px"><label>Site de dépôt des candidatures <span class="ex">site d'emploi (avec ATS) cité dans les annonces de recrutement</span></label><input class="saisie" id="p-contact" value="${esc(P.contact_recrutement || "")}"></div>
         <div class="champ"><label>Adresse de retour de la liste des enquêteurs <span class="ex">mail de l'équipe projet, repris dans la demande de recrutement aux RH</span></label><input class="saisie" id="p-mail-rh" type="email" value="${esc(P.mail_rh || "")}" placeholder="projets@datatym.com"></div>
+        <div class="champ" style="margin-top:14px"><label>Contact de l'équipe d'enquête <span class="ex">téléphone ou mail donné aux répondants dans la lettre d'introduction et aux enquêteurs dans leur guide</span></label><input class="saisie" id="p-contact-enq" value="${esc(P.contact_enquete || "")}" placeholder="enquetes@datatym.com · +223 …"></div>
         <div class="pied-form"><button class="btn btn-primaire" data-enr-params>${ico("check")} Enregistrer</button></div>
       </div></div>
       <div class="carte" style="margin-top:16px"><div class="carte-titre"><h3>${ico("coin")} Coûts unitaires de référence</h3></div><div class="carte-corps">
@@ -1707,7 +1906,7 @@ function vueParametres(app) {
     </div>`;
   A.reveler(app);
   app.querySelectorAll("[data-theme-choix]").forEach((x) => (x.onclick = () => appliquerTheme(x.dataset.themeChoix, true)));
-  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value.trim(), auteur_fichiers: $("#p-auteur").value.trim() || "DATATYM", mail_rh: $("#p-mail-rh").value.trim(),
+  const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value.trim(), auteur_fichiers: $("#p-auteur").value.trim() || "DATATYM", mail_rh: $("#p-mail-rh").value.trim(), contact_enquete: $("#p-contact-enq").value.trim(),
     couts_unitaires: P.couts_unitaires.map((c, k) => ({ cle: c.cle, valeur: Number(app.querySelector(`[data-cu-ref="${k}"]`).value) || 0 })) });
   app.querySelectorAll("[data-enr-params]").forEach((b) => (b.onclick = (e) => occupe(e.currentTarget, async () => {
     await api("PUT", "/api/parametres", lire());

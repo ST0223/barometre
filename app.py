@@ -15,7 +15,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import budget, deroulement, equipe, importation, llm, moteur, paiement, rappels, restitution, store
+from datatym import apurement, budget, deroulement, equipe, importation, llm, moteur, paiement, pretest, rappels, restitution, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -221,6 +221,79 @@ def rappels_fiche(slug):
     chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, "Fiche_Rappels", 1, "xlsx").replace("_v1.", ".")
     chemin.parent.mkdir(parents=True, exist_ok=True)
     rappels.xlsx(chemin, p)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
+@app.put("/api/projets/<slug>/pretest")
+def pretest_enregistrer(slug):
+    """Entretiens tests et problèmes relevés ; rien ne change dans le questionnaire tant qu'on ne le corrige pas."""
+    p = _projet(slug)
+    pretest.enregistrer(p, request.get_json(force=True) or {})
+    s = pretest.synthese(p)
+    store.journaliser(p, f"Pré-test : {s['entretiens']} entretien(s), {s['problemes']} problème(s) relevé(s), {s['a_traiter']} à traiter.")
+    store.sauver(p)
+    return ok(p)
+
+
+@app.get("/api/projets/<slug>/pretest/<fmt>")
+def pretest_fichier(slug, fmt):
+    if fmt not in ("docx", "xlsx"):
+        abort(404)
+    p = _projet(slug)
+    code = "Rapport_Pretest" if fmt == "docx" else "Grille_Pretest"
+    chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, code, 1, fmt).replace("_v1.", ".")
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    (pretest.docx if fmt == "docx" else pretest.grille_xlsx)(chemin, p)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
+@app.get("/api/projets/<slug>/apurement")
+def apurement_etat(slug):
+    """Réponses « Autre » à recoder, doublons à vérifier, journal et état de la base finale."""
+    p = _projet(slug)
+    return jsonify(propre({"autres": apurement.autres(p), "doublons": apurement.doublons(p),
+                           "journal": apurement.donnees(p)["corrections"], "synthese": apurement.synthese(p)}))
+
+
+@app.post("/api/projets/<slug>/apurement/<action>")
+def apurement_agir(slug, action):
+    """corriger · annuler · recoder · figer · defiger : chaque action est journalisée ; la base de collecte est recalculée."""
+    p = _projet(slug)
+    c = request.get_json(silent=True) or {}
+    try:
+        if action == "corriger":
+            x = apurement.corriger(p, c.get("id"), c.get("var"), c.get("valeur"), c.get("motif"))
+            store.journaliser(p, f"Apurement : réponse {x['id']} " + ("écartée" if x["type"] == "exclusion" else f"corrigée ({x['var']})") + f" — {x['motif']}.")
+        elif action == "annuler":
+            x = apurement.annuler(p, c.get("n"))
+            store.journaliser(p, f"Apurement : correction n° {x['n']} annulée.")
+        elif action == "recoder":
+            apurement.recoder(p, c.get("var"), c.get("cle"), c.get("code"))
+        elif action == "figer":
+            x = apurement.figer(p)
+            store.journaliser(p, f"Base finale figée (version {x['version']}, {x['valides']} réponses valides).")
+        elif action == "defiger":
+            apurement.defiger(p)
+            store.journaliser(p, "Base finale défigée : le rapport repart des données du moment.")
+        else:
+            abort(404)
+    except ValueError as exc:
+        return jsonify({"erreur": str(exc)}), 400
+    if action in ("figer", "defiger"):
+        moteur.marquer_rapport(p)
+        store.sauver(p)
+    else:
+        moteur.rafraichir_collecte(p)
+    return ok(p)
+
+
+@app.get("/api/projets/<slug>/apurement.xlsx")
+def apurement_fichier(slug):
+    p = _projet(slug)
+    chemin = store.dossier(slug) / "donnees" / store.nom_fichier(p, "Base_Apuree", 1, "xlsx").replace("_v1.", ".")
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    if not apurement.xlsx(chemin, p):
+        raise moteur.ErreurChaine("Aucune réponse importée.")
     return send_file(chemin, as_attachment=True, download_name=chemin.name)
 
 
