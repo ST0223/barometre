@@ -378,6 +378,15 @@ body[data-page="etude"] { background: linear-gradient(180deg, var(--neige), var(
 .pays { border: 1px solid var(--bord-2); background: var(--carte); color: var(--texte); border-radius: 20px; padding: 5px 12px; font-size: 13px; cursor: pointer; transition: all .25s var(--ease); }
 .pays:hover { border-color: var(--ciel); }
 .pays.actif { background: var(--abysse); border-color: var(--abysse); color: #fff; animation: pop .3s var(--ease); }
+.cat-secteurs { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.cat-onglets { display: flex; gap: 6px; flex-wrap: wrap; }
+.cat-onglet { border: 1.5px solid var(--bord-2); background: var(--carte); color: var(--texte-2); border-radius: 10px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .25s var(--ease); }
+.cat-onglet:hover { border-color: var(--ciel); }
+.cat-onglet.actif { border-color: var(--bleu); background: var(--bleu-50); color: var(--encre-a); }
+.cat-liste { display: flex; flex-direction: column; gap: 10px; }
+.cat-liste[hidden] { display: none; }
+.cat-groupe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cat-groupe > span { flex-basis: 100%; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--texte-3); }
 .curseurs { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
 .cu-tete { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 13px; }
 .cu-tete label { font-weight: 600; color: var(--marine); }

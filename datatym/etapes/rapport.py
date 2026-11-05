@@ -9,6 +9,7 @@ from .. import llm  # noqa: E402
 from ..banque import NSP_CODE, TYPES, code_zone, du_barometre, slug, sont_des_pays  # noqa: E402
 from ..charte import chiffres, image, liste, p, section, tableau  # noqa: E402
 from ..outils import aujourdhui, en_nombre, fmt_marge, nombre, pct, solde_txt  # noqa: E402
+from ..secteurs import regroupement  # noqa: E402
 from ..store import dossier  # noqa: E402
 from .collecte import _norm, indice_entreprises, lire, valides, variables_cles  # noqa: E402
 
@@ -101,8 +102,16 @@ def analyser(projet, cadrage, quest, ech):
     q_sect = next((q for q in quest["questions_plates"] if q["id"] == "id_secteur"), None)
     lib_sect = {m["code"]: m["label"] for m in q_sect["modalites"]} if q_sect else {}
     groupes = {"par_profil": (v_prof, list(lib_prof)), "par_zone": (v_zone, list(lib_zone))}
+    lib_domaine, effectifs_domaine = {}, {}
     if q_sect:
         groupes["par_secteur"] = (q_sect["var"], list(lib_sect))
+        # grands domaines : lecture fiable quand chaque secteur compte trop peu de répondants
+        domaine_de = regroupement(q_sect["modalites"])
+        if domaine_de and q_sect["var"] in df:
+            lib_domaine = {slug(d): d for d in dict.fromkeys(domaine_de.values())}
+            df = df.assign(_domaine=df[q_sect["var"]].map(lambda c: slug(domaine_de[c]) if c in domaine_de else ""))
+            groupes["par_domaine"] = ("_domaine", list(lib_domaine))
+            effectifs_domaine = {c: int((df["_domaine"] == c).sum()) for c in lib_domaine}
     q_de = {q["indicateur"]: q for q in quest["questions_plates"] if q.get("indicateur")}
     resultats = []
     for ind in cadrage["indicateurs"]:
@@ -135,6 +144,7 @@ def analyser(projet, cadrage, quest, ech):
             "effectifs_profil": {c: int((df.get(v_prof, "") == c).sum()) for c in lib_prof},
             "effectifs_zone": {c: int((df.get(v_zone, "") == c).sum()) for c in lib_zone},
             "effectifs_secteur": {c: int((df.get(q_sect["var"], "") == c).sum()) for c in lib_sect} if q_sect else {},
+            "lib_domaine": lib_domaine, "effectifs_domaine": effectifs_domaine,
             "indice_hc": indice_entreprises(projet, df, quest), "resultats": resultats}
 
 
@@ -342,9 +352,9 @@ def lecture_choix(r, an):
     code, label = items[0][1], items[0][0]
     cle = "citations" if multiple else "dist"
     for grp, libs, nom in (("par_profil", an["lib_profil"], "fonction"), ("par_zone", an["lib_zone"], "pays"),
-                           ("par_secteur", an.get("lib_secteur", {}), "secteur")):
+                           ("par_secteur", an.get("lib_secteur", {}), "secteur"), ("par_domaine", an.get("lib_domaine", {}), "grand domaine")):
         vals = [(libs.get(c, c), st.get(cle, {}).get(code, 0)) for c, st in (r.get(grp) or {}).items() if st.get("n", 0) >= SEUIL]
-        if len(vals) >= 2:
+        if len(vals) >= 2 and not (grp == "par_domaine" and "Par secteur," in txt):
             hi, lo = max(vals, key=lambda x: x[1]), min(vals, key=lambda x: x[1])
             if hi[1] - lo[1] >= 10:
                 txt += f" Par {nom}, la part de « {label} » va de {pct(lo[1])} ({lo[0]}) à {pct(hi[1])} ({hi[0]})."
@@ -362,9 +372,9 @@ def lecture_numerique(r, an):
         txt += ", tirée vers le haut par quelques valeurs élevées : la médiane reflète mieux la situation la plus courante"
     txt += f". Un répondant sur deux déclare entre {_val(g['q1'])} et {_val(g['q3'])} (étendue : {_val(g['min'])} à {_val(g['max'])})."
     for grp, libs, nom in (("par_profil", an["lib_profil"], "fonction"), ("par_zone", an["lib_zone"], "pays"),
-                           ("par_secteur", an.get("lib_secteur", {}), "secteur")):
+                           ("par_secteur", an.get("lib_secteur", {}), "secteur"), ("par_domaine", an.get("lib_domaine", {}), "grand domaine")):
         vals = [(libs.get(c, c), st["mediane"]) for c, st in (r.get(grp) or {}).items() if st.get("n", 0) >= SEUIL]
-        if len(vals) >= 2:
+        if len(vals) >= 2 and not (grp == "par_domaine" and "Par secteur," in txt):
             hi, lo = max(vals, key=lambda x: x[1]), min(vals, key=lambda x: x[1])
             if lo[1] and hi[1] >= 1.25 * lo[1]:
                 txt += f" Par {nom}, la médiane va de {_val(lo[1])} ({lo[0]}) à {_val(hi[1])} ({hi[0]})."
@@ -560,7 +570,10 @@ def construire_docs(projet, data, ech):
                     f"Répartition par {Z.lower()}"),
         ] + ([tableau(["Secteur", "Effectif", "Part", "Marge d'erreur"],
                       [[an["lib_secteur"][c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in sorted(an["effectifs_secteur"].items(), key=lambda t: -t[1])],
-                      "Répartition par secteur")] if an.get("effectifs_secteur") else []), source="auto"),
+                      "Répartition par secteur")] if an.get("effectifs_secteur") else [])
+          + ([tableau(["Grand domaine", "Effectif", "Part", "Marge d'erreur"],
+                      [[an["lib_domaine"][c], v, pct(100 * v / n if n else 0), fmt_marge(v)] for c, v in sorted(an["effectifs_domaine"].items(), key=lambda t: -t[1])],
+                      "Répartition par grand domaine")] if an.get("effectifs_domaine") else []), source="auto"),
     ]
     chap = 1
     if x:

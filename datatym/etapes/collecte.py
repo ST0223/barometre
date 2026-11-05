@@ -10,6 +10,7 @@ import pandas as pd
 
 from ..banque import NSP_CODE, code_zone, slug
 from ..outils import repartir
+from ..secteurs import objectifs_egaux
 from ..store import dossier
 
 COLONNES_SYSTEME = {"start", "end", "today", "_submission_time", "duree_minutes", "enqueteur", "consentement", "_id", "_uuid"}
@@ -489,7 +490,7 @@ def tableau_de_bord(projet, quest, ech):
     q_sect = next((x for x in quest["questions_plates"] if x["id"] == "id_secteur"), None)
     par_secteur = []
     if q_sect:
-        objectifs = repartir(projet["fiche"]["taille"], [1] * len(q_sect["modalites"]))
+        objectifs = objectifs_egaux(projet["fiche"]["taille"], q_sect["modalites"])
         for m, obj in zip(q_sect["modalites"], objectifs):
             par_secteur.append({"secteur": m["label"], "code": m["code"], "objectif": obj,
                                 "realise": int((v.get(q_sect["var"], pd.Series(dtype=str)) == m["code"]).sum())})
@@ -501,7 +502,7 @@ def tableau_de_bord(projet, quest, ech):
     croisement = []
     if q_sect and v_zone:
         for z in ech["zones"]:
-            for m, obj in zip(q_sect["modalites"], repartir(ech["tot_zone"][z], [1] * len(q_sect["modalites"]))):
+            for m, obj in zip(q_sect["modalites"], objectifs_egaux(ech["tot_zone"][z], q_sect["modalites"])):
                 r = int(((v.get(v_zone, "") == code_zone(z)) & (v.get(q_sect["var"], "") == m["code"])).sum()) if q_sect["var"] in v and v_zone in v else 0
                 croisement.append({"zone": z, "secteur": m["label"], "code": m["code"], "objectif": obj, "realise": r,
                                    "taux": round(100 * r / obj, 1) if obj else 0})

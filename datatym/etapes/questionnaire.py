@@ -4,6 +4,7 @@ import math
 from ..banque import (NSP_CODE, code_zone, decouper, du_barometre, modalites, profils_concernes, profils_depuis_cible, slug, sont_des_pays, texte_question)
 from ..charte import p, section, tableau, liste
 from ..outils import aujourdhui
+from ..secteurs import contient_informel, decouper_secteurs
 from .cadrage import indicateurs_actifs
 
 DOCS = {
@@ -40,8 +41,14 @@ def questions_identification(fiche, profils, secteurs, domaine):
            consigne="Ne pas lire : cocher le pays d'enquête." if sont_des_pays(fiche["zones"]) else "Ne pas lire : cocher la zone d'enquête."),
     ]
     if len(secteurs) > 1:
-        qs.append(_q("id_secteur", "Dans quel secteur exerce principalement votre structure ?", "select_one",
-                     [{"code": slug(s, maxi=18), "label": s} for s in secteurs], fixe=True))
+        texte = "Dans quel secteur ou quelle activité exercez-vous principalement ?" if contient_informel(secteurs) else "Dans quel secteur exerce principalement votre structure ?"
+        codes = {}
+        mods = []
+        for s in secteurs:
+            base = slug(s, maxi=18)  # deux libellés peuvent commencer pareil : le code reste unique
+            codes[base] = codes.get(base, 0) + 1
+            mods.append({"code": base if codes[base] == 1 else f"{base[:16]}_{codes[base]}", "label": s})
+        qs.append(_q("id_secteur", texte, "select_one", mods, fixe=True))
     qs.append(_q("id_profil", "Quelle fonction occupez-vous ?", "select_one",
                  [{"code": pr["code"], "label": pr["libelle"]} for pr in profils] + [{"code": "autre_hors", "label": "Autre fonction"}],
                  fixe=True))
@@ -79,7 +86,7 @@ def question_indicateur(ind, profils):
 def construire_questions(projet, cadrage, precedentes=None):
     fiche = projet["fiche"]
     profils = cadrage.get("profils") or profils_depuis_cible(fiche["cible"])
-    secteurs = decouper(fiche.get("secteur", ""))
+    secteurs = decouper_secteurs(fiche.get("secteur", ""))
     anciennes = {q["id"]: q for q in (precedentes or [])}
     inds = [i for i in indicateurs_actifs(cadrage) if i["type"] != "indice"]
 

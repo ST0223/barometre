@@ -32,7 +32,40 @@ function joursCollecte(duree, debut) {
 }
 
 function ficheVide() {
-  return { theme: "", objectif: "", cible: [], zones: [], secteur: "", taille: 400, duree: 15, cout: "", date_debut: "", outil: "kobo" };
+  return { theme: "", objectif: "", cible: [], zones: [], secteurs: [], taille: 400, duree: 15, cout: "", date_debut: "", outil: "kobo" };
+}
+
+/** Fiche telle que le serveur l'attend : listes jointes par des virgules. */
+function ficheEnvoi() {
+  const { secteurs, ...f } = E.f;
+  return { ...f, cible: f.cible.join(", "), zones: f.zones.join(", "), secteur: secteurs.join(", "), cout: String(f.cout || "").replace(/\D/g, "") };
+}
+
+/** Catalogue des secteurs et activités : un onglet formel, un onglet informel, chaque puce s'ajoute ou se retire d'un clic. */
+async function chargerCatalogueSecteurs() {
+  const zone = $("#e-catalogue");
+  try {
+    const { catalogue, autre } = await api("GET", "/api/secteurs");
+    if (!zone.isConnected) return;
+    const puce = (s) => `<button type="button" class="pays" data-sect="${esc(s)}">${esc(s)}</button>`;
+    zone.innerHTML = `<div class="cat-onglets">${catalogue.map((g, k) => `<button type="button" class="cat-onglet ${k ? "" : "actif"}" data-statut="${g.statut}">${esc(g.libelle)}</button>`).join("")}</div>
+      ${catalogue.map((g, k) => `<div class="cat-liste" data-liste-statut="${g.statut}" ${k ? "hidden" : ""}>${g.domaines.map((d) => `<div class="cat-groupe"><span>${esc(d.nom)}</span>${d.secteurs.map(puce).join("")}</div>`).join("")}</div>`).join("")}
+      <div class="cat-groupe cat-autre">${puce(autre)}</div>`;
+    zone.onclick = (e) => {
+      const o = e.target.closest("[data-statut]");
+      if (o) {
+        zone.querySelectorAll("[data-statut]").forEach((b) => b.classList.toggle("actif", b === o));
+        zone.querySelectorAll("[data-liste-statut]").forEach((l) => { l.hidden = l.dataset.listeStatut !== o.dataset.statut; });
+        return;
+      }
+      const b = e.target.closest("[data-sect]");
+      if (!b) return;
+      const s = b.dataset.sect;
+      E.f.secteurs = E.f.secteurs.includes(s) ? E.f.secteurs.filter((x) => x !== s) : [...E.f.secteurs, s];
+      rafraichirEtude();
+    };
+    rafraichirEtude();
+  } catch (err) { zone.innerHTML = ""; }
 }
 
 function vueEtude(app, params) {
@@ -76,6 +109,7 @@ function vueEtude(app, params) {
   A.reveler(app);
   A.incliner(".modele", 10, app);
   rafraichirEtude(true);
+  chargerCatalogueSecteurs();
 }
 
 function champ(id, label, html, aide = "") {
@@ -102,10 +136,10 @@ function panneauTerrain() {
     <div class="espaces">${Object.entries(ESPACES_JS).map(([e, l]) => `<button class="espace" data-espace="${esc(e)}"><b>${esc(e)}</b><small>${l.length} pays</small><i class="esp-jauge"><i></i></i></button>`).join("")}</div>
     <div class="pays-grille">${Object.entries(ESPACES_JS).map(([e, l]) => `<div class="pays-groupe"><span>${esc(e)}</span>${l.map((p) => `<button class="pays" data-pays="${esc(p)}">${esc(p)}</button>`).join("")}</div>`).join("")}</div>
     ${champ("e-zones-in", 'Pays retenus <span class="ex">ajoutez librement tout autre pays ou zone</span>', `<div class="puces-saisie" data-liste="zones"><input id="e-zones-in" placeholder="Autre pays ou zone, puis Entrée"></div>`)}
-    <div class="grille-2" style="margin-top:14px">
-      ${champ("e-secteur", "Secteur", `<input class="saisie" id="e-secteur" data-f="secteur" placeholder="Commerce formel">`, "Plusieurs secteurs séparés par des virgules ajoutent une question.")}
-      ${champ("e-date", "Début de la collecte", `<input class="saisie" type="date" id="e-date" data-f="date_debut">`, "Par défaut : le lundi dans trois semaines.")}
-    </div>
+    <div class="lib" style="margin:16px 0 8px">Secteurs et activités</div>
+    <div class="cat-secteurs" id="e-catalogue"></div>
+    ${champ("e-secteurs-in", 'Retenus pour cette étude <span class="ex">ne gardez que les secteurs utiles ; à partir de deux, une question est ajoutée</span>', `<div class="puces-saisie" data-liste="secteurs"><input id="e-secteurs-in" placeholder="Autre secteur ou activité, puis Entrée"></div>`)}
+    ${champ("e-date", "Début de la collecte", `<input class="saisie" type="date" id="e-date" data-f="date_debut">`, "Par défaut : le lundi dans trois semaines.")}
     <div class="curseurs">
       <div class="curseur"><div class="cu-tete"><label for="e-taille">Taille visée</label><b><span id="v-taille"></span> répondants</b></div>
         <input type="range" id="e-taille" data-f="taille" min="50" max="2000" step="10"></div>
@@ -127,10 +161,10 @@ function panneauLancement() {
 }
 
 function appliquerModele(m, anime = true) {
-  Object.assign(E.f, { theme: m.theme, objectif: m.objectif, cible: m.cible.split(",").map((x) => x.trim()), secteur: m.secteur });
+  Object.assign(E.f, { theme: m.theme, objectif: m.objectif, cible: m.cible.split(",").map((x) => x.trim()), secteurs: m.secteur ? m.secteur.split(",").map((x) => x.trim()) : [] });
   if (anime) {
     document.querySelectorAll(".modele").forEach((b) => b.classList.toggle("actif", b.dataset.modele === m.cle));
-    ["e-theme", "e-objectif", "e-secteur"].forEach((id) => { const el = $("#" + id); if (el) { el.value = E.f[el.dataset.f]; el.classList.remove("flash", "erreur"); void el.offsetWidth; el.classList.add("flash"); } });
+    ["e-theme", "e-objectif"].forEach((id) => { const el = $("#" + id); if (el) { el.value = E.f[el.dataset.f]; el.classList.remove("flash", "erreur"); void el.offsetWidth; el.classList.add("flash"); } });
     rafraichirEtude(true);
   }
 }
@@ -259,6 +293,7 @@ function rafraichirEtude(complet) {
     b.querySelector(".esp-jauge i").style.width = `${(100 * n) / l.length}%`;
     b.querySelector("small").textContent = n && n < l.length ? `${n} / ${l.length} pays` : `${l.length} pays`;
   });
+  document.querySelectorAll("[data-sect]").forEach((b) => b.classList.toggle("actif", f.secteurs.includes(b.dataset.sect)));
   document.querySelectorAll(".puces-saisie").forEach((box) => {
     const cle = box.dataset.liste;
     box.querySelectorAll(".puce-e").forEach((x) => x.remove());
@@ -270,7 +305,7 @@ function rafraichirEtude(complet) {
   $("#e-niveaux").innerHTML = f.cible.length ? `<div class="niv-col"><span class="niv dir">Direction</span>${f.cible.filter((c) => DIRECTION_JS.test(c)).map((c) => `<em>${esc(c)}</em>`).join("") || "<em class='vide-n'>—</em>"}</div>
     <div class="niv-col"><span class="niv ope">Opérationnel</span>${f.cible.filter((c) => !DIRECTION_JS.test(c)).map((c) => `<em>${esc(c)}</em>`).join("") || "<em class='vide-n'>—</em>"}</div>` : "";
   $("#e-recap").innerHTML = [["Thème", f.theme], ["Objectif", f.objectif], ["Cible", f.cible.join(", ")], ["Pays", f.zones.length ? `${f.zones.length} : ${f.zones.join(", ")}` : ""],
-    ["Secteur", f.secteur || "Secteur formel"], ["Taille", `${n} répondants`], ["Durée", `${f.duree} jours`], ["Outil", f.outil === "kobo" ? "KoboToolbox" : "QuestionPro"],
+    ["Secteur", f.secteurs.join(", ") || "Secteur formel"], ["Taille", `${n} répondants`], ["Durée", `${f.duree} jours`], ["Outil", f.outil === "kobo" ? "KoboToolbox" : "QuestionPro"],
     ["Plafond", f.cout ? `${f.cout} FCFA` : "Non renseigné"]].map(([k, v]) => `<div><span>${k}</span><b class="${v ? "" : "manque"}">${esc(v || "à compléter")}</b></div>`).join("");
 
   // aperçu vivant
@@ -286,11 +321,26 @@ function rafraichirEtude(complet) {
     [nEnq, `enquêteurs estimés${f.zones.length > 1 ? ` · ${f.zones.length} pays` : ""}`],
     [Math.ceil(n / jours), "questionnaires par jour"],
   ].map(([v, l]) => `<div class="avj"><b>${v}</b><span>${l}</span></div>`).join("")
-    + (f.zones.length > 1 && n / f.zones.length < 30 ? `<div class="avj-alerte">${ico("alert")}<span>Environ ${Math.floor(n / f.zones.length)} répondants par pays : sous le seuil de 30, les résultats par pays ne seront pas publiables. Visez au moins ${30 * f.zones.length} répondants.</span></div>` : "");
+    + (f.zones.length > 1 && n / f.zones.length < 30 ? `<div class="avj-alerte">${ico("alert")}<span>Environ ${Math.floor(n / f.zones.length)} répondants par pays : sous le seuil de 30, les résultats par pays ne seront pas publiables. Visez au moins ${30 * f.zones.length} répondants.</span></div>` : "")
+    + alerteSecteurs(n);
   estimerCout();
   const livr = ["Note de cadrage", "Questionnaire et formulaires", "Échantillonnage et formation", "Note méthodologique", "Tableau de bord", "Note de suivi", "Rapport d'analyse"];
   const remplis = [f.theme && f.objectif, f.cible.length, f.zones.length, true].filter(Boolean).length;
   $("#av-chaine").innerHTML = `<div class="avc-titre">Ce qui sera produit</div>` + livr.map((l, k) => `<div class="avc ${k < remplis + 2 ? "pret" : ""}" style="transition-delay:${k * 60}ms"><i></i>${l}</div>`).join("");
+}
+
+/** Une liste de secteurs trop longue disperse l'échantillon : à signaler dès le choix, sous le seuil de 30 répondants. */
+function alerteSecteurs(n) {
+  const f = E.f;
+  const nb = f.secteurs.filter((s) => s !== "Autre secteur").length;
+  if (nb < 2) return "";
+  const parSecteur = Math.floor(n / nb), croise = Math.floor(n / (nb * Math.max(f.zones.length, 1)));
+  const texte = parSecteur < 30
+    ? `Environ ${parSecteur} répondants par secteur : sous le seuil de 30, les résultats par secteur ne seront pas publiables. Réduisez la liste ou visez au moins ${30 * nb} répondants. Avec les secteurs du catalogue, le rapport les regroupe aussi par grand domaine.`
+    : f.zones.length > 1 && croise < 30
+      ? `Environ ${croise} répondants par croisement pays × secteur : lisez les résultats par pays et par secteur séparément, pas en les croisant.`
+      : "";
+  return texte ? `<div class="avj-alerte">${ico("alert")}<span>${texte}</span></div>` : "";
 }
 
 /** Fourchette de coût de revient, recalculée par le serveur avec les coûts unitaires de Datatym. */
@@ -302,7 +352,7 @@ function estimerCout() {
     const zone = $("#av-cout");
     if (!zone || !f.zones.length || !f.taille) { if (zone) zone.innerHTML = ""; return; }
     try {
-      const e = await api("POST", "/api/estimation", { ...f, cible: f.cible.join(", "), zones: f.zones.join(", "), cout: String(f.cout || "").replace(/\D/g, "") });
+      const e = await api("POST", "/api/estimation", ficheEnvoi());
       const m = (x) => `${(x / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
       zone.innerHTML = `<div class="avj avj-cout"><b>${m(e.bas)} – ${m(e.haut)} FCFA</b><span>coût de revient estimé · central ${m(e.central)}, environ ${nf(e.par_questionnaire)} FCFA par questionnaire</span></div>`
         + (e.plafond && !e.dans_plafond ? `<div class="avj-alerte">${ico("alert")}<span>${e.plafond_court ? "Le plafond est inférieur à l'estimation basse : réduisez le nombre de pays, la taille ou allongez la durée." : "Le plafond ne couvre pas le scénario haut : le plan de collecte devra le confirmer."}</span></div>` : "");
@@ -313,8 +363,7 @@ function estimerCout() {
 async function lancerEtude(ev) {
   const m = manquants(2);
   if (m.length) return signalerManquants(m);
-  const f = E.f;
-  const fiche = { ...f, cible: f.cible.join(", "), zones: f.zones.join(", "), cout: String(f.cout || "").replace(/\D/g, "") };
+  const fiche = ficheEnvoi();
   const r = rideauLancement();
   try {
     let p = await api("POST", "/api/projets", fiche);

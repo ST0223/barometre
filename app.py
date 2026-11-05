@@ -15,7 +15,7 @@ from threading import Timer
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from datatym import apurement, budget, deroulement, equipe, importation, llm, moteur, paiement, pretest, rappels, restitution, store
+from datatym import apurement, budget, deroulement, equipe, importation, llm, moteur, paiement, pretest, rappels, restitution, secteurs, store
 from datatym.banque import TYPES
 from datatym.config import BASE_DIR, PROJETS_DIR, STATIC_DIR, charger_parametres, enregistrer_parametres
 from datatym.etapes import collecte
@@ -580,6 +580,11 @@ def tester_ia():
 def estimation():
     """Fourchette de coût calculée en direct pendant la saisie de la fiche."""
     return jsonify(budget.estimer_cadrage(store.nettoyer_fiche(request.get_json(force=True))))
+
+
+@app.get("/api/secteurs")
+def catalogue_secteurs():
+    return jsonify({"catalogue": secteurs.CATALOGUE, "autre": secteurs.AUTRE})
 
 
 @app.get("/api/types")

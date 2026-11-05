@@ -108,7 +108,7 @@ def analyser(projet, s):
                     + " dès la première semaine, en s'appuyant sur les réseaux professionnels et les annuaires d'entreprises.")
 
     # secteurs
-    secteurs_vides = [x["secteur"] for x in s.get("par_secteur") or [] if not x["realise"]]
+    secteurs_vides = [x["secteur"] for x in s.get("par_secteur") or [] if x["objectif"] and not x["realise"]]
     if secteurs_vides and s["realise"] >= 30:
         obs.append(f"{_pluriel(len(secteurs_vides), 'secteur')} sans aucune réponse : {', '.join(secteurs_vides[:4])}{'…' if len(secteurs_vides) > 4 else ''}.")
         reco.append("Cibler explicitement les secteurs absents dans la liste des entreprises à contacter.")
