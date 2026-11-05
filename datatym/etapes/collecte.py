@@ -41,6 +41,16 @@ def donnees_perimees(projet, quest):
     return f.read_text(encoding="utf-8").strip() != signature(quest) if f.exists() else None
 
 
+def accepter_ajouts(projet, avant, quest):
+    """Des questions ajoutées sans toucher aux autres : les réponses reçues restent valables, elles ne sont pas périmées."""
+    if donnees_perimees(projet, {"questions_plates": avant}) is not False:
+        return
+    actuelles = {q["id"]: q for q in quest["questions_plates"]}
+    trace = lambda q: (q["var"], q.get("texte", ""), [m.get("code") for m in q.get("modalites") or []])
+    if all(q["id"] in actuelles and trace(q) == trace(actuelles[q["id"]]) for q in avant):
+        chemin_donnees(projet).with_suffix(".signature").write_text(signature(quest), encoding="utf-8")
+
+
 def variables_cles(quest):
     v = {q["id"]: q["var"] for q in quest["questions_plates"]}
     return v.get("id_enqueteur"), v.get("id_zone"), v.get("id_profil")

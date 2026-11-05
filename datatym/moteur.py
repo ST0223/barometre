@@ -71,6 +71,7 @@ def vue(projet):
         v["etapes"]["collecte"]["apurement_synthese"] = apurement.synthese(projet)
     if _data(projet, "questionnaire"):
         v["etapes"]["questionnaire"]["pretest_synthese"] = {**pretest.synthese(projet), "conclusion_auto": pretest.conclusion_auto(projet)}
+        v["etapes"]["questionnaire"]["collecte_commencee"] = bool((_data(projet, "collecte") or {}).get("stats")) and collecte_commencee(projet)
     v["ordre"] = [{"cle": c, "libelle": l} for c, l in ETAPES]
     return v
 
@@ -334,6 +335,14 @@ def _editable(projet, cle):
         raise ErreurChaine("Générez d'abord cette étape.")
 
 
+def collecte_commencee(projet):
+    """Vraies réponses reçues ; des données de test se régénèrent et ne bloquent rien."""
+    if str((_data(projet, "collecte") or {}).get("source") or "").startswith("Données de test"):
+        return False
+    df = collecte.lire(projet, apurer=False)
+    return df is not None and not df.empty
+
+
 def maj_data(projet, cle, maj):
     _editable(projet, cle)
     e = projet["etapes"][cle]
@@ -344,11 +353,35 @@ def maj_data(projet, cle, maj):
                 d[k] = maj[k]
         e["data"] = cadrage.normaliser(d)
     elif cle == "questionnaire":
+        avant = list(d.get("questions_plates") or [])
+        var_avant = {q["id"]: q["var"] for q in avant}
+        renommees, changements = {}, []
         if "sections" in maj:
             d["sections"] = maj["sections"]
+            renommees, changements = questionnaire.synchroniser_cadrage(d, _data(projet, "cadrage"), avant)
         if "consentement" in maj:
             d["consentement_modifie"] = maj["consentement"]
-        e["data"] = questionnaire.normaliser(projet, d)
+        try:
+            e["data"] = questionnaire.normaliser(projet, d)
+        except ValueError as err:
+            raise ErreurChaine(str(err))
+        var_apres = {q["id"]: q["var"] for q in e["data"]["questions_plates"]}
+        # les réponses reçues sont rangées par variable : une variable qui change les ferait glisser sous une autre question
+        if collecte_commencee(projet):
+            deplacees = [q["num"] for q in e["data"]["questions_plates"] if q["id"] in var_avant and var_avant[q["id"]] != q["var"]]
+            if deplacees:
+                raise ErreurChaine(f"La collecte a commencé : ces questions changeraient de variable et les réponses reçues seraient mal rangées ({', '.join(deplacees[:6])}"
+                                   f"{'…' if len(deplacees) > 6 else ''}). Ajoutez plutôt les nouvelles questions en fin de section, sans déplacer ni retirer les autres.")
+            collecte.accepter_ajouts(projet, avant, e["data"])
+        # le pré-test note ses problèmes par variable : ils restent rattachés à la bonne question
+        correspondance = {var_avant[i]: var_apres.get(renommees.get(i, i), "") for i in var_avant}
+        for pb in (projet.get("pretest") or {}).get("problemes") or []:
+            if pb.get("var"):
+                pb["var"] = correspondance.get(pb["var"], pb["var"])
+        if changements:
+            cadrage.normaliser(_data(projet, "cadrage"))
+            store.journaliser(projet, "Questionnaire modifié, note de cadrage ajustée : " + " ; ".join(changements) + ".")
+            _apres_maj(projet, "cadrage")
     elif cle == "echantillonnage":
         for k in ("params", "recrutement"):
             if k in maj:

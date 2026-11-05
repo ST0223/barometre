@@ -946,9 +946,13 @@ function editeurQuestions(z, e) {
   const libP = Object.fromEntries(profils.map((p) => [p.code, p.libelle]));
   const jauge = (titre, mins) => Object.entries(mins).map(([c, v]) => `<div class="jauge"><div class="t">${esc(titre)} · ${esc(libP[c] || c)}</div><div class="v">${nf(v, 1)} min</div>
     <div class="b"><i class="${v > 15 ? "trop" : ""}" style="width:${Math.min(100, (v / 15) * 100)}%"></i></div></div>`).join("");
+  // sections modifiables : ni l'identification (première) ni la clôture (dernière)
+  const libre = (si) => si > 0 && si < W.sections.length - 1;
+  const calculable = (q) => ["select_one", "select_multiple", "integer"].includes(q.type);
   z.className = "carte-corps";
   z.innerHTML = `
-    ${d.alerte_duree ? `<div class="bandeau alerte">${ico("alert")}<div>La version terrain dépasse le plafond de 15 minutes pour au moins un profil. Désactivez des indicateurs dans le cadrage ou rendez des questions facultatives.</div></div>` : ""}
+    ${e.collecte_commencee ? `<div class="bandeau alerte">${ico("lock")}<div><b>La collecte a commencé.</b> Les réponses reçues sont rangées par variable : vous pouvez ajouter des questions en fin de section, mais pas déplacer ni retirer celles qui existent.</div></div>` : ""}
+    ${d.alerte_duree ? `<div class="bandeau alerte">${ico("alert")}<div>La version terrain dépasse le plafond de 15 minutes pour au moins un profil. Retirez des questions ou rendez-les facultatives.</div></div>` : ""}
     ${(() => {
       const qs = W.sections.flatMap((s) => s.ids);
       const ind = qs.filter((q) => q.indicateur).length;
@@ -958,9 +962,14 @@ function editeurQuestions(z, e) {
     <div class="jauges" style="margin-bottom:18px">${jauge("Terrain", d.duree_terrain)}${jauge("Digital", d.duree_digital)}</div>
     <div class="champ" style="margin-bottom:8px"><label>Message de consentement</label><textarea class="saisie" id="consent" rows="4">${esc(W.consentement)}</textarea></div>
     ${W.sections.map((s, si) => `
-      <div class="sec-q"><h4><span>${esc(s.lettre)}</span>${esc(s.titre)}</h4>
+      <div class="sec-q"><h4><span>${esc(s.lettre)}</span>${libre(si) ? `<input class="saisie petite sec-titre" data-titre="${si}" value="${esc(s.titre)}" aria-label="Nom de la section">
+          <button class="btn btn-fantome btn-petit btn-ed" data-sec-monte="${si}" title="Monter la section" ${libre(si - 1) ? "" : "disabled"}>↑</button>
+          <button class="btn btn-fantome btn-petit btn-ed" data-sec-descend="${si}" title="Descendre la section" ${libre(si + 1) ? "" : "disabled"}>↓</button>
+          ${s.ids.some((q) => q.fixe) ? "" : `<button class="btn btn-fantome btn-petit btn-danger btn-ed" data-sec-suppr="${si}" title="Supprimer la section">${ico("trash")}</button>`}` : esc(s.titre)}</h4>
         <div class="liste-q">${s.ids.map((q, qi) => `
-          <div class="carte-q"><div class="num">${esc(q.num)}</div><div class="lignes">
+          <div class="carte-q"><div class="num">${esc(q.num)}${libre(si) ? `<div class="q-fleches">
+              <button class="btn-ed" data-q-monte="${si}:${qi}" title="Monter la question" ${qi > 0 || libre(si - 1) ? "" : "disabled"}>↑</button>
+              <button class="btn-ed" data-q-descend="${si}:${qi}" title="Descendre la question" ${qi < s.ids.length - 1 || libre(si + 1) ? "" : "disabled"}>↓</button></div>` : ""}</div><div class="lignes">
             <input class="saisie" data-s="${si}" data-q="${qi}" data-k="texte" value="${esc(q.texte)}" style="font-weight:600">
             <div class="meta-q"><code>${esc(q.var)}</code>
               ${q.indicateur ? `<span class="tag">Indicateur ${esc(q.indicateur)}</span>` : q.ajoutee ? '<span class="tag manuel">Ajoutée</span>' : '<span class="tag">Identification</span>'}
@@ -968,19 +977,29 @@ function editeurQuestions(z, e) {
               <select class="saisie petite" style="width:auto" data-s="${si}" data-q="${qi}" data-k="type">${Object.entries(TYPES_Q).map(([v, l]) => `<option value="${v}" ${q.type === v ? "selected" : ""}>${l}</option>`).join("")}</select>
               <label class="bascule"><input type="checkbox" data-s="${si}" data-q="${qi}" data-k="obligatoire" ${q.obligatoire !== false ? "checked" : ""}> Obligatoire</label>
               ${q.condition ? `<span>${ico("info")} ${esc(q.condition)}</span>` : ""}
-              ${q.ajoutee ? `<button class="btn btn-fantome btn-petit btn-danger btn-ed" data-suppr="${si}:${qi}">${ico("trash")}</button>` : ""}
+              ${q.ajoutee || (q.indicateur && /^q_I/.test(q.id) && S.projet.etapes.cadrage.data.indicateurs.some((i) => i.id === q.indicateur && i.ajoute_questionnaire))
+                ? (calculable(q) ? `<label class="bascule" title="Crée un indicateur : la question est calculée et commentée dans le rapport"><input type="checkbox" data-rapport="${si}:${qi}" ${q.indicateur ? (q.dans_rapport === false ? "" : "checked") : q.dans_rapport ? "checked" : ""}> Inclure dans le rapport</label>`
+                  : `<span class="aide" style="font-size:11.5px">Texte collecté, non calculé dans le rapport</span>`) : ""}
+              ${q.fixe ? "" : `<button class="btn btn-fantome btn-petit btn-danger btn-ed" data-suppr="${si}:${qi}" title="Supprimer la question">${ico("trash")}</button>`}
             </div>
             ${["select_one", "select_multiple"].includes(q.type) ? `<textarea class="saisie petite" rows="${Math.min(9, (q.modalites || []).length + 1)}" data-s="${si}" data-q="${qi}" data-k="modalites" title="code = libellé, une modalité par ligne">${esc((q.modalites || []).map((m) => `${m.code} = ${m.label}`).join("\n"))}</textarea>` : ""}
             <input class="saisie petite" data-s="${si}" data-q="${qi}" data-k="consigne" value="${esc(q.consigne || "")}" placeholder="Consigne pour l'enquêteur (facultatif)">
             ${!q.fixe ? `<div class="meta-q">Posée à : ${profils.map((p) => `<label class="bascule"><input type="checkbox" data-s="${si}" data-q="${qi}" data-prof="${p.code}" ${!q.profils || q.profils.includes(p.code) ? "checked" : ""}> ${esc(p.libelle)}</label>`).join("")}</div>` : ""}
           </div></div>`).join("")}
         </div>
-        ${s.lettre !== "A" && si < W.sections.length - 1 ? `<button class="btn btn-petit btn-fantome btn-ed" style="margin-top:8px" data-ajq="${si}">${ico("plus")} Ajouter une question dans « ${esc(s.titre)} »</button>` : ""}
-      </div>`).join("")}`;
+        ${libre(si) ? `<button class="btn btn-petit btn-fantome btn-ed" style="margin-top:8px" data-ajq="${si}">${ico("plus")} Ajouter une question dans « ${esc(s.titre)} »</button>` : ""}
+      </div>
+      ${si === W.sections.length - 2 ? `<button class="btn btn-petit btn-ed" style="margin-top:16px" id="aj-section">${ico("plus")} Ajouter une section</button>` : ""}`).join("")}`;
   z.oninput = z.onchange = (ev) => {
     const t = ev.target;
     S.sale = true;
     if (t.id === "consent") { W.consentement = t.value; W.consentModifie = true; return; }
+    if (t.dataset.titre !== undefined) { W.sections[+t.dataset.titre].titre = t.value; return; }
+    if (t.dataset.rapport) {
+      const [si, qi] = t.dataset.rapport.split(":").map(Number);
+      W.sections[si].ids[qi].dans_rapport = t.checked;
+      return;
+    }
     if (t.dataset.s === undefined) return;
     const q = W.sections[+t.dataset.s].ids[+t.dataset.q];
     q.modifiee = true;
@@ -1000,19 +1019,71 @@ function editeurQuestions(z, e) {
     if (k === "type" && ev.type === "change" && ["select_one", "select_multiple"].includes(q.type) && !(q.modalites || []).length) q.modalites = [{ code: "oui", label: "Oui" }, { code: "non", label: "Non" }];
     if (k === "type" && ev.type === "change") rafraichirOnglet("questionnaire");
   };
+  // après chaque changement de structure : la page reste à la même hauteur
+  const redessiner = () => {
+    const y = window.scrollY;
+    S.sale = true;
+    rafraichirOnglet("questionnaire");
+    window.scrollTo(0, y);
+  };
+  const nouvelleQuestion = (titre) => ({ id: `aj_${Date.now()}_${Math.floor(Math.random() * 1000)}`, texte: "Nouvelle question", type: "select_one",
+    modalites: [{ code: "oui", label: "Oui" }, { code: "non", label: "Non" }], ajoutee: true, modifiee: true, dans_rapport: true,
+    bloc: titre, obligatoire: true, profils: null, consigne: "", num: "…", var: "…" });
+  // questions dont l'affichage dépend d'une de celles qu'on retire
+  const dependantes = (ids) => W.sections.flatMap((s) => s.ids).filter((q) => !ids.includes(q.id)
+    && ((q.conditions || []).some((c) => ids.includes(c[0])) || (q.condition_sur && ids.includes(q.condition_sur[0]))));
+  const avertissement = (qs) => {
+    const inds = qs.filter((q) => q.indicateur).map((q) => q.indicateur);
+    const dep = dependantes(qs.map((q) => q.id));
+    return [inds.length ? `L'indicateur ${inds.join(", ")} sera désactivé dans la note de cadrage et disparaîtra du rapport.` : "",
+      dep.length ? `Le filtre de ${dep.map((q) => q.num).join(", ")} sera retiré : ces questions seront posées à tous les répondants.` : ""].filter(Boolean).join(" ");
+  };
   z.querySelectorAll("[data-ajq]").forEach((b) => (b.onclick = () => {
     const s = W.sections[+b.dataset.ajq];
-    s.ids.push({ id: `aj_${Date.now()}`, texte: "Nouvelle question", type: "select_one", modalites: [{ code: "oui", label: "Oui" }, { code: "non", label: "Non" }],
-      ajoutee: true, modifiee: true, bloc: s.titre, obligatoire: true, profils: null, consigne: "", num: "…", var: "…" });
-    S.sale = true;
-    rafraichirOnglet("questionnaire");
+    s.ids.push(nouvelleQuestion(s.titre));
+    redessiner();
   }));
-  z.querySelectorAll("[data-suppr]").forEach((b) => (b.onclick = () => {
+  const ajS = z.querySelector("#aj-section");
+  if (ajS) ajS.onclick = () => {
+    const noms = new Set(W.sections.map((s) => s.titre));
+    let titre = "Nouvelle section", k = 1;
+    while (noms.has(titre)) titre = `Nouvelle section ${++k}`;
+    W.sections.splice(W.sections.length - 1, 0, { lettre: "…", titre, ids: [nouvelleQuestion(titre)] });
+    redessiner();
+  };
+  z.querySelectorAll("[data-suppr]").forEach((b) => (b.onclick = async () => {
     const [si, qi] = b.dataset.suppr.split(":").map(Number);
+    const q = W.sections[si].ids[qi];
+    const msg = avertissement([q]);
+    if (msg && !(await confirmer("Supprimer cette question ?", `${msg} L'opération s'annule tant que vous n'avez pas enregistré.`, "Supprimer", "btn-danger"))) return;
     W.sections[si].ids.splice(qi, 1);
-    S.sale = true;
-    rafraichirOnglet("questionnaire");
+    redessiner();
   }));
+  z.querySelectorAll("[data-sec-suppr]").forEach((b) => (b.onclick = async () => {
+    const si = +b.dataset.secSuppr;
+    const s = W.sections[si];
+    if (s.ids.length && !(await confirmer(`Supprimer la section « ${s.titre} » ?`, `Ses ${s.ids.length} question(s) seront retirées. ${avertissement(s.ids)} L'opération s'annule tant que vous n'avez pas enregistré.`, "Supprimer", "btn-danger"))) return;
+    W.sections.splice(si, 1);
+    redessiner();
+  }));
+  const deplacerSection = (si, sens) => {
+    const [s] = W.sections.splice(si, 1);
+    W.sections.splice(si + sens, 0, s);
+    redessiner();
+  };
+  z.querySelectorAll("[data-sec-monte]").forEach((b) => (b.onclick = () => deplacerSection(+b.dataset.secMonte, -1)));
+  z.querySelectorAll("[data-sec-descend]").forEach((b) => (b.onclick = () => deplacerSection(+b.dataset.secDescend, 1)));
+  // une question en bout de section passe dans la section voisine
+  const deplacerQuestion = (si, qi, sens) => {
+    const ids = W.sections[si].ids;
+    const [q] = ids.splice(qi, 1);
+    if (qi + sens >= 0 && qi + sens <= ids.length) ids.splice(qi + sens, 0, q);
+    else if (sens < 0) W.sections[si - 1].ids.push(q);
+    else W.sections[si + 1].ids.unshift(q);
+    redessiner();
+  };
+  z.querySelectorAll("[data-q-monte]").forEach((b) => (b.onclick = () => { const [si, qi] = b.dataset.qMonte.split(":").map(Number); deplacerQuestion(si, qi, -1); }));
+  z.querySelectorAll("[data-q-descend]").forEach((b) => (b.onclick = () => { const [si, qi] = b.dataset.qDescend.split(":").map(Number); deplacerQuestion(si, qi, 1); }));
   piedEnregistrer(z, "questionnaire", () => {
     const corps = { sections: W.sections };
     if (W.consentModifie) corps.consentement = W.consentement;

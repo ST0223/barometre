@@ -83,7 +83,28 @@ def question_indicateur(ind, profils):
     return q
 
 
-def construire_questions(projet, cadrage, precedentes=None):
+def _relettrer(sections):
+    """Lettre de chaque section selon sa position : A pour l'identification, puis B, C…"""
+    if len(sections) > 26:
+        raise ValueError("Le questionnaire ne peut pas dépasser 26 sections.")
+    for k, s in enumerate(sections):
+        s["lettre"] = chr(ord("A") + k)
+
+
+def _ordre_precedent(sections, structure):
+    """Conserve l'ordre des sections et des questions choisi à l'édition ; ce qui est nouveau vient après.
+    L'identification et la clôture ne bougent pas."""
+    if not structure or len(sections) < 3:
+        return sections
+    rang_s = {s["titre"]: k for k, s in enumerate(structure)}
+    rang_q = {q["id"]: k for s in structure for k, q in enumerate(s.get("ids") or [])}
+    milieu = sorted(sections[1:-1], key=lambda s: rang_s.get(s["titre"], len(rang_s)))
+    for s in milieu:
+        s["ids"] = sorted(s["ids"], key=lambda q: rang_q.get(q["id"], len(rang_q)))
+    return [sections[0], *milieu, sections[-1]]
+
+
+def construire_questions(projet, cadrage, precedentes=None, structure=None):
     fiche = projet["fiche"]
     profils = cadrage.get("profils") or profils_depuis_cible(fiche["cible"])
     secteurs = decouper_secteurs(fiche.get("secteur", ""))
@@ -106,15 +127,15 @@ def construire_questions(projet, cadrage, precedentes=None):
     sections[0]["ids"] += [garder(question_indicateur(i, profils)) for i in inds if i.get("identification")]
     inds = [i for i in inds if not i.get("identification")]
     blocs = []
-    for i in inds:
-        if i["bloc"] not in blocs:
-            blocs.append(i["bloc"])
-    lettres = "BCDEFGHIJKLMNOPQRSTUVWXY"
-    for k, bloc in enumerate(blocs):
+    # une section peut ne contenir que des questions ajoutées à la main
+    for b in [i["bloc"] for i in inds] + [a.get("bloc") for a in anciennes.values() if a.get("ajoutee")]:
+        if b and b not in blocs:
+            blocs.append(b)
+    for bloc in blocs:
         qs = [garder(question_indicateur(i, profils)) for i in inds if i["bloc"] == bloc]
         qs += [a for a in anciennes.values() if a.get("ajoutee") and a.get("bloc") == bloc]
-        sections.append({"lettre": lettres[k], "titre": bloc, "ids": qs})
-    sections.append({"lettre": lettres[len(blocs)], "titre": "Clôture", "ids": [
+        sections.append({"lettre": "", "titre": bloc, "ids": qs})
+    sections.append({"lettre": "", "titre": "Clôture", "ids": [
         # contrôle qualité : un échantillon de répondants est rappelé pour vérifier que l'entretien a bien eu lieu
         garder(_q("cl_rappel", "Datatym rappelle quelques répondants pour vérifier la bonne réalisation de l'enquête. "
                   "Acceptez-vous d'être recontacté brièvement à ce sujet ?", "select_one",
@@ -129,6 +150,8 @@ def construire_questions(projet, cadrage, precedentes=None):
                   "email", fixe=True, obligatoire=False)),
         garder(_q("cl_commentaire", "Avez-vous une remarque ou une suggestion à formuler ?", "text", fixe=True, obligatoire=False)),
     ]})
+    sections = _ordre_precedent(sections, structure)
+    _relettrer(sections)
     return profils, sections
 
 
@@ -206,7 +229,7 @@ def consentement(fiche, minutes):
 
 def generer(projet, cadrage, precedent=None):
     prec = (precedent or {}).get("questions_plates")
-    profils, sections = construire_questions(projet, cadrage, prec)
+    profils, sections = construire_questions(projet, cadrage, prec, (precedent or {}).get("sections"))
     return finaliser(projet, {"profils": profils, "sections": sections})
 
 
@@ -223,9 +246,99 @@ def finaliser(projet, data):
     return data
 
 
+TYPE_INDICATEUR = {"select_one": "unique", "select_multiple": "multiple", "integer": "numerique"}
+
+
+def synchroniser_cadrage(data, cadrage, avant):
+    """Répercute dans le cadrage ce qui a été décidé dans le questionnaire, pour que note de cadrage, dictionnaire
+    et rapport restent cohérents : question retirée, section renommée ou question déplacée, question à inclure au rapport.
+    Renvoie les identifiants de questions renommés et les changements à inscrire au journal."""
+    inds = {i["id"]: i for i in cadrage.get("indicateurs", [])}
+    renommees, changements = {}, []
+    sections = data["sections"]
+
+    def suivant():
+        nums = [int(k[1:]) for k in inds if k[1:].isdigit()]
+        return f"I{(max(nums) + 1 if nums else 1):02d}"
+
+    for k, s in enumerate(sections):
+        milieu = 0 < k < len(sections) - 1
+        for q in s["ids"]:
+            if milieu:
+                q["bloc"] = s["titre"]
+            calculable = q["type"] in TYPE_INDICATEUR
+            ind = inds.get(q.get("indicateur"))
+            if q.get("ajoutee") and q.get("dans_rapport") and calculable:
+                ident = suivant()
+                ind = {"id": ident, "actif": True, "objet": "", "sens": "", "definition": "", "ajoute_questionnaire": True, "niveau": "tous"}
+                inds[ident] = ind
+                cadrage["indicateurs"].append(ind)
+                renommees[q["id"]] = f"q_{ident}"
+                q.update(id=f"q_{ident}", indicateur=ident, ajoutee=False, modifiee=True)
+                changements.append(f"indicateur {ident} créé")
+            elif ind and ind.get("ajoute_questionnaire") and not (q.get("dans_rapport") is not False and calculable):
+                cadrage["indicateurs"].remove(ind)
+                del inds[ind["id"]]
+                changements.append(f"indicateur {ind['id']} retiré du rapport")
+                q.update(indicateur=None, ajoutee=True, dans_rapport=False, modifiee=True)
+                continue
+            if ind and ind.get("ajoute_questionnaire"):
+                # formulation, type et modalités suivent la question
+                valeurs = {"libelle": q["texte"], "question": q["texte"], "type": TYPE_INDICATEUR[q["type"]], "bloc": s["titre"],
+                           "options": [m["label"] for m in q.get("modalites") or []], "niveau": q.get("profils") or "tous"}
+                if any(ind.get(c) != v for c, v in valeurs.items()):
+                    if ind.get("libelle"):  # déjà créé : sa formulation change
+                        changements.append(f"indicateur {ind['id']} actualisé")
+                    ind.update(valeurs, definition="")
+            elif ind and milieu and ind.get("bloc") != s["titre"]:
+                changements.append(f"indicateur {ind['id']} placé dans « {s['titre']} »")
+                ind["bloc"] = s["titre"]
+    restantes = {q.get("indicateur") for s in sections for q in s["ids"]}
+    for q in avant:
+        ind = inds.get(q.get("indicateur"))
+        if ind and q["indicateur"] not in restantes and ind.get("actif", True):
+            if ind.get("ajoute_questionnaire"):
+                cadrage["indicateurs"].remove(ind)
+                del inds[ind["id"]]
+            else:
+                ind["actif"] = False
+            changements.append(f"indicateur {q['indicateur']} désactivé")
+    return renommees, changements
+
+
 def normaliser(projet, data):
-    """Après édition : reconstruit les sections à partir des questions (ordre conservé)."""
-    return finaliser(projet, data)
+    """Après édition : sections vides retirées, lettres et variables recalculées selon l'ordre choisi, filtres vérifiés."""
+    sections = data["sections"]
+    if len(sections) < 2:
+        raise ValueError("L'identification et la clôture du questionnaire ne peuvent pas être supprimées.")
+    garde = [sections[0]] + [s for s in sections[1:-1] if s.get("ids")] + [sections[-1]]
+    titres = [str(s.get("titre") or "").strip() for s in garde]
+    if not all(titres):
+        raise ValueError("Donnez un nom à chaque section.")
+    doubles = {t for t in titres if titres.count(t) > 1}
+    if doubles:
+        raise ValueError(f"Deux sections portent le même nom : « {sorted(doubles)[0]} ».")
+    for s, t in zip(garde, titres):
+        s["titre"] = t
+    data["sections"] = garde
+    _relettrer(garde)
+    # une question retirée ne laisse pas de filtre orphelin derrière elle
+    ids = {q["id"] for s in garde for q in s["ids"]}
+    for s in garde:
+        for q in s["ids"]:
+            if q.get("conditions"):
+                q["conditions"] = [c for c in q["conditions"] if c[0] in ids]
+            if q.get("condition_sur") and q["condition_sur"][0] not in ids:
+                q.pop("condition_sur")
+    data = finaliser(projet, data)
+    rang = {q["id"]: k for k, q in enumerate(data["questions_plates"])}
+    num = {q["id"]: q["num"] for q in data["questions_plates"]}
+    for q in data["questions_plates"]:
+        sources = [c[0] for c in q.get("conditions") or []] + ([q["condition_sur"][0]] if q.get("condition_sur") else [])
+        for src in sources:
+            if rang[src] > rang[q["id"]]:
+                raise ValueError(f"La question {q['num']} dépend de la réponse à {num[src]} : elle doit rester après elle.")
+    return data
 
 
 def _mods_txt(q):
