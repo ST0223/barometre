@@ -14,7 +14,7 @@ const ESPACES_JS = {
   "Guinée": ["Guinée"],
   "RD Congo": ["RD Congo"],
 };
-const ETAPES_ETUDE = [["Le sujet", "Thème et objectif"], ["La cible", "Profils interrogés"], ["Le terrain", "Zones, taille, durée"], ["Le lancement", "Budget et récapitulatif"]];
+const ETAPES_ETUDE = [["Le sujet", "Thème et objectif"], ["La cible", "Profils et secteurs"], ["Le terrain", "Zones, taille, durée"], ["Le lancement", "Budget et récapitulatif"]];
 
 const E = { etape: 0, f: null };
 
@@ -127,7 +127,10 @@ function panneauCible() {
   return `<h2 class="ass-titre">Qui interroge-t-on&nbsp;?</h2>
     ${champ("e-cible-in", 'Profils de la cible <span class="obl">*</span>', `<div class="puces-saisie" data-liste="cible"><input id="e-cible-in" placeholder="Saisir un profil puis Entrée"></div>`, "Les dirigeants et les profils opérationnels ne reçoivent pas les mêmes questions.")}
     <div class="suggestions" data-sugg="cible">${SUGG_CIBLE.map((s) => `<button data-ajout="${esc(s)}">+ ${esc(s)}</button>`).join("")}</div>
-    <div class="profils-niveaux" id="e-niveaux"></div>`;
+    <div class="profils-niveaux" id="e-niveaux"></div>
+    <div class="lib" style="margin:16px 0 8px">Secteurs et activités</div>
+    <div class="cat-secteurs" id="e-catalogue"></div>
+    ${champ("e-secteurs-in", 'Retenus pour cette étude <span class="ex">ne gardez que les secteurs utiles ; à partir de deux, une question est ajoutée</span>', `<div class="puces-saisie" data-liste="secteurs"><input id="e-secteurs-in" placeholder="Autre secteur ou activité, puis Entrée"></div>`)}`;
 }
 
 function panneauTerrain() {
@@ -136,9 +139,6 @@ function panneauTerrain() {
     <div class="espaces">${Object.entries(ESPACES_JS).map(([e, l]) => `<button class="espace" data-espace="${esc(e)}"><b>${esc(e)}</b><small>${l.length} pays</small><i class="esp-jauge"><i></i></i></button>`).join("")}</div>
     <div class="pays-grille">${Object.entries(ESPACES_JS).map(([e, l]) => `<div class="pays-groupe"><span>${esc(e)}</span>${l.map((p) => `<button class="pays" data-pays="${esc(p)}">${esc(p)}</button>`).join("")}</div>`).join("")}</div>
     ${champ("e-zones-in", 'Pays retenus <span class="ex">ajoutez librement tout autre pays ou zone</span>', `<div class="puces-saisie" data-liste="zones"><input id="e-zones-in" placeholder="Autre pays ou zone, puis Entrée"></div>`)}
-    <div class="lib" style="margin:16px 0 8px">Secteurs et activités</div>
-    <div class="cat-secteurs" id="e-catalogue"></div>
-    ${champ("e-secteurs-in", 'Retenus pour cette étude <span class="ex">ne gardez que les secteurs utiles ; à partir de deux, une question est ajoutée</span>', `<div class="puces-saisie" data-liste="secteurs"><input id="e-secteurs-in" placeholder="Autre secteur ou activité, puis Entrée"></div>`)}
     ${champ("e-date", "Début de la collecte", `<input class="saisie" type="date" id="e-date" data-f="date_debut">`, "Par défaut : le lundi dans trois semaines.")}
     <div class="curseurs">
       <div class="curseur"><div class="cu-tete"><label for="e-taille">Taille visée</label><b><span id="v-taille"></span> répondants</b></div>
