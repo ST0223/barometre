@@ -71,6 +71,7 @@ def vue(projet):
         v["etapes"]["collecte"]["apurement_synthese"] = apurement.synthese(projet)
     if _data(projet, "questionnaire"):
         v["etapes"]["questionnaire"]["pretest_synthese"] = {**pretest.synthese(projet), "conclusion_auto": pretest.conclusion_auto(projet)}
+        v["etapes"]["questionnaire"]["final"] = pretest.est_final(projet)
         v["etapes"]["questionnaire"]["collecte_commencee"] = bool((_data(projet, "collecte") or {}).get("stats")) and collecte_commencee(projet)
     v["ordre"] = [{"cle": c, "libelle": l} for c, l in ETAPES]
     return v
@@ -282,6 +283,8 @@ def generer(projet, cle):
     if e["statut"] == "valide":
         raise ErreurChaine("Étape validée : rouvrez-la pour la régénérer.")
     prec = e.get("data") or {}
+    if cle == "questionnaire":
+        _archiver_testee(projet)
     if cle == "cadrage":
         if prec:
             # la cible a pu changer dans la fiche : on garde le niveau déjà choisi pour chaque profil
@@ -335,6 +338,11 @@ def _editable(projet, cle):
         raise ErreurChaine("Générez d'abord cette étape.")
 
 
+def _archiver_testee(projet):
+    if pretest.archiver_version_testee(projet):
+        store.journaliser(projet, f"Pré-test : questionnaire testé archivé (version {projet['pretest']['version_testee']['version']}) avant correction.")
+
+
 def collecte_commencee(projet):
     """Vraies réponses reçues ; des données de test se régénèrent et ne bloquent rien."""
     if str((_data(projet, "collecte") or {}).get("source") or "").startswith("Données de test"):
@@ -354,6 +362,8 @@ def maj_data(projet, cle, maj):
         e["data"] = cadrage.normaliser(d)
     elif cle == "questionnaire":
         avant = list(d.get("questions_plates") or [])
+        empreinte_avant = pretest.empreinte(avant)
+        consentement_avant = d.get("consentement")
         var_avant = {q["id"]: q["var"] for q in avant}
         renommees, changements = {}, []
         if "sections" in maj:
@@ -373,6 +383,9 @@ def maj_data(projet, cle, maj):
                 raise ErreurChaine(f"La collecte a commencé : ces questions changeraient de variable et les réponses reçues seraient mal rangées ({', '.join(deplacees[:6])}"
                                    f"{'…' if len(deplacees) > 6 else ''}). Ajoutez plutôt les nouvelles questions en fin de section, sans déplacer ni retirer les autres.")
             collecte.accepter_ajouts(projet, avant, e["data"])
+        # première correction après le pré-test : les fichiers en place sont ceux qui ont été testés
+        if pretest.empreinte(e["data"]["questions_plates"]) != empreinte_avant or e["data"].get("consentement") != consentement_avant:
+            _archiver_testee(projet)
         # le pré-test note ses problèmes par variable : ils restent rattachés à la bonne question
         correspondance = {var_avant[i]: var_apres.get(renommees.get(i, i), "") for i in var_avant}
         for pb in (projet.get("pretest") or {}).get("problemes") or []:
@@ -419,6 +432,28 @@ def maj_doc(projet, cle, nom, modele):
     return projet
 
 
+def _exporter_et_archiver(projet, cle):
+    e = projet["etapes"][cle]
+    exporter(projet, cle)
+    archive = store.dossier(projet["slug"]) / "versions" / f"{cle}_v{e['version']}"
+    archive.mkdir(parents=True, exist_ok=True)
+    for f in e["fichiers"]:
+        src = store.dossier(projet["slug"]) / "livrables" / f["fichier"]
+        if src.exists():
+            shutil.copy(src, archive / f["fichier"])
+
+
+def pretest_concluant(projet):
+    """Rien à corriger : le questionnaire en place devient le final, déjà validé ou non, sans nouvelle version."""
+    if projet["etapes"]["questionnaire"]["statut"] != "valide":
+        return valider(projet, "questionnaire")
+    pretest.marquer_final(projet, True)
+    _exporter_et_archiver(projet, "questionnaire")
+    store.journaliser(projet, f"Questionnaire version {projet['etapes']['questionnaire']['version']} confirmé comme final après le pré-test.")
+    store.sauver(projet)
+    return projet
+
+
 def valider(projet, cle):
     s = statut(projet, cle)
     if s == "valide":
@@ -429,13 +464,9 @@ def valider(projet, cle):
         raise ErreurChaine("Rien à valider pour l'instant.")
     _exiger_valide(projet, cle)
     e = projet["etapes"][cle]
-    exporter(projet, cle)
-    archive = store.dossier(projet["slug"]) / "versions" / f"{cle}_v{e['version']}"
-    archive.mkdir(parents=True, exist_ok=True)
-    for f in e["fichiers"]:
-        src = store.dossier(projet["slug"]) / "livrables" / f["fichier"]
-        if src.exists():
-            shutil.copy(src, archive / f["fichier"])
+    if cle == "questionnaire":
+        pretest.marquer_final(projet, True)
+    _exporter_et_archiver(projet, cle)
     e["statut"] = "valide"
     e["valide_le"] = store.maintenant()
     store.journaliser(projet, f"« {LIBELLES[cle]} » : version {e['version']} validée et archivée.")
@@ -447,6 +478,9 @@ def rouvrir(projet, cle):
     e = projet["etapes"][cle]
     if e["statut"] != "valide":
         return projet
+    if cle == "questionnaire":
+        _archiver_testee(projet)
+        pretest.marquer_final(projet, False)
     e["statut"] = "brouillon"
     e["version"] += 1
     _marquer_aval(projet, cle)

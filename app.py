@@ -235,6 +235,28 @@ def pretest_enregistrer(slug):
     return ok(p)
 
 
+@app.post("/api/projets/<slug>/pretest/concluant")
+def pretest_concluant(slug):
+    """Pré-test sans correction à faire : le questionnaire en place est validé tel quel et devient le final."""
+    p = _projet(slug)
+    pretest.enregistrer(p, request.get_json(force=True) or {})
+    s = pretest.synthese(p)
+    if not s["entretiens"]:
+        return jsonify({"erreur": "Saisissez au moins un entretien test avant de conclure le pré-test."}), 400
+    if s["a_traiter"]:
+        return jsonify({"erreur": f"{s['a_traiter']} problème(s) restent à traiter : corrigez-les ou classez-les sans suite."}), 400
+    store.journaliser(p, f"Pré-test concluant : {s['entretiens']} entretien(s), {s['problemes']} problème(s) relevé(s), aucun à traiter.")
+    return ok(moteur.pretest_concluant(p))
+
+
+@app.get("/api/projets/<slug>/pretest/testee/<path:fichier>")
+def pretest_version_testee(slug, fichier):
+    chemin = pretest.chemin_version_testee(_projet(slug), fichier)
+    if not chemin or not chemin.exists():
+        abort(404)
+    return send_file(chemin, as_attachment=True, download_name=chemin.name)
+
+
 @app.get("/api/projets/<slug>/pretest/<fmt>")
 def pretest_fichier(slug, fmt):
     if fmt not in ("docx", "xlsx"):

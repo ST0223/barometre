@@ -263,6 +263,10 @@ select.saisie { padding-right: 28px; }
 .q-fleches button:hover:not(:disabled) { border-color: var(--bleu); color: var(--bleu); }
 .q-fleches button:disabled { opacity: .35; cursor: default; }
 .sec-titre { flex: 1; max-width: 420px; font-weight: 600; }
+.q-pretest { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--ambre-50); font-size: 12.5px; }
+.q-pretest svg { flex-shrink: 0; }
+.q-pretest span { flex: 1; }
+.carte-q.q-focus { border-color: var(--bleu); box-shadow: 0 0 0 3px var(--bleu-50); }
 .liste-q { display: flex; flex-direction: column; gap: 10px; }
 .sec-q > h4 { font-size: 13px; margin: 18px 0 10px; display: flex; gap: 8px; align-items: center; }
 .sec-q > h4 span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--bleu); color: #fff; font-size: 12px; }

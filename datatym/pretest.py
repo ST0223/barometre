@@ -2,6 +2,7 @@
 avant la validation définitive et le déploiement. Grille d'observation (Excel) et rapport de pré-test (Word).
 """
 import math
+import shutil
 
 from openpyxl import Workbook
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -10,6 +11,7 @@ from .charte import chiffres, p, rendre_modele, section, tableau
 from .config import auteur_fichiers
 from .formulaires import _feuille
 from .outils import aujourdhui, date_courte, nombre
+from .store import dossier
 
 TYPES = {
     "comprehension": "Question mal comprise",
@@ -33,8 +35,66 @@ STATUTS = {"a_traiter": "À traiter", "corrige": "Corrigé", "sans_suite": "Sans
 MODES = {"terrain": "Face à face (terrain)", "telephone": "Téléphone", "digital": "En ligne (auto-administré)"}
 
 
+MENTION_FINALE = "Version finale, après pré-test"
+DOSSIER_TESTEE = "questionnaire_pretest"
+
+
 def donnees(projet):
     return projet.setdefault("pretest", {"entretiens": [], "problemes": [], "conclusion": ""})
+
+
+def commence(projet):
+    d = projet.get("pretest") or {}
+    return bool(d.get("entretiens") or d.get("problemes"))
+
+
+def empreinte(questions):
+    """Ce qui change vraiment le questionnaire testé : un simple enregistrement sans modification ne compte pas."""
+    return [[q.get(k) for k in ("id", "var", "texte", "type", "modalites", "consigne", "profils", "obligatoire", "conditions", "condition_sur")] for q in questions]
+
+
+def archiver_version_testee(projet):
+    """Garde une copie du questionnaire tel qu'il a été testé, avant la première correction. Une seule fois."""
+    d = donnees(projet)
+    e = projet["etapes"]["questionnaire"]
+    if d.get("version_testee") or not commence(projet):
+        return False
+    racine = dossier(projet["slug"])
+    cible = racine / "versions" / DOSSIER_TESTEE
+    copies = []
+    for f in e.get("fichiers") or []:
+        src = racine / "livrables" / f["fichier"]
+        if src.exists():
+            cible.mkdir(parents=True, exist_ok=True)
+            shutil.copy(src, cible / f["fichier"])
+            copies.append({"nom": f["nom"], "fichier": f["fichier"], "type": f["type"]})
+    if not copies:
+        return False
+    d["version_testee"] = {"version": e.get("version") or 1, "date": aujourdhui(), "fichiers": copies}
+    return True
+
+
+def chemin_version_testee(projet, fichier):
+    """Fichier archivé, seulement s'il figure dans la liste de la version testée."""
+    v = (projet.get("pretest") or {}).get("version_testee") or {}
+    if fichier not in {f["fichier"] for f in v.get("fichiers") or []}:
+        return None
+    return dossier(projet["slug"]) / "versions" / DOSSIER_TESTEE / fichier
+
+
+def est_final(projet):
+    """Validé après un pré-test : un questionnaire validé avant le pré-test ne l'est pas encore."""
+    e = projet["etapes"]["questionnaire"]
+    return e.get("statut") == "valide" and any(MENTION_FINALE in (m.get("meta") or []) for m in (e.get("docs") or {}).values())
+
+
+def marquer_final(projet, final):
+    """Mention sur la page de garde des documents du questionnaire validé après un pré-test."""
+    for m in (projet["etapes"]["questionnaire"].get("docs") or {}).values():
+        meta = [x for x in m.get("meta") or [] if x != MENTION_FINALE]
+        if final and (projet.get("pretest") or {}).get("entretiens"):
+            meta.insert(1 if meta else 0, MENTION_FINALE)
+        m["meta"] = meta
 
 
 def _quest(projet):

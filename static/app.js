@@ -424,7 +424,7 @@ function colonneDroite(e) {
   const p = S.projet;
   const fichiers = e ? e.fichiers || [] : [];
   return `<div class="col-droite">
-    ${e ? `<div class="carte"><div class="carte-titre"><h3>Livrables</h3><span class="tag">v${e.version || 1}</span></div>
+    ${e ? `<div class="carte"><div class="carte-titre"><h3>Livrables</h3><span style="display:inline-flex;gap:6px">${e.final ? `<span class="tag" style="color:var(--vert)" title="Version validée après le pré-test">Questionnaire final</span>` : ""}<span class="tag">v${e.version || 1}</span></span></div>
       ${fichiers.length ? fichiers.map((f) => `
         <div class="livrable"><div class="ico-fichier ${f.type}">${f.type.toUpperCase()}</div>
           <div style="min-width:0"><div class="nom">${esc(f.nom)}</div><div class="fic">${esc(f.fichier)}</div></div>
@@ -708,6 +708,8 @@ async function agir(btn, cle, act) {
   if (act === "valider" && cle === "questionnaire" && p.etapes.questionnaire.data.alerte_duree) {
     if (!(await confirmer("Durée supérieure à 15 minutes", "Le questionnaire dépasse la durée plafond. Valider quand même ?", "Valider"))) return;
   }
+  const resteAFaire = cle === "questionnaire" ? (p.etapes.questionnaire.pretest_synthese || {}).a_traiter : 0;
+  if (act === "valider" && resteAFaire && !(await confirmer("Pré-test : corrections en attente", `${resteAFaire > 1 ? `${resteAFaire} problèmes relevés au pré-test restent` : "Un problème relevé au pré-test reste"} à traiter. Valider ce questionnaire quand même ?`, "Valider quand même"))) return;
   const voile = ["generer", "regenerer"].includes(act) ? voileGeneration(cle) : null;
   await occupe(btn, async () => {
     try {
@@ -949,6 +951,7 @@ function editeurQuestions(z, e) {
   // sections modifiables : ni l'identification (première) ni la clôture (dernière)
   const libre = (si) => si > 0 && si < W.sections.length - 1;
   const calculable = (q) => ["select_one", "select_multiple", "integer"].includes(q.type);
+  const problemesPretest = (S.projet.pretest || {}).problemes || [];
   z.className = "carte-corps";
   z.innerHTML = `
     ${e.collecte_commencee ? `<div class="bandeau alerte">${ico("lock")}<div><b>La collecte a commencé.</b> Les réponses reçues sont rangées par variable : vous pouvez ajouter des questions en fin de section, mais pas déplacer ni retirer celles qui existent.</div></div>` : ""}
@@ -967,9 +970,11 @@ function editeurQuestions(z, e) {
           <button class="btn btn-fantome btn-petit btn-ed" data-sec-descend="${si}" title="Descendre la section" ${libre(si + 1) ? "" : "disabled"}>↓</button>
           ${s.ids.some((q) => q.fixe) ? "" : `<button class="btn btn-fantome btn-petit btn-danger btn-ed" data-sec-suppr="${si}" title="Supprimer la section">${ico("trash")}</button>`}` : esc(s.titre)}</h4>
         <div class="liste-q">${s.ids.map((q, qi) => `
-          <div class="carte-q"><div class="num">${esc(q.num)}${libre(si) ? `<div class="q-fleches">
+          <div class="carte-q" data-var="${esc(q.var)}"><div class="num">${esc(q.num)}${libre(si) ? `<div class="q-fleches">
               <button class="btn-ed" data-q-monte="${si}:${qi}" title="Monter la question" ${qi > 0 || libre(si - 1) ? "" : "disabled"}>↑</button>
               <button class="btn-ed" data-q-descend="${si}:${qi}" title="Descendre la question" ${qi < s.ids.length - 1 || libre(si + 1) ? "" : "disabled"}>↓</button></div>` : ""}</div><div class="lignes">
+            ${problemesPretest.map((pb, k) => (pb.var === q.var && pb.statut === "a_traiter" ? `<div class="q-pretest">${ico("alert")}<span><b>Pré-test : ${esc(PT_ACTIONS[pb.action] || "à revoir")}.</b> ${esc(pb.description)}</span>
+              <button class="btn btn-petit btn-ed" data-pb-fait="${k}">${ico("check")} Marquer corrigé</button></div>` : "")).join("")}
             <input class="saisie" data-s="${si}" data-q="${qi}" data-k="texte" value="${esc(q.texte)}" style="font-weight:600">
             <div class="meta-q"><code>${esc(q.var)}</code>
               ${q.indicateur ? `<span class="tag">Indicateur ${esc(q.indicateur)}</span>` : q.ajoutee ? '<span class="tag manuel">Ajoutée</span>' : '<span class="tag">Identification</span>'}
@@ -1084,11 +1089,32 @@ function editeurQuestions(z, e) {
   };
   z.querySelectorAll("[data-q-monte]").forEach((b) => (b.onclick = () => { const [si, qi] = b.dataset.qMonte.split(":").map(Number); deplacerQuestion(si, qi, -1); }));
   z.querySelectorAll("[data-q-descend]").forEach((b) => (b.onclick = () => { const [si, qi] = b.dataset.qDescend.split(":").map(Number); deplacerQuestion(si, qi, 1); }));
+  // problème du pré-test réglé : enregistré tout de suite, les modifications en cours restent à l'écran
+  z.querySelectorAll("[data-pb-fait]").forEach((b) => (b.onclick = async () => {
+    const pt = clone(S.projet.pretest);
+    pt.problemes[+b.dataset.pbFait].statut = "corrige";
+    try {
+      S.projet = await api("PUT", `/api/projets/${S.projet.slug}/pretest`, pt);
+      const y = window.scrollY;
+      rafraichirOnglet("questionnaire");
+      window.scrollTo(0, y);
+      toast("Problème marqué comme corrigé.", "succes");
+    } catch (err) { toast(err.message, "erreur"); }
+  }));
   piedEnregistrer(z, "questionnaire", () => {
     const corps = { sections: W.sections };
     if (W.consentModifie) corps.consentement = W.consentement;
     return corps;
   });
+  // arrivée depuis un problème du pré-test : la question concernée est mise en avant
+  if (S.focusVar) {
+    const carte = [...z.querySelectorAll(".carte-q")].find((c) => c.dataset.var === S.focusVar);
+    S.focusVar = null;
+    if (carte) {
+      carte.classList.add("q-focus");
+      carte.scrollIntoView({ block: "center" });
+    }
+  }
 }
 
 // ------------------------------------------------------------------ éditeur : échantillonnage
@@ -1630,7 +1656,10 @@ function editeurPretest(z, e) {
   z.className = "carte-corps";
   z.innerHTML = `
     <div class="bandeau info">${ico("info")}<div>Avant de valider le questionnaire, faites-le passer à <b>5 à 10 répondants de la cible</b>, dans les conditions réelles (même outil, même mode),
-      en couvrant chaque profil. Notez la durée et chaque difficulté, puis corrigez les questions dans l'onglet <b>Questions</b>.</div></div>
+      en couvrant chaque profil. Notez la durée et chaque difficulté, puis corrigez les questions dans l'onglet <b>Questions</b>. <b>Le questionnaire que vous validez ensuite devient le questionnaire final</b> ; s'il n'y a rien à corriger, le fichier reste le même.</div></div>
+    ${e.final ? `<div class="bandeau info">${ico("check")}<div><b>Questionnaire final : version ${e.version}</b>, validée le ${heureFr(e.valide_le)} après le pré-test. Ses fichiers sont dans les livrables ; déployez cette version sur l'outil de collecte.</div></div>` : ""}
+    ${(p.pretest || {}).version_testee ? `<div class="aide" style="margin:0 0 14px;font-size:12.5px"><b>Version testée conservée</b> (v${p.pretest.version_testee.version}, archivée le ${esc(p.pretest.version_testee.date)}) :
+      ${p.pretest.version_testee.fichiers.map((f) => `<a href="/api/projets/${p.slug}/pretest/testee/${encodeURIComponent(f.fichier)}">${esc(f.nom)}</a>`).join(" · ")}</div>` : ""}
     ${sy.a_traiter && e.statut !== "valide" ? `<div class="bandeau alerte">${ico("alert")}<div><b>${sy.a_traiter > 1 ? `${sy.a_traiter} ajustements à apporter` : "Un ajustement à apporter"}</b> avant de valider le questionnaire.</div></div>` : ""}
     ${sy.a_traiter && e.statut === "valide" ? `<div class="bandeau alerte">${ico("alert")}<div>Le questionnaire est validé mais <b>${sy.a_traiter > 1 ? `${sy.a_traiter} ajustements relevés` : "un ajustement relevé"}</b> au pré-test ${sy.a_traiter > 1 ? "restent" : "reste"} à traiter : rouvrez l'étape pour corriger les questions.</div></div>` : ""}
     <div class="kpis-tb" style="grid-template-columns:repeat(4,1fr)">
@@ -1664,7 +1693,8 @@ function editeurPretest(z, e) {
         <td><input class="saisie petite" data-pb="${i}|description" value="${esc(x.description)}" placeholder="Ce qui s'est passé"></td>
         <td><select class="saisie petite" data-pb="${i}|action">${opts(PT_ACTIONS, x.action)}</select></td>
         <td><select class="saisie petite" data-pb="${i}|statut">${opts(PT_STATUTS, x.statut)}</select></td>
-        <td><button class="btn btn-petit" data-suppr-pb="${i}" title="Retirer">${ico("trash")}</button></td></tr>`).join("") || `<tr><td colspan="6" class="aide">Aucun problème relevé.</td></tr>`}
+        <td style="white-space:nowrap"><button class="btn btn-petit" data-corriger-pb="${i}" title="Ouvrir la question dans l'onglet Questions">${ico("edit")} Corriger</button>
+          <button class="btn btn-petit" data-suppr-pb="${i}" title="Retirer">${ico("trash")}</button></td></tr>`).join("") || `<tr><td colspan="6" class="aide">Aucun problème relevé.</td></tr>`}
     </tbody></table></div>
     <button class="btn btn-petit" id="pt-aj-pb" style="margin-bottom:20px">${ico("plus")} Ajouter un problème</button>
 
@@ -1686,11 +1716,35 @@ function editeurPretest(z, e) {
   $("#pt-aj-pb").onclick = () => { W.problemes.push({ var: "", type: "comprehension", description: "", action: "reformuler", statut: "a_traiter" }); redessiner(); };
   z.querySelectorAll("[data-suppr-e]").forEach((b) => (b.onclick = () => { W.entretiens.splice(Number(b.dataset.supprE), 1); redessiner(); }));
   z.querySelectorAll("[data-suppr-pb]").forEach((b) => (b.onclick = () => { W.problemes.splice(Number(b.dataset.supprPb), 1); redessiner(); }));
+  // aller corriger : ce qui vient d'être noté est enregistré d'abord, pour ne rien perdre en changeant d'onglet
+  z.querySelectorAll("[data-corriger-pb]").forEach((b) => (b.onclick = () => occupe(b, async () => {
+    const pb = W.problemes[Number(b.dataset.corrigerPb)];
+    try {
+      if (S.sale) S.projet = await api("PUT", `/api/projets/${p.slug}/pretest`, W);
+      S.sale = false; S.travail = null; S.focusVar = pb.var;
+      S.onglet = "parametres";
+      history.replaceState(null, "", `#/p/${p.slug}/questionnaire/parametres`);
+      panneauEtape("questionnaire");
+    } catch (err) { toast(err.message, "erreur"); }
+  })));
   const pied = document.createElement("div");
   pied.className = "actions";
-  pied.style.marginTop = "18px";
-  pied.innerHTML = `<button class="btn btn-primaire" id="pt-enreg">${ico("check")} Enregistrer le pré-test</button>`;
+  pied.style.cssText = "margin-top:18px;gap:10px;flex-wrap:wrap";
+  pied.innerHTML = `<button class="btn btn-primaire" id="pt-enreg">${ico("check")} Enregistrer le pré-test</button>
+    ${e.statut === "brouillon" || (e.statut === "valide" && !e.final) ? `<button class="btn btn-succes" id="pt-concluant" title="Le questionnaire actuel devient le questionnaire final">${ico("check")} Pré-test concluant : ${e.statut === "valide" ? "ce questionnaire est le final" : "valider ce questionnaire"}</button>` : ""}`;
   z.appendChild(pied);
+  const concl = z.querySelector("#pt-concluant");
+  if (concl) concl.onclick = async () => {
+    if (!W.entretiens.length) return toast("Saisissez au moins un entretien test avant de conclure le pré-test.", "erreur");
+    const reste = W.problemes.filter((x) => x.statut === "a_traiter").length;
+    if (reste) return toast(`${reste} problème(s) restent à traiter : corrigez-les ou classez-les sans suite.`, "erreur");
+    const texte = W.problemes.length ? "Les problèmes relevés ont été traités." : "Aucun problème n'a été relevé : le fichier reste le même.";
+    if (!(await confirmer("Pré-test concluant ?", `${texte} Le questionnaire actuel (version ${e.version})${e.statut === "valide" ? "" : " sera validé et"} deviendra le **questionnaire final**.`, "Confirmer"))) return;
+    occupe(concl, async () => {
+      try { majProjet(await api("POST", `/api/projets/${p.slug}/pretest/concluant`, W), "Pré-test concluant : questionnaire final validé."); }
+      catch (err) { toast(err.message, "erreur"); }
+    });
+  };
   $("#pt-enreg").onclick = (ev) => occupe(ev.currentTarget, async () => {
     try { majProjet(await api("PUT", `/api/projets/${p.slug}/pretest`, W), "Pré-test enregistré."); }
     catch (err) { toast(err.message, "erreur"); }
