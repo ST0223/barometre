@@ -45,7 +45,14 @@ body[data-page="accueil"] .principal { padding-bottom: 0; }
 .nav { position: fixed; inset: 0 0 auto 0; z-index: 30; height: 68px; display: flex; align-items: center; gap: 28px; padding: 0 clamp(16px, 4vw, 48px);
   background: rgba(249, 252, 255, .78); backdrop-filter: blur(16px) saturate(1.4); border-bottom: 1px solid rgba(208, 227, 255, .7); transition: background .35s, border-color .35s, height .35s; }
 .nav.defile { height: 60px; box-shadow: 0 6px 30px rgba(8, 31, 92, .08); }
+.nav-marque { display: flex; align-items: center; gap: 10px; }
 .nav-marque img { height: 30px; display: block; }
+.nav-marque .marque-ico { width: 32px; height: 32px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 135, 224, .28); transition: transform .35s var(--ease); }
+.nav-marque:hover .marque-ico { transform: rotate(-8deg) scale(1.05); }
+.marque-nom { font-family: Sora, Inter, sans-serif; font-weight: 800; font-size: 19px; letter-spacing: .05em; color: var(--marque, #19243E); white-space: nowrap; transition: color .35s; }
+.marque-nom span { color: #0087E0; }
+.nav.sur-sombre:not(.defile) .marque-nom { color: #fff; }
+.nav.sur-sombre:not(.defile) .marque-nom span { color: #7FC4FF; }
 .logo-sombre { display: none !important; }
 .nav-liens { display: flex; gap: 4px; margin: 0 auto; }
 .nav-liens a { position: relative; padding: 8px 16px; border-radius: 10px; color: var(--texte-2); font-weight: 600; font-size: 15.5px; white-space: nowrap; transition: color .2s; }
@@ -683,6 +690,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
 :root[data-theme="sombre"] .nav { background: rgba(10, 17, 30, .82); border-bottom-color: rgba(49, 65, 95, .7); }
 :root[data-theme="sombre"] .nav .logo-clair { display: none !important; }
 :root[data-theme="sombre"] .nav .logo-sombre { display: block !important; }
+:root[data-theme="sombre"] .marque-nom { color: #fff; }
+:root[data-theme="sombre"] .marque-nom span { color: #4FB0F5; }
 :root[data-theme="sombre"] .carte-suivi .cs-etiq.clair { fill: #0B1220; stroke: rgba(255, 255, 255, .55); }
 :root[data-theme="sombre"] .carte-verre { background: rgba(19, 29, 48, .8); border-color: rgba(60, 82, 122, .55); }
 :root[data-theme="sombre"] .avj { background: rgba(19, 29, 48, .88); border-color: var(--bord); }
@@ -707,6 +716,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); cursor
   :root:not([data-theme="clair"]) .nav { background: rgba(10, 17, 30, .82); border-bottom-color: rgba(49, 65, 95, .7); }
   :root:not([data-theme="clair"]) .nav .logo-clair { display: none !important; }
   :root:not([data-theme="clair"]) .nav .logo-sombre { display: block !important; }
+  :root:not([data-theme="clair"]) .marque-nom { color: #fff; }
+  :root:not([data-theme="clair"]) .marque-nom span { color: #4FB0F5; }
   :root:not([data-theme="clair"]) .carte-suivi .cs-etiq.clair { fill: #0B1220; stroke: rgba(255, 255, 255, .55); }
   :root:not([data-theme="clair"]) .carte-verre { background: rgba(19, 29, 48, .8); border-color: rgba(60, 82, 122, .55); }
   :root:not([data-theme="clair"]) .avj { background: rgba(19, 29, 48, .88); border-color: var(--bord); }

@@ -1,4 +1,4 @@
-"""Plateforme Datatym — automatisation des baromètres.
+"""BAROMAKER (Datatym) — automatisation des baromètres.
 
 Lancement : python app.py  puis ouvrir http://127.0.0.1:8765
 """
@@ -635,7 +635,7 @@ if __name__ == "__main__":
         PROJETS_DIR.mkdir(exist_ok=True)
         if not os.environ.get("SANS_NAVIGATEUR"):
             Timer(2.5, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
-        print(f"\n  Plateforme Datatym : http://127.0.0.1:{port}"
+        print(f"\n  BAROMAKER : http://127.0.0.1:{port}"
               "\n  Le serveur se recharge tout seul quand le code est mis à jour.\n")
     # use_reloader : toute modification d'un fichier Python relance le serveur, plus besoin de relancer lancer.bat
     app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=True)

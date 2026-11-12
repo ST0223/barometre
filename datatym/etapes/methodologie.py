@@ -163,7 +163,7 @@ def construire_docs(projet, data, cadrage, quest, ech):
                 ("**Formulaire :** fichier XLSForm pour KoboToolbox, généré depuis le questionnaire validé." if fiche.get("outil") == "kobo"
                  else "**Formulaire :** fichier d'import pour QuestionPro, généré depuis le questionnaire validé ; chaque enquêteur "
                       "diffuse le lien portant son identifiant."),
-                "**Suivi :** tableau de bord de la plateforme Datatym, synchronisé avec l'outil de collecte : avancement par enquêteur, "
+                "**Suivi :** tableau de bord de la plateforme BAROMAKER de Datatym, synchronisé avec l'outil de collecte : avancement par enquêteur, "
                 f"par {'pays' if pays else 'zone'}, par profil et par quota, carte, écarts au calendrier, indicateurs calculés en direct.",
             ]),
         ]),

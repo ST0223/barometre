@@ -1,4 +1,6 @@
-# Plateforme Datatym — automatisation des baromètres
+# BAROMAKER — automatisation des baromètres (Datatym)
+
+![BAROMAKER](static/logo_baromaker.svg)
 
 De la fiche d'entrée (7 paramètres) au rapport d'analyse : chaque livrable est généré au format Datatym,
 modifiable dans l'interface ou dans Word, validé avant de lancer le suivant. Une correction faite en amont

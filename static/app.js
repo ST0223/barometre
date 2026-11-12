@@ -1,4 +1,4 @@
-/* Plateforme Datatym — interface de production des baromètres */
+/* BAROMAKER (Datatym) — interface de production des baromètres */
 "use strict";
 
 // ------------------------------------------------------------------ utilitaires
