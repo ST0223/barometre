@@ -51,6 +51,9 @@ body[data-page="accueil"] .principal { padding-bottom: 0; }
 .nav-marque:hover .marque-ico { transform: rotate(-8deg) scale(1.05); }
 .marque-nom { font-family: Sora, Inter, sans-serif; font-weight: 800; font-size: 19px; letter-spacing: .05em; color: var(--marque, #19243E); white-space: nowrap; transition: color .35s; }
 .marque-nom span { color: #0087E0; }
+.marque-bloc { display: flex; flex-direction: column; line-height: 1; }
+.marque-by { align-self: flex-end; margin-top: 3px; font-family: Inter, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--texte-3); white-space: nowrap; }
+.nav.sur-sombre:not(.defile) .marque-by { color: rgba(255, 255, 255, .6); }
 .nav.sur-sombre:not(.defile) .marque-nom { color: #fff; }
 .nav.sur-sombre:not(.defile) .marque-nom span { color: #7FC4FF; }
 .logo-sombre { display: none !important; }
