@@ -115,8 +115,10 @@ et clé API QuestionPro (non conservée). Seules les réponses complétées sont
 
 La rédaction s'appuie sur des règles et une banque d'indicateurs (climat des affaires, numérique/IA,
 emploi/talents, générique) : aucune clé API n'est nécessaire. La rédaction assistée par Claude (clé API
-Anthropic) est visible dans Paramètres et signalée par le badge « IA inactive / IA active » de la barre de
-navigation ; elle reste inactive tant qu'aucune clé n'est saisie et cochée. Une fois activée, Claude propose des indicateurs et des textes adaptés au thème, et rédige les messages clés du rapport.
+Anthropic) se règle dans Paramètres ; elle reste inactive tant qu'aucune clé n'est saisie et cochée.
+Le bouton ✨ en bas à droite ouvre l'**Assistant BAROMAKER** sur toutes les pages : discussion avec Claude, qui
+connaît l'écran ouvert (fiche, étapes et questionnaire de l'étude) et propose des suggestions adaptées à la page ;
+bleu tant que l'IA est inactive (il répond alors qu'il n'est pas branché), vert une fois activée. Claude propose des indicateurs et des textes adaptés au thème, et rédige les messages clés du rapport.
 
 ## Organisation du code
 

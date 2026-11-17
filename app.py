@@ -598,6 +598,39 @@ def tester_ia():
     return jsonify({"ok": reussi, "message": message})
 
 
+def _contexte_assistant(page, slug):
+    """Résumé de l'écran ouvert pour l'assistant : page, fiche de l'étude, statut des étapes, questionnaire."""
+    lignes = [f"Page : {page or 'inconnue'}"]
+    p = store.charger(slug) if slug else None
+    if p:
+        f = p.get("fiche", {})
+        lignes.append("Étude : " + " ; ".join(f"{k} = {v}" for k, v in f.items() if v not in ("", None, [], {})))
+        lignes.append("Étapes : " + ", ".join(f"{k} ({e.get('statut', '?')})" for k, e in p.get("etapes", {}).items()))
+        quest = (p.get("etapes", {}).get("questionnaire") or {}).get("data") or {}
+        for s in quest.get("sections", []):
+            lignes.append(f"Section {s.get('titre', '')} :")
+            for q in s.get("questions", []):
+                opts = ", ".join(str(o.get("label", "")) for o in (q.get("modalites") or [])[:12])
+                lignes.append(f"  {q.get('var') or q.get('id', '')} [{q.get('type', '')}] {q.get('texte', '')}" + (f" — {opts}" if opts else ""))
+    return "\n".join(lignes)[:60000]
+
+
+@app.post("/api/assistant")
+def assistant():
+    c = request.get_json(force=True)
+    messages = [{"role": m["role"], "content": str(m["content"])[:8000]} for m in (c.get("messages") or [])[-20:]
+                if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()]
+    if not messages or messages[-1]["role"] != "user":
+        return jsonify({"erreur": "Message vide."}), 400
+    if not llm.disponible():
+        return jsonify({"actif": False})
+    try:
+        texte = llm.discuter(messages, _contexte_assistant(c.get("page"), c.get("slug")))
+    except RuntimeError as exc:
+        return jsonify({"actif": True, "erreur": str(exc)}), 502
+    return jsonify({"actif": True, "texte": texte})
+
+
 @app.post("/api/estimation")
 def estimation():
     """Fourchette de coût calculée en direct pendant la saisie de la fiche."""

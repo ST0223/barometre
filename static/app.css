@@ -452,3 +452,61 @@ select.saisie { padding-right: 28px; }
 .depot { text-align: left; }
 .depot-ico svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .depot b .ex { margin-left: 6px; font-weight: 500; }
+
+/* ---------- assistant BAROMAKER (bouton flottant + panneau) ---------- */
+.toasts { bottom: 96px; }
+.ia-fab { position: fixed; right: 24px; bottom: 24px; z-index: 45; width: 58px; height: 58px; border: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #2EA3F2 0%, #0A6FC2 45%, #19243E 100%);
+  box-shadow: 0 10px 30px rgba(0, 135, 224, .45), inset 0 1px 0 rgba(255, 255, 255, .25); transition: transform .3s var(--ease, ease), box-shadow .3s; }
+.ia-fab svg { width: 27px; height: 27px; fill: currentColor; transition: transform .45s var(--ease, ease); filter: drop-shadow(0 0 6px rgba(255, 255, 255, .55)); }
+.ia-fab::before, .ia-fab::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(46, 163, 242, .55); animation: ia-onde 2.8s ease-out infinite; pointer-events: none; }
+.ia-fab::after { animation-delay: 1.4s; }
+.ia-fab:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 14px 38px rgba(0, 135, 224, .6); }
+.ia-fab:hover svg { transform: rotate(18deg) scale(1.08); }
+.ia-fab.ouvert svg { transform: rotate(90deg); }
+.ia-fab.ouvert::before, .ia-fab.ouvert::after { animation: none; opacity: 0; }
+.ia-fab.actif { background: linear-gradient(135deg, #3BD49A 0%, #0A9E74 45%, #0E3328 100%); box-shadow: 0 10px 30px rgba(16, 185, 129, .4); }
+.ia-fab.actif::before, .ia-fab.actif::after { border-color: rgba(59, 212, 154, .55); }
+@keyframes ia-onde { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(1.75); opacity: 0; } }
+
+.ia-panneau { position: fixed; right: 24px; bottom: 96px; z-index: 45; width: min(400px, calc(100vw - 32px)); height: min(580px, calc(100vh - 130px));
+  display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; background: var(--carte); border: 1px solid var(--bord);
+  box-shadow: 0 24px 70px rgba(8, 31, 92, .28); animation: ia-entree .35s var(--ease, ease); }
+.ia-panneau[hidden] { display: none; }
+@keyframes ia-entree { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+.ia-tete { display: flex; align-items: center; gap: 10px; padding: 14px 14px 14px 16px; color: #fff;
+  background: linear-gradient(120deg, #19243E 0%, #0A4F96 60%, #0A7AD1 100%); }
+.ia-avatar { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, .14); }
+.ia-avatar svg { width: 19px; height: 19px; fill: #fff; }
+.ia-titre { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ia-titre b { font-family: Sora, Inter, sans-serif; font-size: 14.5px; }
+.ia-titre span { font-size: 11.5px; color: rgba(255, 255, 255, .75); }
+.ia-titre a { color: #9FD6FF; text-decoration: underline; }
+.ia-point { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #F2C66D; vertical-align: 1px; }
+.ia-point.on { background: #3BD49A; box-shadow: 0 0 0 3px rgba(59, 212, 154, .25); }
+.ia-btn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: rgba(255, 255, 255, .8); cursor: pointer; display: grid; place-items: center; }
+.ia-btn:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+.ia-btn svg, .ia-envoyer svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ia-fil { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--fond); }
+.ia-msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; color: var(--texte); }
+.ia-msg p { margin: 0 0 6px; } .ia-msg p:last-child { margin-bottom: 0; }
+.ia-msg ul { margin: 4px 0 6px; padding-left: 18px; } .ia-msg li { margin: 2px 0; }
+.ia-bot { align-self: flex-start; background: var(--carte); border: 1px solid var(--bord); border-bottom-left-radius: 4px; }
+.ia-moi { align-self: flex-end; background: #0087E0; color: #fff; border-bottom-right-radius: 4px; }
+.ia-erreur { border-color: #F19A9A; color: #B42318; }
+.ia-lien { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 8px; background: #0087E0; color: #fff !important; font-weight: 600; font-size: 12.5px; text-decoration: none; }
+.ia-attente { display: flex; gap: 5px; padding: 13px 15px; }
+.ia-attente i { width: 7px; height: 7px; border-radius: 50%; background: #0087E0; animation: ia-point 1.2s infinite ease-in-out; }
+.ia-attente i:nth-child(2) { animation-delay: .15s; } .ia-attente i:nth-child(3) { animation-delay: .3s; }
+@keyframes ia-point { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
+.ia-sugg { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; margin-top: 2px; }
+.ia-sugg button { border: 1px solid var(--bord-2); background: var(--carte); color: var(--encre-a, #081F5C); border-radius: 18px; padding: 7px 12px; font: inherit; font-size: 12.5px; font-weight: 600; text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
+.ia-sugg button:hover { border-color: #0087E0; background: var(--bleu-50); }
+.ia-saisie { display: flex; align-items: flex-end; gap: 8px; padding: 12px; border-top: 1px solid var(--bord); background: var(--carte); }
+.ia-saisie textarea { flex: 1; resize: none; max-height: 130px; padding: 10px 12px; border: 1px solid var(--bord-2); border-radius: 12px; background: var(--fond); color: var(--texte); font: inherit; font-size: 13.5px; line-height: 1.4; outline: none; }
+.ia-saisie textarea:focus { border-color: #0087E0; box-shadow: 0 0 0 3px rgba(0, 135, 224, .15); }
+.ia-envoyer { width: 40px; height: 40px; flex: none; border: 0; border-radius: 12px; background: #0087E0; color: #fff; cursor: pointer; display: grid; place-items: center; }
+.ia-envoyer:hover { background: #0A6FC2; }
+@media (max-width: 520px) { .ia-fab { right: 16px; bottom: 16px; } .ia-panneau { right: 16px; bottom: 86px; } }
+@media (prefers-reduced-motion: reduce) { .ia-fab::before, .ia-fab::after, .ia-panneau, .ia-attente i { animation: none; } }
+@media print { .ia-fab, .ia-panneau { display: none !important; } }

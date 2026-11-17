@@ -145,13 +145,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function chargerParams() {
   S.params = await api("GET", "/api/parametres");
-  const b = $("#badge-ia");
-  b.hidden = !IA_VISIBLE;
-  const on = S.params.ia_active && S.params.cle_definie;
-  b.className = "badge-ia" + (on ? " on" : "");
-  b.innerHTML = ico("sparkle") + (on ? "IA active" : "IA inactive");
-  b.title = on ? "La rédaction est assistée par Claude" : "Rédaction par règles (activer l'IA dans Paramètres)";
-  b.onclick = () => { location.hash = "#/parametres"; };
+  // état de l'IA : affiché par le bouton de l'assistant, en bas à droite (static/js/assistant.js)
+  const fab = $("#ia-fab");
+  if (fab) fab.classList.toggle("actif", !!(S.params.ia_active && S.params.cle_definie));
 }
 
 function lireRoute() {
