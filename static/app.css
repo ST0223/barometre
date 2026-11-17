@@ -55,7 +55,9 @@ input, select, textarea, button { font: inherit; color: inherit; }
 .barre-pied { border-top: 1px solid var(--bord); padding-top: 12px; display: flex; align-items: center; justify-content: space-between; }
 .lien-barre { display: flex; align-items: center; gap: 8px; color: var(--texte-2); padding: 6px 8px; border-radius: 8px; font-weight: 500; }
 .lien-barre:hover { background: var(--fond); color: var(--texte); }
-.badge-ia { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--fond); color: var(--texte-3); }
+.badge-ia { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px 3px 7px; border-radius: 20px; background: var(--fond); color: var(--texte-3); cursor: pointer; }
+.badge-ia[hidden] { display: none; }
+.badge-ia svg { width: 13px; height: 13px; flex: none; }
 .badge-ia.on { background: var(--vert-50); color: var(--vert); }
 .principal { min-width: 0; padding: 28px 36px 60px; }
 

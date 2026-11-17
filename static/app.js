@@ -115,8 +115,8 @@ async function chargerListe() {
   if (c) c.textContent = S.projets.length || "";
 }
 
-// Rédaction assistée par Claude (clé API Anthropic) : masquée de l'interface ; passer à true pour la réafficher
-const IA_VISIBLE = false;
+// Rédaction assistée par Claude (clé API Anthropic) : visible dans l'interface ; reste inactive tant qu'aucune clé n'est saisie
+const IA_VISIBLE = true;
 
 // Thème : Auto (suit Windows), Clair ou Sombre ; le choix reste sur ce poste
 const THEMES = [["auto", "ecran", "Thème automatique (suit le système)"], ["clair", "soleil", "Thème clair"], ["sombre", "lune", "Thème sombre"]];
@@ -149,8 +149,9 @@ async function chargerParams() {
   b.hidden = !IA_VISIBLE;
   const on = S.params.ia_active && S.params.cle_definie;
   b.className = "badge-ia" + (on ? " on" : "");
-  b.textContent = on ? "IA active" : "IA inactive";
+  b.innerHTML = ico("sparkle") + (on ? "IA active" : "IA inactive");
   b.title = on ? "La rédaction est assistée par Claude" : "Rédaction par règles (activer l'IA dans Paramètres)";
+  b.onclick = () => { location.hash = "#/parametres"; };
 }
 
 function lireRoute() {

@@ -115,8 +115,8 @@ et clé API QuestionPro (non conservée). Seules les réponses complétées sont
 
 La rédaction s'appuie sur des règles et une banque d'indicateurs (climat des affaires, numérique/IA,
 emploi/talents, générique) : aucune clé API n'est nécessaire. La rédaction assistée par Claude (clé API
-Anthropic) est masquée de l'interface ; pour la réafficher, passer `IA_VISIBLE` à `true` dans `static/app.js`.
-Claude propose alors des indicateurs et des textes adaptés au thème, et rédige les messages clés du rapport.
+Anthropic) est visible dans Paramètres et signalée par le badge « IA inactive / IA active » de la barre de
+navigation ; elle reste inactive tant qu'aucune clé n'est saisie et cochée. Une fois activée, Claude propose des indicateurs et des textes adaptés au thème, et rédige les messages clés du rapport.
 
 ## Organisation du code
 
