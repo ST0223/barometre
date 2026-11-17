@@ -85,6 +85,7 @@
     IA.ouvert = ouvrir;
     $("#ia-panneau").hidden = !ouvrir;
     $("#ia-fab").classList.toggle("ouvert", ouvrir);
+    document.body.classList.toggle("ia-ouvert", ouvrir);  // les notes passent à côté du panneau
     $("#ia-fab").setAttribute("aria-expanded", String(ouvrir));
     if (ouvrir) { dessiner(); setTimeout(() => $("#ia-texte").focus(), 60); }
   }

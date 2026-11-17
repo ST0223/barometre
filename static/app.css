@@ -454,7 +454,9 @@ select.saisie { padding-right: 28px; }
 .depot b .ex { margin-left: 6px; font-weight: 500; }
 
 /* ---------- assistant BAROMAKER (bouton flottant + panneau) ---------- */
-.toasts { bottom: 96px; }
+.toasts { bottom: 96px; transition: right .3s; }
+body.ia-ouvert .toasts { right: 440px; }
+@media (max-width: 900px) { body.ia-ouvert .toasts { right: 22px; bottom: auto; top: 80px; } }
 .ia-fab { position: fixed; right: 24px; bottom: 24px; z-index: 45; width: 58px; height: 58px; border: 0; border-radius: 50%; cursor: pointer;
   display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #2EA3F2 0%, #0A6FC2 45%, #19243E 100%);
   box-shadow: 0 10px 30px rgba(0, 135, 224, .45), inset 0 1px 0 rgba(255, 255, 255, .25); transition: transform .3s var(--ease, ease), box-shadow .3s; }
@@ -465,8 +467,6 @@ select.saisie { padding-right: 28px; }
 .ia-fab:hover svg { transform: rotate(18deg) scale(1.08); }
 .ia-fab.ouvert svg { transform: rotate(90deg); }
 .ia-fab.ouvert::before, .ia-fab.ouvert::after { animation: none; opacity: 0; }
-.ia-fab.actif { background: linear-gradient(135deg, #3BD49A 0%, #0A9E74 45%, #0E3328 100%); box-shadow: 0 10px 30px rgba(16, 185, 129, .4); }
-.ia-fab.actif::before, .ia-fab.actif::after { border-color: rgba(59, 212, 154, .55); }
 @keyframes ia-onde { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(1.75); opacity: 0; } }
 
 .ia-panneau { position: fixed; right: 24px; bottom: 96px; z-index: 45; width: min(400px, calc(100vw - 32px)); height: min(580px, calc(100vh - 130px));
