@@ -2,7 +2,7 @@
 from datetime import timedelta
 
 from .. import budget, llm
-from ..banque import (DOMAINES, TYPES, decouper, definition_auto, indicateurs_par_defaut, profils_concernes,
+from ..banque import (DOMAINES, TYPES, decouper, definition_auto, indicateurs_par_defaut, poids_profil, profils_concernes,
                       profils_depuis_cible, resume_champ, sont_des_pays)
 from ..charte import liste, p, section, tableau, chiffres
 from ..outils import date_fr, debut_collecte, fcfa, fmt_marge, repartir, aujourdhui
@@ -193,7 +193,8 @@ def construire_docs(projet, data):
     inds = indicateurs_actifs(data)
     zones = decouper(fiche["zones"])
     n = fiche["taille"]
-    par_profil = repartir(n, [1] * len(profils))
+    # poids de chaque profil (parts de l'échantillon, ex. 70 / 20 / 10) ; à parts égales par défaut
+    par_profil = repartir(n, [poids_profil(p_) for p_ in profils])
     par_zone = repartir(n, [1] * len(zones)) if zones else []
     lib_profil = {p_["code"]: p_["libelle"] for p_ in profils}
 
@@ -213,7 +214,13 @@ def construire_docs(projet, data):
     for p_, k in zip(profils, par_profil):
         precision.append([f"Profil : {p_['libelle']}", str(k), fmt_marge(k)])
     if len(zones) > 1:
-        precision.append([f"Par {'pays' if sont_des_pays(zones) else 'zone'} (moyenne)", str(n // len(zones)), fmt_marge(n // len(zones))])
+        mot = "pays" if sont_des_pays(zones) else "zone"
+        precision.append([f"Par {mot} (moyenne)", str(n // len(zones)), fmt_marge(n // len(zones))])
+        if len(profils) > 1:
+            for p_, k in zip(profils, par_profil):
+                k_z = k // len(zones)
+                if k_z:
+                    precision.append([f"{p_['libelle']} d'un même {mot} (moyenne)", str(k_z), fmt_marge(k_z)])
 
     sections = [
         section("contexte", "1. Contexte et justification", [p(t) for t in data.get("contexte", [])]),

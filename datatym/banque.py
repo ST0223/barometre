@@ -114,6 +114,15 @@ def profils_depuis_cible(cible):
     return profils
 
 
+def poids_profil(profil):
+    """Poids d'un profil dans l'échantillon, fixé au cadrage (ex. 70 / 20 / 10) ; 1 si non renseigné ou invalide."""
+    try:
+        v = float(str(profil.get("poids", 1)).replace(",", "."))
+    except ValueError:
+        return 1.0
+    return v if v > 0 else 1.0
+
+
 # ----------------------------------------------------------------- types
 # Échelles ordinales codées en chiffres, du plus défavorable au plus favorable ; « Ne sait pas » = 99.
 NSP_CODE = "99"

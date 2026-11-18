@@ -3,7 +3,7 @@ import math
 from datetime import date, timedelta
 
 from .. import budget, equipe
-from ..banque import decouper, du_barometre, nom_barometre, slug, sont_des_pays
+from ..banque import decouper, du_barometre, nom_barometre, poids_profil, slug, sont_des_pays
 from ..charte import liste, p, section, tableau, chiffres
 from ..config import auteur_fichiers, charger_parametres
 from ..outils import aujourdhui, date_courte, date_fr, debut_collecte, fcfa, fmt_marge, jours_collecte, nombre, pct, repartir
@@ -23,7 +23,7 @@ def params_defaut(projet, quest):
         "rendement": 6, "marge": 0.9, "sans_dimanche": True,
         "date_debut": debut_collecte(fiche).isoformat(),
         "poids_zones": {z: 1 for z in zones},
-        "poids_profils": {pr["code"]: 1 for pr in quest["profils"]},
+        "poids_profils": {pr["code"]: poids_profil(pr) for pr in quest["profils"]},  # poids fixés au cadrage
         "noms_enqueteurs": [], "nb_enqueteurs_force": None,
         "couts": budget.couts_reference(), "hypotheses": dict(budget.HYPOTHESES_DEFAUT),
     }
@@ -240,7 +240,7 @@ def generer(projet, quest, precedent=None):
     prec = precedent or {}
     params = prec.get("params") or params_defaut(projet, quest)
     # profils et zones peuvent avoir changé en amont
-    params["poids_profils"] = {pr["code"]: params.get("poids_profils", {}).get(pr["code"], 1) for pr in quest["profils"]}
+    params["poids_profils"] = {pr["code"]: params.get("poids_profils", {}).get(pr["code"], poids_profil(pr)) for pr in quest["profils"]}
     zones = decouper(projet["fiche"]["zones"])
     params["poids_zones"] = {z: params.get("poids_zones", {}).get(z, 1) for z in zones}
     return calculer(projet, quest, params, prec.get("recrutement"))

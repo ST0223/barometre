@@ -866,6 +866,21 @@ function piedEnregistrer(z, cle, construire, libelle = "Enregistrer et mettre à
 const TYPES_IND = { jugement: "Jugement", evolution: "Évolution passée", perspective: "Perspective", satisfaction: "Satisfaction 1–5", intention: "Intention", multiple: "Choix multiple", unique: "Choix unique", numerique: "Numérique" };
 const NIVEAUX = { tous: "Tous les profils", direction: "Direction", operationnel: "Opérationnel" };
 
+// effectif de chaque profil selon son poids (plus fort reste, comme le serveur) : somme = taille de l'échantillon
+function effectifsProfils(z, profils) {
+  const n = Number((S.projet && S.projet.fiche && S.projet.fiche.taille) || 0);
+  const poids = profils.map((p) => (Number(p.poids) > 0 ? Number(p.poids) : 1));
+  const s = poids.reduce((a, b) => a + b, 0);
+  const bruts = poids.map((w) => (n * w) / s);
+  const eff = bruts.map(Math.floor);
+  let reste = n - eff.reduce((a, b) => a + b, 0);
+  bruts.map((b, k) => [b - Math.floor(b), k]).sort((a, b) => b[0] - a[0]).forEach(([, k]) => { if (reste > 0) { eff[k]++; reste--; } });
+  profils.forEach((p, k) => {
+    const c = z.querySelector(`[data-pr-eff="${k}"]`);
+    if (c) c.textContent = `${eff[k].toLocaleString("fr-FR")} (${Math.round((100 * poids[k]) / s)} %)`;
+  });
+}
+
 function editeurIndicateurs(z, e) {
   if (!S.travail) S.travail = clone({ indicateurs: e.data.indicateurs, profils: e.data.profils });
   const W = S.travail;
@@ -876,10 +891,13 @@ function editeurIndicateurs(z, e) {
   z.innerHTML = `
     <div class="bandeau info">${ico("info")}<div>Les indicateurs sont la base de tous les livrables. <b>Désactiver un indicateur le retire du questionnaire et du dictionnaire</b> à la prochaine mise à jour de ces étapes.</div></div>
     <div class="lib" style="margin-bottom:8px">Profils de la cible</div>
-    <div class="grille-tab" style="margin-bottom:20px"><table><thead><tr><th>Profil</th><th>Code</th><th>Niveau (détermine les questions reçues)</th></tr></thead><tbody>
+    <div class="grille-tab" style="margin-bottom:6px"><table><thead><tr><th>Profil</th><th>Code</th><th>Niveau (détermine les questions reçues)</th><th>Poids dans l'échantillon</th><th>Effectif</th></tr></thead><tbody>
       ${W.profils.map((p, k) => `<tr><td><input class="saisie petite" data-pr="${k}" data-k="libelle" value="${esc(p.libelle)}"></td><td><code>${esc(p.code)}</code></td>
-        <td><select class="saisie petite" data-pr="${k}" data-k="niveau"><option value="direction" ${p.niveau === "direction" ? "selected" : ""}>Direction</option><option value="operationnel" ${p.niveau === "operationnel" ? "selected" : ""}>Opérationnel</option></select></td></tr>`).join("")}
+        <td><select class="saisie petite" data-pr="${k}" data-k="niveau"><option value="direction" ${p.niveau === "direction" ? "selected" : ""}>Direction</option><option value="operationnel" ${p.niveau === "operationnel" ? "selected" : ""}>Opérationnel</option></select></td>
+        <td><input class="saisie petite" style="width:90px" type="number" min="0" step="any" data-pr="${k}" data-k="poids" value="${esc(p.poids ?? 1)}"></td>
+        <td class="eff-profil" data-pr-eff="${k}"></td></tr>`).join("")}
     </tbody></table></div>
+    <p class="aide" style="margin:0 0 20px">Le poids fixe la part de chaque profil : 70, 20 et 10 donnent 70 %, 20 % et 10 % de l'échantillon. Repris par l'étape Échantillonnage pour les quotas.</p>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="lib">Indicateurs recherchés</div>
       <button class="btn btn-petit btn-ed" id="aj-ind">${ico("plus")} Ajouter un indicateur</button></div>
     <datalist id="dl-blocs">${blocs.map((b) => `<option value="${esc(b)}">`).join("")}</datalist>
@@ -899,10 +917,15 @@ function editeurIndicateurs(z, e) {
           <input class="saisie petite" data-i="${k}" data-k="objet" value="${esc(ind.objet || "")}" placeholder="Objet mesuré, ex. le niveau d'activité de votre entreprise">
           <input class="saisie petite" style="margin-top:4px" data-i="${k}" data-k="question" value="${esc(ind.question || "")}" placeholder="Formulation libre (facultatif)">`}</td></tr>`).join("")}
     </tbody></table></div>`;
+  effectifsProfils(z, W.profils);
   z.oninput = z.onchange = (ev) => {
     const t = ev.target;
     S.sale = true;
-    if (t.dataset.pr !== undefined) { W.profils[+t.dataset.pr][t.dataset.k] = t.value; return; }
+    if (t.dataset.pr !== undefined) {
+      W.profils[+t.dataset.pr][t.dataset.k] = t.dataset.k === "poids" ? Number(t.value) : t.value;
+      if (t.dataset.k === "poids") effectifsProfils(z, W.profils);
+      return;
+    }
     if (t.dataset.comp && indice) {
       const set = new Set(indice.composantes || []);
       t.checked ? set.add(t.dataset.comp) : set.delete(t.dataset.comp);
