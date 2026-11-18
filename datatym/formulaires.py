@@ -211,11 +211,14 @@ def xlsform(chemin, projet, quest, cadrage=None, enqueteurs=None):
         if q["type"] == "select_multiple" and any(m["code"] == "autre" for m in q["modalites"]):
             ligne(type="text", name=f"{var}_autre", label="Préciser Autre", required="yes", required_message=OBLIGATOIRE,
                   relevant=f"selected(${{{var}}}, 'autre')")
+        elif q["type"] == "select_one" and any(m["code"] == "autre" for m in q["modalites"]):
+            ligne(type="text", name=f"{var}_autre", label="Préciser", required="yes", required_message=OBLIGATOIRE,
+                  relevant=f"${{{var}}} = 'autre'")
         if q["id"] == "id_profil":
             ligne(type="note", name="hors_cible", label="**Merci.** Ce baromètre ne concerne pas votre fonction.",
                   relevant=f"${{{var}}} = 'autre_hors'")
         if q.get("exclut"):
-            ligne(type="note", name=f"{var}_fin", label="**Merci.** Votre entreprise n'entre pas dans le champ de ce baromètre.",
+            ligne(type="note", name=f"{var}_fin", label="**Merci.** Vous n'entrez pas dans le champ de ce baromètre.",
                   relevant=" or ".join(f"${{{var}}} = '{c}'" for c in q["exclut"]))
 
     ligne(type="start", name="start")

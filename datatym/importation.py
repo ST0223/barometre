@@ -473,8 +473,12 @@ def _codes(labels, type_):
             code, n = base, 2
             while code in vus:
                 code, n = f"{base[:15]}_{n}", n + 1
+        elif re.match(r"ne (sait|sais) pas", _bas(l)):
+            code = "99"
+        elif re.match(r"autre\b(?! (pays|ville|fonction))", _bas(l)) and "autre" not in vus:
+            code = "autre"  # le formulaire ajoute le champ « préciser »
         else:
-            code = "99" if re.match(r"ne (sait|sais) pas", _bas(l)) else str(k)
+            code = str(k)
         vus.add(code)
         mods.append({"code": code, "label": l})
     return mods
@@ -522,7 +526,8 @@ def _questionnaire_redige(blocs):
         type_ = "multiple" if tl.startswith("choix multiple") else "unique"
         if "[liste pays" in tl or any(p.strip().startswith("[") for p in it["puces"]):
             a_completer.append(it["num"])
-        base = {"texte": texte, "section": "A" if s["genre"] in ("intro", "profil") else (s["lettre"] or "B"),
+        # « A » désigne l'identification dans la plateforme : un « Bloc A » thématique reçoit une clé à part
+        base = {"texte": texte, "section": "A" if s["genre"] in ("intro", "profil") else f"bloc_{s['lettre'] or s['nom']}",
                 "bloc": "Profil du répondant" if s["genre"] in ("intro", "profil") else s["nom"], "condition_texte": "",
                 "facultatif": False, "niveau_tag": " / ".join([s["tag"]] + tags).strip(" /"), "base": it["num"]}
         if tl.startswith("grille"):
@@ -616,7 +621,7 @@ def _questionnaire_redige(blocs):
                 fin = next((j for j in range(k + 1, len(developpees)) if developpees[j]["section"] != q["section"]), len(developpees))
             elif (m := re.match(r"^bloc\s+([0-9a-z])\b", bas)):
                 lettre = m.group(1).upper()
-                fin = debut_bloc.get("A" if lettre == "0" else lettre, len(developpees))
+                fin = debut_bloc.get("A" if lettre == "0" else f"bloc_{lettre}", len(developpees))
             elif (m := re.match(r"^([a-z]\d+)\b", bas)) and m.group(1).upper() in position:
                 fin = position[m.group(1).upper()]
             else:

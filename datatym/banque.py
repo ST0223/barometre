@@ -195,7 +195,8 @@ def modalites(ind):
             label = o.get("label", "") if isinstance(o, dict) else str(o)
             code = (o.get("code") if isinstance(o, dict) else None) or (str(k) if t == "unique" else slug(label, maxi=18))
             mods.append({"code": code, "label": label})
-        if t == "multiple" and not any(m["code"] == "autre" for m in mods):
+        if (t == "multiple" or not mods) and not any(m["code"] == "autre" for m in mods):
+            # liste encore à établir (banques, opérateurs…) : la réponse est saisie en clair, le formulaire reste valide
             mods.append({"code": "autre", "label": "Autre (préciser)"})
         return mods
     else:
