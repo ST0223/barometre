@@ -121,17 +121,13 @@ const IA_VISIBLE = true;
 // Thème : Auto (suit Windows), Clair ou Sombre ; le choix reste sur ce poste
 const THEMES = [["auto", "ecran", "Thème automatique (suit le système)"], ["clair", "soleil", "Thème clair"], ["sombre", "lune", "Thème sombre"]];
 function themeActuel() { try { return localStorage.getItem("theme") || "auto"; } catch (e) { return "auto"; } }
-function appliquerTheme(t, annoncer = false) {
+function appliquerTheme(t) {  // changement silencieux : pas de note
   if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   try { if (t === "auto") localStorage.removeItem("theme"); else localStorage.setItem("theme", t); } catch (e) { /* stockage indisponible */ }
   const b = $("#theme");
   if (b) { const [, i, l] = THEMES.find((x) => x[0] === t); b.innerHTML = ico(i); b.title = `${l} — cliquer pour changer`; b.setAttribute("aria-label", l); }
   // choix de la page Paramètres, s'il est affiché
   document.querySelectorAll("[data-theme-choix]").forEach((x) => x.classList.toggle("actif", x.dataset.themeChoix === t));
-  if (annoncer) {
-    const sombre = t === "sombre" || (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    toast(`${THEMES.find((x) => x[0] === t)[2]} activé${t === "auto" ? ` : ${sombre ? "sombre" : "clair"} en ce moment` : ""}.`, "succes");
-  }
 }
 document.addEventListener("DOMContentLoaded", () => {
   appliquerTheme(themeActuel());
@@ -139,7 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#theme").onclick = () => {
     const sombreSysteme = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const ordre = sombreSysteme ? ["auto", "clair", "sombre"] : ["auto", "sombre", "clair"];
-    appliquerTheme(ordre[(ordre.indexOf(themeActuel()) + 1) % ordre.length], true);
+    appliquerTheme(ordre[(ordre.indexOf(themeActuel()) + 1) % ordre.length]);
   };
 });
 
@@ -2097,7 +2093,7 @@ function vueParametres(app) {
       </div></div>
     </div>`;
   A.reveler(app);
-  app.querySelectorAll("[data-theme-choix]").forEach((x) => (x.onclick = () => appliquerTheme(x.dataset.themeChoix, true)));
+  app.querySelectorAll("[data-theme-choix]").forEach((x) => (x.onclick = () => appliquerTheme(x.dataset.themeChoix)));
   const lire = () => ({ ia_active: $("#p-ia").checked, anthropic_api_key: $("#p-cle").value, modele: $("#p-modele").value, presentation_datatym: $("#p-pres").value, contact_recrutement: $("#p-contact").value.trim(), auteur_fichiers: $("#p-auteur").value.trim() || "DATATYM", mail_rh: $("#p-mail-rh").value.trim(), contact_enquete: $("#p-contact-enq").value.trim(),
     couts_unitaires: P.couts_unitaires.map((c, k) => ({ cle: c.cle, valeur: Number(app.querySelector(`[data-cu-ref="${k}"]`).value) || 0 })) });
   app.querySelectorAll("[data-enr-params]").forEach((b) => (b.onclick = (e) => occupe(e.currentTarget, async () => {
