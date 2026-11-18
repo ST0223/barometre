@@ -482,6 +482,7 @@ body.ia-ouvert .toasts { right: 440px; }
 .ia-titre b { font-family: Sora, Inter, sans-serif; font-size: 14.5px; }
 .ia-titre span { font-size: 11.5px; color: rgba(255, 255, 255, .75); }
 .ia-titre a { color: #9FD6FF; text-decoration: underline; }
+.ia-titre span:empty { display: none; }
 .ia-point { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #F2C66D; vertical-align: 1px; }
 .ia-point.on { background: #3BD49A; box-shadow: 0 0 0 3px rgba(59, 212, 154, .25); }
 .ia-btn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: rgba(255, 255, 255, .8); cursor: pointer; display: grid; place-items: center; }

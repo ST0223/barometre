@@ -92,7 +92,7 @@
 
   function dessiner() {
     const on = actif();
-    $("#ia-etat").innerHTML = on ? `<i class="ia-point on"></i>Claude connecté` : `<i class="ia-point"></i>Non branché — <a href="#/parametres">activer</a>`;
+    $("#ia-etat").innerHTML = on ? "" :`<i class="ia-point"></i>Non branché — <a href="#/parametres">activer</a>`;
     const fil = $("#ia-fil");
     const accueil = `<div class="ia-msg ia-bot">${rendu(`Bonjour ! Je suis l'assistant de BAROMAKER. Je peux t'aider à formuler une étude, rédiger ou relire des questions, choisir une taille d'échantillon ou lire un résultat.${on ? "" : "\n**Je ne suis pas encore branché** : il faut une clé API Anthropic dans Paramètres pour que je réponde vraiment."}`)}</div>`;
     const sugg = IA.messages.length ? "" : `<div class="ia-sugg">${ecran().sugg.map((s) => `<button type="button" data-ia-sugg="${esc(s)}">${esc(s)}</button>`).join("")}</div>`;
