@@ -111,7 +111,25 @@ et clé API QuestionPro (non conservée). Seules les réponses complétées sont
 - Les libellés des réponses sont retraduits en codes (1, 2, 99…) ; les réponses « Autre » sont conservées.
 - Pour le suivi par enquêteur, chaque enquêteur partage le lien de l'enquête avec `?custom1=` suivi de son identifiant (`ENQML01`…, ou `enq1`… tant que la liste des RH n'est pas importée)
 
-## Rédaction assistée par Claude (masquée)
+## Ce qui est modifiable
+
+Tout livrable reste modifiable : dans l'interface (onglets **Paramètres** et **Rédaction** de chaque étape) ou dans Word
+après téléchargement. Une étape validée se rouvre à tout moment ; les étapes suivantes passent alors « à mettre à jour ».
+Seules exceptions : les sections d'identification et de clôture du questionnaire sont fixes, les noms de variables sont
+figés dès que de vraies réponses sont reçues, la base finale apurée est figée et datée (on la défige pour reprendre l'apurement, puis on la refige),
+et les réponses reçues ne sont jamais modifiées (les corrections vont dans le journal d'apurement, annulables).
+Une modification faite dans Word n'est pas réimportée dans la plateforme : régénérer le document la remplace ; pour qu'elle dure,
+la faire dans l'onglet **Rédaction** (les sections rédigées à la main sont conservées lors des mises à jour).
+Il n'y a pas de comptes ni de droits par utilisateur : la plateforme tourne sur le poste, toute personne qui l'ouvre peut tout modifier.
+
+## Limites actuelles
+
+Pas encore dans BAROMAKER : comparaison automatique avec l'édition précédente d'un baromètre, pondération (redressement)
+des résultats, tests de significativité entre groupes, analyse des réponses ouvertes (hors recodage des « Autre »),
+base anonymisée à remettre au client, traduction des documents. Les valeurs manquantes ne sont jamais imputées.
+L'assistant propose mais ne modifie rien lui-même.
+
+## Assistant et rédaction assistée par Claude
 
 La rédaction s'appuie sur des règles et une banque d'indicateurs (climat des affaires, numérique/IA,
 emploi/talents, générique) : aucune clé API n'est nécessaire. La rédaction assistée par Claude (clé API
