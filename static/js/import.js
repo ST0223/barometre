@@ -56,7 +56,7 @@ function verifImport(r) {
   const z = $("#import-zone");
   const blocs = {};
   p.indicateurs.forEach((i) => (blocs[i.bloc || "Résultats"] = blocs[i.bloc || "Résultats"] || []).push(i));
-  const origine = { questionnaire: "repris du questionnaire, une question par indicateur", note: "repris du tableau de la note", aucune: "aucun : ceux de la banque Datatym seront proposés" }[p.origine_indicateurs];
+  const origine = { questionnaire: "repris du questionnaire, une question par indicateur", note: "repris du tableau de la note", questions_note: "repris des questions écrites dans la note, une question par indicateur", aucune: "aucun : ceux de la banque Datatym seront proposés" }[p.origine_indicateurs];
   const nbCond = p.indicateurs.filter((i) => i.condition).length;
   z.innerHTML = `
     <div class="carte" style="margin-bottom:16px"><div class="carte-titre"><h3>${ico("check")} Ce qui a été compris</h3>

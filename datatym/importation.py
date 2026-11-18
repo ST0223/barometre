@@ -7,6 +7,7 @@ les secteurs et les fonctions. Deux formats de questionnaire sont lus : « techn
 Modalités, Type, Condition) et « terrain » (Code, Question, Consigne, Réponses).
 """
 import re
+import unicodedata
 
 import docx
 from docx.oxml.ns import qn
@@ -75,6 +76,90 @@ def _nettoyer_liste(libelle):
     t = re.sub(r"\s*,\s*", " – ", t)
     t = re.sub(r"\s+et\s+", " – ", t)
     return re.sub(r"\s*\((.*?)\)", lambda m: f" ({m.group(1)})", t).strip(" –")
+
+
+# ------------------------------------------------------------------ note rédigée librement (brief)
+def _bas(t):
+    """Minuscules sans accents, ponctuation conservée (traits d'union, apostrophes droites)."""
+    t = (t or "").replace("’", "'").replace("‘", "'").replace("‑", "-")
+    t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()
+    return re.sub(r"\s+", " ", t).strip().lower()
+
+
+_INTERROGATIFS = r"^(quel|quelle|quels|quelles|qu'|que |quoi|combien|comment|ou |pourquoi|a quel|de quel|dans quel|entre |parmi|au bout|lequel|laquelle)"
+_INTERTITRE_OBJECTIFS = r"\b(objectifs?|permettre|finalite|servir a|servira a|a quoi sert|but de l)"
+_INTERTITRE_HYPOTHESES = r"\b(insights?|hypotheses?|resultats? attendus?|constats? attendus?|exemples? de (resultats|constats|chiffres))"
+_PROFIL = r"\b(en tant que|vous etes|je suis|j'ai entre|votre age|quel age|tranche d'age|sexe|genre)\b"
+
+
+def _type_question(texte, options):
+    """Type d'indicateur d'une question écrite en clair, et ses modalités si elles se déduisent du libellé."""
+    b = _bas(texte)
+    if options:
+        multiple = re.search(r"\b(quel(le)?s sont|lesquel(le)?s|plusieurs|toutes? les|cochez)\b", b) or re.search(r"\bparmi les\b.*\bquel(le)?s\b", b)
+        return ("multiple" if multiple else "unique"), options
+    if re.search(r"\b(combien|nombre de|quel montant|quelle somme)\b", b):
+        return "numerique", []
+    inversion = re.search(r"\b[a-z]+-(t-)?(vous|ils?|elles?|on|tu)\b", b)
+    if inversion and not re.match(_INTERROGATIFS, b):
+        if re.search(r",[^,?]*\bou\b", b[inversion.end():].split("?")[0]):  # « arrêté, moins ou toujours ? » : réponses à écrire
+            return "unique", []
+        return "unique", ["Oui", "Non"]
+    return "unique", []  # choix à compléter (liste de banques, d'opérateurs…)
+
+
+def lire_brief(blocs, theme=""):
+    """Lit une note sans titres ni tableaux : un paragraphe d'introduction suivi de puces forme un groupe.
+
+    Les intertitres d'objectifs et d'hypothèses donnent les objectifs et les constats à vérifier ; les paragraphes
+    qui posent une question (avec leurs puces comme réponses) donnent des questions ; une question de profil
+    « en tant que » donne la cible."""
+    groupes = []
+    for b in blocs:
+        if b["type"] != "p":
+            continue
+        if b["liste"] and groupes:
+            groupes[-1]["puces"].append(b["texte"])
+        elif not b["liste"]:
+            groupes.append({"tete": b["texte"], "puces": []})
+    res = {"objectifs": [], "hypotheses": [], "cible": [], "contexte": [], "questions": []}
+    vus, n = set(), 0
+    for g in groupes:
+        tete, puces, bas = g["tete"], g["puces"], _bas(g["tete"])
+        if theme and bas == _bas(theme):
+            continue
+        sujet_etude = re.search(r"\b(enquete|etude|barometre|sondage)\b", bas)
+        if re.search(_INTERTITRE_OBJECTIFS, bas) and (sujet_etude or not bas.endswith("?")) and puces:
+            res["objectifs"] += [p.rstrip(" .…") for p in puces]
+            continue
+        if re.search(_INTERTITRE_HYPOTHESES, bas) and puces:
+            res["hypotheses"] += puces
+            continue
+        profil = bool(puces and re.search(_PROFIL, bas))  # question de profil : toujours avec ses réponses en puces
+        question = tete.rstrip().endswith("?") or profil or (tete.rstrip().endswith(":") and puces)
+        if not question:
+            if len(tete) > 150 and not puces:
+                res["contexte"].append(tete)
+            continue
+        texte = tete.rstrip(" :")
+        options = list(puces)
+        if not options and (m := re.search(r"\?\s*\(([^()]+,[^()]+)\)\s*$", texte)):  # « … ? (2, 5, 10) »
+            options = [x.strip() for x in m.group(1).split(",") if x.strip()]
+            texte = texte[:m.start()].rstrip() + " ?"
+        cle = re.sub(r"[^a-z0-9]+", "", _bas(texte))
+        if cle in vus:
+            continue
+        vus.add(cle)
+        type_, mods = _type_question(texte, options)
+        n += 1
+        role = "fonction" if profil and re.search(r"\b(en tant que|vous etes|je suis)\b", bas) else _role(texte)
+        if role == "fonction" and mods and not res["cible"]:
+            res["cible"] = [o for o in mods if not o.lower().startswith("autre")]
+        res["questions"].append({"num": f"Q{n}", "texte": texte, "section": "A" if profil else "B",
+                                 "bloc": "Profil du répondant" if profil else "Questions de l'étude", "condition_texte": "",
+                                 "facultatif": False, "role": role, "type": type_,
+                                 "modalites": [{"code": None, "label": m} for m in mods]})
+    return res
 
 
 # ------------------------------------------------------------------ note de cadrage
@@ -186,6 +271,20 @@ def analyser_note(blocs):
         elif (m := re.search(r"\b(\d{1,2})\s+semaines\b", texte_tout)):
             prop["fiche"]["duree"] = 7 * int(m.group(1))
             notes.append(f"Durée déduite de « {m.group(0)} » : à vérifier, c'est peut-être la durée totale de l'étude et non celle du terrain.")
+    # note rédigée librement (brief) : intertitres suivis de puces, questions écrites en paragraphes
+    brief = lire_brief(tout, prop["fiche"].get("theme", ""))
+    if not prop["objectifs"] and brief["objectifs"]:
+        prop["objectifs"] = brief["objectifs"]
+    if brief["objectifs"] and not prop["fiche"].get("objectif"):
+        prop["fiche"]["objectif"] = brief["objectifs"][0].rstrip(" .…")
+    if brief["hypotheses"]:
+        prop["contexte"].append("Constats que l'étude devra vérifier, cités à titre d'exemple dans la demande : "
+                                + " ; ".join(h.rstrip(" .") for h in brief["hypotheses"]) + ".")
+    if brief["cible"] and not prop["fiche"].get("cible"):
+        prop["fiche"]["cible"] = ", ".join(_nettoyer_liste(c) for c in brief["cible"])
+    if not prop["contexte"] and brief["contexte"]:
+        prop["contexte"] = brief["contexte"]
+    prop["questions_note"] = brief["questions"]
     for cle, lib in (("theme", "le thème"), ("objectif", "l'objectif"), ("cible", "la cible"), ("zones", "les pays"), ("taille", "la taille"), ("duree", "la durée")):
         if not prop["fiche"].get(cle):
             notes.append(f"La note ne précise pas {lib} de façon reconnaissable : à compléter.")
@@ -347,6 +446,32 @@ def _condition(texte, par_num):
     return clauses
 
 
+def _vers_indicateurs(questions, format_):
+    """Une question = un indicateur ; les questions d'identification prises en charge par la plateforme sont écartées."""
+    par_num = {q["num"]: q for q in questions}
+    retenues = [q for q in questions if q.get("role") not in ("enqueteur", "pays", "secteur", "fonction", "restitution")]
+    ids = {q["num"]: f"I{k:02d}" for k, q in enumerate(retenues, 1)}
+    inds = []
+    for q in retenues:
+        bloc = q["bloc"] if format_ == "note" or q["section"] != "A" else "Profil de l'entreprise"
+        ind = {"id": ids[q["num"]], "libelle": q.get("libelle") or re.sub(r"\s+", " ", q["texte"]).rstrip(" ?")[:90],
+               "type": q["type"], "bloc": bloc, "niveau": "tous",
+               "actif": True, "sens": "", "objet": "", "question": q["texte"],
+               "options": [{"code": m["code"], "label": m["label"]} if m["code"] else m["label"] for m in q["modalites"]]}
+        if q["section"] == "A":
+            ind["identification"] = True
+        if q.get("exclut"):
+            ind["exclut"] = q["exclut"]
+        if q["type"] == "multiple":
+            ind["max_choix"] = q.get("max_choix", 0)
+        if q.get("condition_texte") and format_ == "technique":
+            clauses = [c for c in _condition(q["condition_texte"], par_num) if c["num"] in ids]
+            if clauses:
+                ind["condition"] = [{"si": ids[c["num"]], "valeurs": c["valeurs"], "sauf": c["sauf"]} for c in clauses]
+        inds.append(ind)
+    return inds
+
+
 # ------------------------------------------------------------------ proposition complète
 def proposer(chemin_note, chemin_questionnaire=None):
     """Proposition d'étude à vérifier : fiche, contexte, objectifs, indicateurs (et leur origine), points d'attention."""
@@ -369,26 +494,7 @@ def proposer(chemin_note, chemin_questionnaire=None):
             f["secteur"] = ", ".join(_nettoyer_liste(m["label"]) for m in ident["secteur"]["modalites"] if not m["label"].lower().startswith("autre"))
         if "fonction" in ident:
             f["cible"] = ", ".join(_nettoyer_liste(m["label"]) for m in ident["fonction"]["modalites"] if not m["label"].lower().startswith("autre"))
-        par_num = {q["num"]: q for q in questions}
-        retenues = [q for q in questions if q.get("role") not in ("enqueteur", "pays", "secteur", "fonction", "restitution")]
-        ids = {q["num"]: f"I{k:02d}" for k, q in enumerate(retenues, 1)}
-        inds = []
-        for q in retenues:
-            ind = {"id": ids[q["num"]], "libelle": q.get("libelle") or re.sub(r"\s+", " ", q["texte"]).rstrip(" ?")[:90],
-                   "type": q["type"], "bloc": "Profil de l'entreprise" if q["section"] == "A" else q["bloc"], "niveau": "tous",
-                   "actif": True, "sens": "", "objet": "", "question": q["texte"],
-                   "options": [{"code": m["code"], "label": m["label"]} if m["code"] else m["label"] for m in q["modalites"]]}
-            if q["section"] == "A":
-                ind["identification"] = True
-            if q.get("exclut"):
-                ind["exclut"] = q["exclut"]
-            if q["type"] == "multiple":
-                ind["max_choix"] = q.get("max_choix", 0)
-            if q.get("condition_texte") and prop.get("format_questionnaire") == "technique":
-                clauses = [c for c in _condition(q["condition_texte"], par_num) if c["num"] in ids]
-                if clauses:
-                    ind["condition"] = [{"si": ids[c["num"]], "valeurs": c["valeurs"], "sauf": c["sauf"]} for c in clauses]
-            inds.append(ind)
+        inds = _vers_indicateurs(questions, format_)
         if inds and prop["indicateurs"] and format_ == "terrain":
             # la note a son tableau d'indicateurs (types d'échelle, indice) : il prime sur un questionnaire terrain
             notes.append("Indicateurs repris du tableau de la note (types et indice conservés) ; le questionnaire a servi à préciser le champ.")
@@ -402,6 +508,18 @@ def proposer(chemin_note, chemin_questionnaire=None):
         sans_options = [i["libelle"] for i in prop["indicateurs"] if i["type"] in ("unique", "multiple")]
         if sans_options:
             notes.append(f"{len(sans_options)} indicateur(s) à choix n'ont pas de modalités dans la note : complétez-les dans l'étape Cadrage.")
+    elif len(prop["questions_note"]) >= 3:  # une question isolée dans une note rédigée n'est pas un questionnaire
+        # questions écrites dans la note elle-même : une question = un indicateur
+        prop["indicateurs"] = _vers_indicateurs(prop["questions_note"], "note")
+        prop["origine_indicateurs"] = "questions_note"
+        qs = prop["indicateurs"]
+        a_completer = sum(1 for q in qs if q["type"] in ("unique", "multiple") and not q["options"])
+        oui_non = sum(1 for q in qs if q["options"] == ["Oui", "Non"])
+        notes.append(f"{len(qs)} questions lues dans la note, reprises une par une comme indicateurs"
+                     + (f" ; {oui_non} en Oui / Non d'après leur formulation" if oui_non else "")
+                     + (f" ; {a_completer} sans liste de réponses (banques, opérateurs, réponses libres…) : à compléter dans l'étape Questionnaire" if a_completer else "")
+                     + ".")
+    prop.pop("questions_note", None)
     if prop["origine_indicateurs"] == "aucune":
         notes.append("Aucun tableau d'indicateurs ni questionnaire : la plateforme proposera les indicateurs de sa banque, à ajuster.")
     return prop, notes
