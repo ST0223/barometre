@@ -1,9 +1,5 @@
 """Charte documentaire Datatym appliquée aux sorties Word (logos Datatym et Agiltym en tête).
 
-Style des notes d'étude : page de garde compacte (surtitre doré, titre bleu nuit, accroche, ligne de version),
-en-tête « Commanditaire · Baromètre — Document », pied « … · Datatym, groupe Agiltym — Confidentiel · Page x / y »,
-tableaux à en-tête bleu nuit. Les documents longs (avec sommaire) gardent une page de garde pleine.
-
 Tous les documents sont décrits par un « modèle de document » (dict sérialisable) :
     {titre, surtitre, sous_titre, meta[], en_tete, paysage, sommaire,
      sections: [{id, titre, niveau, source, blocs: [...]}]}
@@ -24,8 +20,6 @@ from docx.shared import Cm, Pt, RGBColor, Twips
 from .config import BASE_DIR, BLEU, BLEU_CLAIR, GRIS, LOGO, LOGO_AGILTYM, MARINE, POLICE, auteur_fichiers
 
 GRAS_RE = re.compile(r"\*\*(.+?)\*\*")
-NUIT, OR, GRIS_TEXTE = "1F3864", "B8912F", "595959"  # bleu nuit, or, gris des mentions
-SIGNATURE = "Datatym, groupe Agiltym"
 
 
 def _rgb(hexa):
@@ -139,7 +133,7 @@ class DocDatatym:
         pf.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
         pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         pf.space_after = Pt(6)
-        for nom, taille, couleur, avant in (("Heading 1", 15, NUIT, 18), ("Heading 2", 13, NUIT, 12), ("Heading 3", 12, OR, 8)):
+        for nom, taille, couleur, avant in (("Heading 1", 16, MARINE, 18), ("Heading 2", 13.5, BLEU, 12), ("Heading 3", 12, MARINE, 8)):
             st = styles[nom]
             st.font.name = POLICE
             st.font.size = Pt(taille)
@@ -192,10 +186,10 @@ class DocDatatym:
         p2 = header.add_paragraph()
         p2.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         p2.paragraph_format.space_after = Pt(0)
-        _police_run(p2.add_run(en_tete), 8.5, couleur=GRIS_TEXTE)
+        _police_run(p2.add_run(en_tete), 8, couleur="6B7280")
         bordure = OxmlElement("w:pBdr")
         bas = OxmlElement("w:bottom")
-        for k, v in (("w:val", "single"), ("w:sz", "6"), ("w:space", "4"), ("w:color", NUIT)):
+        for k, v in (("w:val", "single"), ("w:sz", "6"), ("w:space", "4"), ("w:color", BLEU)):
             bas.set(qn(k), v)
         bordure.append(bas)
         p2._p.get_or_add_pPr().append(bordure)
@@ -204,52 +198,42 @@ class DocDatatym:
             fp = pied.paragraphs[0]
             fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             r = fp.add_run(f"{self.pied}   ·   Page ")
-            _police_run(r, 8.5, couleur=GRIS_TEXTE)
-            _champ(fp, "PAGE", 8.5, GRIS_TEXTE)
+            _police_run(r, 9, couleur="6B7280")
+            _champ(fp, "PAGE")
             r = fp.add_run(" / ")
-            _police_run(r, 8.5, couleur=GRIS_TEXTE)
-            _champ(fp, "NUMPAGES", 8.5, GRIS_TEXTE)
+            _police_run(r, 9, couleur="6B7280")
+            _champ(fp, "NUMPAGES")
 
     # ---------- blocs ----------
-    def couverture(self, surtitre, titre, sous_titre="", meta=(), pleine=False):
-        """Page de garde. Compacte (notes) : surtitre doré, titre, sous-titre, accroche dorée (1re ligne de meta),
-        mentions grises (lignes suivantes), puis le texte sur la même page. Pleine (documents longs) : page à part."""
+    def couverture(self, surtitre, titre, sous_titre="", meta=()):
         d = self.doc
-        for _ in range(5 if pleine else 0):
+        for _ in range(5):
             d.add_paragraph()
         if surtitre:
             p = d.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p.paragraph_format.space_after = Pt(2)
-            ajouter_texte(p, surtitre.upper(), 9, OR, gras_defaut=True)
+            ajouter_texte(p, surtitre.upper(), 10.5, BLEU, gras_defaut=True)
         p = d.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        p.paragraph_format.line_spacing = 1.05
-        p.paragraph_format.space_after = Pt(3)
-        ajouter_texte(p, titre, 26 if pleine else 22, NUIT, gras_defaut=True)
+        p.paragraph_format.line_spacing = 1.1
+        ajouter_texte(p, titre, 26, MARINE, gras_defaut=True)
         if sous_titre:
             p = d.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p.paragraph_format.line_spacing = 1.1
-            p.paragraph_format.space_after = Pt(3)
-            ajouter_texte(p, sous_titre, 15, NUIT, gras_defaut=True)
-        meta = [m for m in (meta or ()) if str(m).strip()]
-        for k, ligne in enumerate(meta):
-            p = d.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p.paragraph_format.line_spacing = 1.1
-            p.paragraph_format.space_after = Pt(2 if k < len(meta) - 1 else 10)
-            ajouter_texte(p, ligne, 10.5 if k == 0 else 9, OR if k == 0 else GRIS_TEXTE)
+            ajouter_texte(p, sous_titre, 15, MARINE)
         p = d.add_paragraph()
-        p.paragraph_format.space_after = Pt(6)
         bordure = OxmlElement("w:pBdr")
         bas = OxmlElement("w:bottom")
-        for k, v in (("w:val", "single"), ("w:sz", "8"), ("w:space", "1"), ("w:color", NUIT)):
+        for k, v in (("w:val", "single"), ("w:sz", "18"), ("w:space", "1"), ("w:color", BLEU)):
             bas.set(qn(k), v)
         bordure.append(bas)
         p._p.get_or_add_pPr().append(bordure)
-        if pleine:
-            self.saut_page()
+        for ligne in meta or ():
+            p = d.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.space_after = Pt(0)
+            ajouter_texte(p, ligne, 11, "4B5563")
+        self.saut_page()
 
     def sommaire(self):
         self.titre("Sommaire", 1)
@@ -275,7 +259,7 @@ class DocDatatym:
             ppr.append(shd)
             bordure = OxmlElement("w:pBdr")
             gauche = OxmlElement("w:left")
-            for k, v in (("w:val", "single"), ("w:sz", "24"), ("w:space", "8"), ("w:color", OR)):
+            for k, v in (("w:val", "single"), ("w:sz", "24"), ("w:space", "8"), ("w:color", BLEU)):
                 gauche.set(qn(k), v)
             bordure.append(gauche)
             ppr.append(bordure)
@@ -297,17 +281,17 @@ class DocDatatym:
             p = self.doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             p.paragraph_format.keep_with_next = True
-            ajouter_texte(p, f"Tableau {self.n_tableaux}. {legende}", 10, NUIT, gras_defaut=True)
+            ajouter_texte(p, f"Tableau {self.n_tableaux}. {legende}", 10, MARINE, gras_defaut=True)
         n = max(len(colonnes), max((len(l) for l in lignes), default=0), 1)
         t = self.doc.add_table(rows=1, cols=n)
         t.alignment = WD_TABLE_ALIGNMENT.CENTER
-        _bordures_tableau(t, "8C8C8C")
+        _bordures_tableau(t)
         entete = t.rows[0]
         _repeter_entete(entete)
         for i in range(n):
             c = entete.cells[i]
             c.text = ""
-            _ombrer(c, NUIT)
+            _ombrer(c, MARINE)
             p = c.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             p.paragraph_format.line_spacing = 1.0
@@ -325,6 +309,8 @@ class DocDatatym:
                 if str(val).startswith("{{fond:"):  # case colorée sans texte (diagramme de Gantt)
                     _ombrer(c, str(val)[7:13])
                     val = ""
+                elif k % 2 == 1:
+                    _ombrer(c, GRIS)
                 p = c.paragraphs[0]
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 p.paragraph_format.line_spacing = 1.0
@@ -394,34 +380,12 @@ class DocDatatym:
         return chemin
 
 
-def contexte_document(modele, projet=None, version=None):
-    """Surtitre, en-tête et pied d'un document selon l'étude : « H&C EXECUTIVE EDUCATION · DATATYM, GROUPE AGILTYM »,
-    « H&C · Baromètre … — Note de cadrage v2 », « … · Datatym, groupe Agiltym — Confidentiel »."""
-    m = dict(modele)
-    if not projet:
-        return m
-    fiche = projet.get("fiche") or {}
-    comm = (fiche.get("commanditaire") or "").strip()
-    theme = (fiche.get("theme") or "").strip()
-    court = re.sub(r"\s+(executive education|consulting|group|groupe|sa|sarl)\b.*$", "", comm, flags=re.I).strip() or comm
-    titre = m.get("titre", "")
-    v = f" v{version}" if version else ""
-    if not m.get("entete_manuel"):
-        m["surtitre"] = f"{comm.upper()}  ·  {SIGNATURE.upper()}" if comm else SIGNATURE.upper()
-        m["en_tete"] = " — ".join(x for x in (" · ".join(x for x in (court, theme) if x), f"{titre}{v}".strip()) if x)
-    if m.get("pied", "Document interne — Confidentiel") == "Document interne — Confidentiel":
-        m["pied"] = f"{comm.upper()}  ·  {SIGNATURE} — Confidentiel" if comm else f"{SIGNATURE} — Confidentiel"
-    return m
-
-
 def rendre_modele(modele, chemin, projet=None, version=None):
-    """Produit le .docx d'un modèle de document (au style de l'étude si `projet` est fourni)."""
-    modele = contexte_document(modele, projet, version)
+    """Produit le .docx d'un modèle de document (charte bleue Datatym ; `projet` et `version` sont acceptés pour les appelants)."""
     d = DocDatatym(modele.get("en_tete", ""), paysage=modele.get("paysage", False),
                    pied=modele.get("pied", "Document interne — Confidentiel"))
     d.proprietes(modele.get("titre", ""), modele.get("sous_titre", ""), auteur_fichiers())
-    d.couverture(modele.get("surtitre", ""), modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("meta", []),
-                 pleine=bool(modele.get("sommaire") or modele.get("couverture") == "pleine"))
+    d.couverture(modele.get("surtitre", ""), modele.get("titre", ""), modele.get("sous_titre", ""), modele.get("meta", []))
     if modele.get("sommaire"):
         d.sommaire()
     for sec in modele.get("sections", []):

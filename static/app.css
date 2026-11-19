@@ -204,7 +204,7 @@ select.saisie { padding-right: 28px; }
 .choix-doc .btn.actif { background: var(--marine); border-color: var(--marine); color: #fff; }
 .page { max-width: 800px; margin: 0 auto 20px; background: #fff; box-shadow: 0 2px 12px rgba(25, 36, 62, .12); padding: 56px 64px; font-family: "Times New Roman", Times, serif; font-size: 15px; line-height: 1.5; color: #111; text-align: justify; }
 .page.paysage { max-width: 1060px; }
-.page .pg-entete { display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid #1F3864; padding-bottom: 6px; margin-bottom: 26px; font-family: var(--police); font-size: 10.5px; color: #6B7280; text-align: right; }
+.page .pg-entete { display: flex; flex-direction: column; gap: 4px; border-bottom: 1.5px solid var(--bleu); padding-bottom: 6px; margin-bottom: 26px; font-family: var(--police); font-size: 10.5px; color: #6B7280; text-align: right; }
 .page .pg-pied { margin-top: 30px; padding-top: 8px; border-top: 1px solid #E3E8EF; text-align: center; font-family: var(--police); font-size: 10.5px; color: #6B7280; }
 .page .pg-logos { display: flex; justify-content: space-between; align-items: center; }
 .page .pg-logos img { height: 22px; margin: 0 !important; }
@@ -212,25 +212,22 @@ select.saisie { padding-right: 28px; }
 .page .pg-logos.grands { margin-bottom: 60px; }
 .page .pg-logos.grands img { height: 46px; }
 .page .pg-logos.grands img + img { height: 38px; }
-.page .couv { padding: 6px 0 14px; border-bottom: 1.5px solid #1F3864; margin-bottom: 24px; text-align: left; }
-.page .couv.pleine { padding: 90px 0 34px; }
-.page .couv .st { color: #B8912F; font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
-.page .couv h1 { font-family: "Times New Roman", serif; font-size: 29px; color: #1F3864; margin: 4px 0 4px; }
-.page .couv.pleine h1 { font-size: 34px; }
-.page .couv .sous { font-size: 19px; color: #1F3864; font-weight: 700; }
-.page .couv .accroche { margin-top: 6px; font-size: 14px; color: #B8912F; }
-.page .couv .meta { margin-top: 4px; font-size: 12px; color: #595959; }
-.page h2 { font-family: "Times New Roman", serif; font-size: 20px; color: #1F3864; margin: 26px 0 8px; text-align: left; }
-.page h3 { font-family: "Times New Roman", serif; font-size: 17px; color: #1F3864; margin: 18px 0 6px; text-align: left; }
+.page .couv { padding: 90px 0 34px; border-bottom: 3px solid var(--bleu); margin-bottom: 30px; text-align: left; }
+.page .couv .st { color: var(--bleu); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.page .couv h1 { font-family: "Times New Roman", serif; font-size: 34px; color: var(--encre); margin: 6px 0 6px; }
+.page .couv .sous { font-size: 19px; color: var(--encre); }
+.page .couv .meta { margin-top: 14px; font-size: 13.5px; color: #4B5563; }
+.page h2 { font-family: "Times New Roman", serif; font-size: 21px; color: var(--encre); margin: 26px 0 8px; text-align: left; }
+.page h3 { font-family: "Times New Roman", serif; font-size: 17px; color: var(--bleu); margin: 18px 0 6px; text-align: left; }
 .page p { margin: 0 0 8px; }
 .page p.note { font-size: 13px; color: #4B5563; font-style: italic; }
-.page p.encadre { background: #EAF2FB; border-left: 4px solid #B8912F; padding: 10px 14px; color: #1F3864; }
+.page p.encadre { background: var(--bleu-50); border-left: 4px solid var(--bleu); padding: 10px 14px; color: var(--encre); }
 .page ul, .page ol { margin: 0 0 10px; padding-left: 22px; }
 .page li { margin-bottom: 3px; }
 .page table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; font-size: 12.5px; text-align: left; line-height: 1.3; }
-.page th { background: #1F3864; color: #fff; padding: 6px 8px; font-weight: 700; vertical-align: top; }
-.page td { border: 1px solid #8C8C8C; padding: 5px 8px; vertical-align: top; white-space: pre-line; }
-
+.page th { background: var(--marine); color: #fff; padding: 6px 8px; font-weight: 700; vertical-align: top; }
+.page td { border: 1px solid #C9D3E0; padding: 5px 8px; vertical-align: top; white-space: pre-line; }
+.page tr:nth-child(even) td { background: #F2F4F7; }
 .page .leg { font-size: 13px; font-weight: 700; color: var(--encre); margin: 12px 0 4px; text-align: left; }
 .page .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 8px 0 14px; }
 .page .kpis div { background: var(--bleu-50); text-align: center; padding: 12px 6px; }
