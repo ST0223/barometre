@@ -213,12 +213,12 @@ def exporter(projet, cle):
             f = f"{nom_court(projet['fiche']['theme'])}.xlsx"  # nom court, identique au form_id du formulaire
             formulaires.xlsform(out / f, projet, e["data"], c)
             ajout("Formulaire XLSForm (KoboToolbox)", f)
-        # fichier média à joindre au formulaire dans Kobo (nom imposé par le XLSForm) : noms provisoires,
-        # pour déployer et tester le formulaire avant le recrutement ; inutile si la collecte se fait sur QuestionPro
+        # pas de liste d'enquêteurs à cette étape : le recrutement passe par les RH, et la liste pour Kobo
+        # (liste_enqueteurs.csv) est produite à l'étape Échantillonnage, une fois la liste des RH importée
         ech = _data(projet, "echantillonnage") or {}
-        if kobo and not ech.get("equipe_rh"):
-            formulaires.liste_enqueteurs(out / formulaires.FICHIER_ENQUETEURS, e["data"])
-            ajout("Liste des enquêteurs pour Kobo (provisoire, pour tester le formulaire)", formulaires.FICHIER_ENQUETEURS)
+        provisoire = out / formulaires.FICHIER_ENQUETEURS
+        if provisoire.exists() and not ech.get("equipe_rh"):
+            provisoire.unlink()  # ancienne liste provisoire (Enq1, Enq2…)
         if not kobo:
             f = store.nom_fichier(projet, "Import_QuestionPro", v, "txt")
             formulaires.questionpro(out / f, e["data"])

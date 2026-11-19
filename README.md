@@ -102,7 +102,8 @@ Le site de dépôt des candidatures et l'adresse de retour de la liste se règle
 ## Déployer le formulaire sur KoboToolbox
 
 1. Importer le fichier `…_XLSForm_Kobo_vN.xlsx` comme nouveau projet.
-2. Dans **Paramètres › Médias**, joindre `liste_enqueteurs.csv` (nom à conserver tel quel) : il alimente la
+2. Dans **Paramètres › Médias**, joindre `liste_enqueteurs.csv` (nom à conserver tel quel), produit à l'étape
+   **Échantillonnage** une fois la liste des RH importée (l'étape Questionnaire n'en produit pas) : il alimente la
    question « Enquêteur » et les champs calculés nom, superviseur et catégorie.
 3. Déployer. Le fichier a été contrôlé avec `pyxform`, le convertisseur utilisé par KoboToolbox.
 
