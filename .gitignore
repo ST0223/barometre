@@ -16,3 +16,5 @@ __pycache__/
 /*.docx
 /*.xlsx
 /*.pptx
+# Documents des études (notes, questionnaires, XLSForm), un dossier par baromètre (confidentiels)
+etudes/

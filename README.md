@@ -168,6 +168,8 @@ static/                interface sans dépendance
   js/accueil.js        page d'accueil
   js/etude.js          assistant « Lancer une étude »
 projets/               un dossier par baromètre : projet.json, livrables, versions, données, graphiques
+etudes/                documents de travail reçus ou rédigés hors plateforme, un dossier par baromètre
+                       (brief, notes, questionnaires, XLSForm, rangés par version), hors Git (confidentiels)
 Resources/             documents de référence, hors Git (confidentiels)
   exemplaires/         modèles fournis par le cabinet (cadrage, questionnaires, XLSForm, formation)
   rapports-reference/  rapports Gen Z (Côte d'Ivoire, Sénégal) servant de modèle au rapport
