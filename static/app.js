@@ -182,7 +182,7 @@ async function router() {
     S.etape = h[2] || etapeCourante(S.projet);
     if (!ORDRE.includes(S.etape)) S.etape = "fiche";
     S.sens = memePage ? Math.sign(ORDRE.indexOf(S.etape) - ORDRE.indexOf(avant)) : 0;
-    S.onglet = h[3] || null; S.doc = null; S.travail = null; S.docTravail = null;
+    S.onglet = h[3] || null; S.doc = null; S.travail = null; S.condEd = null; S.docTravail = null;
     chargerListe();
     return vueProjet(!memePage);
   }
@@ -200,7 +200,7 @@ function aller(etape) { location.hash = `#/p/${S.projet.slug}/${etape}`; }
 
 function majProjet(p, msg) {
   S.projet = p;
-  S.travail = null; S.docTravail = null; S.sale = false; S.sens = 0;
+  S.travail = null; S.condEd = null; S.docTravail = null; S.sale = false; S.sens = 0;
   if (msg) toast(msg, "succes");
   chargerListe();
   vueProjet(false);
@@ -604,7 +604,7 @@ function panneauEtape(cle) {
   document.querySelectorAll("[data-suivant]").forEach((b) => (b.onclick = () => aller(b.dataset.suivant)));
   document.querySelectorAll("[data-o]").forEach((b) => (b.onclick = async () => {
     if (S.sale && !(await confirmer("Modifications non enregistrées", "Changer d'onglet sans enregistrer ?", "Continuer", "btn-danger"))) return;
-    S.sale = false; S.travail = null; S.docTravail = null;
+    S.sale = false; S.travail = null; S.condEd = null; S.docTravail = null;
     S.onglet = b.dataset.o;
     history.replaceState(null, "", `#/p/${p.slug}/${cle}/${S.onglet}`);
     panneauEtape(cle);
@@ -855,7 +855,7 @@ function piedEnregistrer(z, cle, construire, libelle = "Enregistrer et mettre à
     return;
   }
   z.insertAdjacentHTML("beforeend", `<div class="pied-form"><button class="btn" data-annuler>Annuler</button><button class="btn btn-primaire" data-enr>${ico("check")} ${esc(libelle)}</button></div>`);
-  z.querySelector("[data-annuler]").onclick = () => { S.travail = null; S.sale = false; rafraichirOnglet(cle); };
+  z.querySelector("[data-annuler]").onclick = () => { S.travail = null; S.condEd = null; S.sale = false; rafraichirOnglet(cle); };
   z.querySelector("[data-enr]").onclick = (ev) => occupe(ev.currentTarget, async () => {
     const r = await api("PUT", `/api/projets/${S.projet.slug}/etapes/${cle}/data`, construire());
     majProjet(r, "Paramètres enregistrés, documents mis à jour.");
@@ -968,6 +968,44 @@ function editeurQuestions(z, e) {
   const libre = (si) => si > 0 && si < W.sections.length - 1;
   const calculable = (q) => ["select_one", "select_multiple", "integer"].includes(q.type);
   const problemesPretest = (S.projet.pretest || {}).problemes || [];
+  // conditions d'affichage « Posée si » : clauses reliées par « ou », chacune [id de la question, codes retenus, sauf]
+  const toutes = W.sections.flatMap((s) => s.ids);
+  const parId = Object.fromEntries(toutes.map((x) => [x.id, x]));
+  const aChoix = (x) => ["select_one", "select_multiple"].includes(x.type) && (x.modalites || []).length;
+  const nomQ = (x) => (x.num && x.num !== "…" ? x.num : "question ajoutée");
+  const texteClause = ([id, vals, sauf]) => {
+    const src = parId[id];
+    if (!src) return "";
+    const libs = Object.fromEntries((src.modalites || []).map((m) => [m.code, m.label]));
+    const op = src.type === "select_multiple" ? (sauf ? "ne contient pas" : "contient") : (sauf ? "≠" : "=");
+    return `${nomQ(src)} ${op} ${vals.map((v) => libs[v] || v).join(" ou ")}`;
+  };
+  const texteConditions = (conds) => (conds || []).map(texteClause).filter(Boolean).join(" ou ");
+  const blocCondition = (si, qi, q) => {
+    const cle = `${si}:${qi}`;
+    const conds = q.conditions || [];
+    if (!(S.condEd && S.condEd.cle === cle)) {
+      return `<div class="meta-q cond-q">${ico("info")}<span>${conds.length ? `Posée si ${esc(texteConditions(conds))}` : "Posée sans condition"}</span>
+        <button class="btn btn-petit btn-fantome btn-ed" data-cond="${cle}">${conds.length ? "Modifier la condition" : "Ajouter une condition"}</button></div>`;
+    }
+    const avant = toutes.slice(0, toutes.indexOf(q)).filter(aChoix);
+    const B = S.condEd.brouillon;
+    return `<div class="cond-ed">
+      <div class="lib">Posée si… <span class="aide">(plusieurs règles : il suffit qu'une seule soit remplie)</span></div>
+      ${B.map(([id, vals, sauf], k) => {
+        const src = parId[id];
+        const multi = src && src.type === "select_multiple";
+        return `<div class="cond-ligne">
+          <select class="saisie petite" data-ce-q="${k}">${avant.map((x) => `<option value="${esc(x.id)}" ${x.id === id ? "selected" : ""}>${esc(nomQ(x))} · ${esc(x.texte.slice(0, 70))}</option>`).join("")}</select>
+          <select class="saisie petite" data-ce-op="${k}" style="width:auto"><option value="0" ${!sauf ? "selected" : ""}>${multi ? "contient" : "est"}</option><option value="1" ${sauf ? "selected" : ""}>${multi ? "ne contient pas" : "n'est pas"}</option></select>
+          <div class="cond-vals">${(src ? src.modalites : []).map((m) => `<label class="bascule"><input type="checkbox" data-ce-v="${k}" value="${esc(m.code)}" ${vals.includes(m.code) ? "checked" : ""}> ${esc(m.label)}</label>`).join("")}</div>
+          <button class="btn btn-petit btn-fantome btn-danger btn-ed" data-ce-suppr="${k}" title="Retirer cette règle">${ico("trash")}</button></div>`;
+      }).join("")}
+      ${avant.length ? `<button class="btn btn-petit btn-fantome btn-ed" data-ce-ajout>${ico("plus")} ${B.length ? "Ou une autre règle" : "Ajouter une règle"}</button>`
+        : `<p class="aide">Aucune question à choix ne précède celle-ci : elle ne peut pas dépendre d'une réponse.</p>`}
+      <div class="cond-pied"><button class="btn btn-petit btn-ed" data-ce-annuler>Annuler</button>
+        <button class="btn btn-petit btn-primaire btn-ed" data-ce-ok>${ico("check")} Appliquer</button></div></div>`;
+  };
   z.className = "carte-corps";
   z.innerHTML = `
     ${e.collecte_commencee ? `<div class="bandeau alerte">${ico("lock")}<div><b>La collecte a commencé.</b> Les réponses reçues sont rangées par variable : vous pouvez ajouter des questions en fin de section, mais pas déplacer ni retirer celles qui existent.</div></div>` : ""}
@@ -997,7 +1035,6 @@ function editeurQuestions(z, e) {
               ${q.modifiee ? '<span class="tag manuel">Modifiée</span>' : ""}
               <select class="saisie petite" style="width:auto" data-s="${si}" data-q="${qi}" data-k="type">${Object.entries(TYPES_Q).map(([v, l]) => `<option value="${v}" ${q.type === v ? "selected" : ""}>${l}</option>`).join("")}</select>
               <label class="bascule"><input type="checkbox" data-s="${si}" data-q="${qi}" data-k="obligatoire" ${q.obligatoire !== false ? "checked" : ""}> Obligatoire</label>
-              ${q.condition ? `<span>${ico("info")} ${esc(q.condition)}</span>` : ""}
               ${q.ajoutee || (q.indicateur && /^q_I/.test(q.id) && S.projet.etapes.cadrage.data.indicateurs.some((i) => i.id === q.indicateur && i.ajoute_questionnaire))
                 ? (calculable(q) ? `<label class="bascule" title="Crée un indicateur : la question est calculée et commentée dans le rapport"><input type="checkbox" data-rapport="${si}:${qi}" ${q.indicateur ? (q.dans_rapport === false ? "" : "checked") : q.dans_rapport ? "checked" : ""}> Inclure dans le rapport</label>`
                   : `<span class="aide" style="font-size:11.5px">Texte collecté, non calculé dans le rapport</span>`) : ""}
@@ -1006,6 +1043,10 @@ function editeurQuestions(z, e) {
             ${["select_one", "select_multiple"].includes(q.type) ? `<textarea class="saisie petite" rows="${Math.min(9, (q.modalites || []).length + 1)}" data-s="${si}" data-q="${qi}" data-k="modalites" title="code = libellé, une modalité par ligne">${esc((q.modalites || []).map((m) => `${m.code} = ${m.label}`).join("\n"))}</textarea>` : ""}
             <input class="saisie petite" data-s="${si}" data-q="${qi}" data-k="consigne" value="${esc(q.consigne || "")}" placeholder="Consigne pour l'enquêteur (facultatif)">
             ${!q.fixe ? `<div class="meta-q">Posée à : ${profils.map((p) => `<label class="bascule"><input type="checkbox" data-s="${si}" data-q="${qi}" data-prof="${p.code}" ${!q.profils || q.profils.includes(p.code) ? "checked" : ""}> ${esc(p.libelle)}</label>`).join("")}</div>` : ""}
+            ${q.fixe ? (q.condition ? `<div class="meta-q"><span>${ico("info")} ${esc(q.condition)}</span></div>` : "") : blocCondition(si, qi, q)}
+            ${libre(si) && !e.collecte_commencee ? `<div class="q-actions">
+              <button class="btn btn-petit btn-fantome btn-ed" data-ajq-sous="${si}:${qi}">${ico("plus")} Insérer une question en dessous</button>
+              <button class="btn btn-petit btn-fantome btn-ed" data-dup="${si}:${qi}" title="Copie modifiable, placée juste en dessous">${ico("file")} Dupliquer</button></div>` : ""}
           </div></div>`).join("")}
         </div>
         ${libre(si) ? `<button class="btn btn-petit btn-fantome btn-ed" style="margin-top:8px" data-ajq="${si}">${ico("plus")} Ajouter une question dans « ${esc(s.titre)} »</button>` : ""}
@@ -1041,11 +1082,15 @@ function editeurQuestions(z, e) {
     if (k === "type" && ev.type === "change") rafraichirOnglet("questionnaire");
   };
   // après chaque changement de structure : la page reste à la même hauteur
-  const redessiner = () => {
+  const revoir = () => {
     const y = window.scrollY;
-    S.sale = true;
     rafraichirOnglet("questionnaire");
     window.scrollTo(0, y);
+  };
+  const redessiner = () => {
+    S.sale = true;
+    S.condEd = null;  // la structure change : l'éditeur de condition ouvert se referme
+    revoir();
   };
   const nouvelleQuestion = (titre) => ({ id: `aj_${Date.now()}_${Math.floor(Math.random() * 1000)}`, texte: "Nouvelle question", type: "select_one",
     modalites: [{ code: "oui", label: "Oui" }, { code: "non", label: "Non" }], ajoutee: true, modifiee: true, dans_rapport: true,
@@ -1064,6 +1109,58 @@ function editeurQuestions(z, e) {
     s.ids.push(nouvelleQuestion(s.titre));
     redessiner();
   }));
+  // nouvelle question placée juste sous une autre
+  z.querySelectorAll("[data-ajq-sous]").forEach((b) => (b.onclick = () => {
+    const [si, qi] = b.dataset.ajqSous.split(":").map(Number);
+    W.sections[si].ids.splice(qi + 1, 0, nouvelleQuestion(W.sections[si].titre));
+    redessiner();
+  }));
+  // copie modifiable d'une question (formulation, réponses, condition, profils), placée juste en dessous
+  z.querySelectorAll("[data-dup]").forEach((b) => (b.onclick = () => {
+    const [si, qi] = b.dataset.dup.split(":").map(Number);
+    const src = W.sections[si].ids[qi];
+    const copie = { ...clone(src), id: `aj_${Date.now()}_${Math.floor(Math.random() * 1000)}`, ajoutee: true, modifiee: true, fixe: false,
+      indicateur: null, dans_rapport: calculable(src), bloc: W.sections[si].titre, texte: `${src.texte} (copie)`, num: "…", var: "…" };
+    W.sections[si].ids.splice(qi + 1, 0, copie);
+    redessiner();
+  }));
+  // éditeur de condition
+  const brouillon = () => S.condEd.brouillon;
+  const carteDe = (cle) => { const [si, qi] = cle.split(":").map(Number); return W.sections[si].ids[qi]; };
+  z.querySelectorAll("[data-cond]").forEach((b) => (b.onclick = () => {
+    S.condEd = { cle: b.dataset.cond, brouillon: clone(carteDe(b.dataset.cond).conditions || []) };
+    if (!S.condEd.brouillon.length) {
+      const q = carteDe(b.dataset.cond);
+      const avant = toutes.slice(0, toutes.indexOf(q)).filter(aChoix);
+      if (avant.length) S.condEd.brouillon.push([avant[avant.length - 1].id, [], false]);
+    }
+    revoir();
+  }));
+  z.querySelectorAll("[data-ce-q]").forEach((s) => (s.onchange = () => { brouillon()[+s.dataset.ceQ] = [s.value, [], false]; revoir(); }));
+  z.querySelectorAll("[data-ce-op]").forEach((s) => (s.onchange = () => { brouillon()[+s.dataset.ceOp][2] = s.value === "1"; }));
+  z.querySelectorAll("[data-ce-v]").forEach((c) => (c.onchange = () => {
+    const cl = brouillon()[+c.dataset.ceV];
+    cl[1] = c.checked ? [...new Set([...cl[1], c.value])] : cl[1].filter((v) => v !== c.value);
+  }));
+  z.querySelectorAll("[data-ce-suppr]").forEach((b) => (b.onclick = () => { brouillon().splice(+b.dataset.ceSuppr, 1); revoir(); }));
+  const ceAjout = z.querySelector("[data-ce-ajout]");
+  if (ceAjout) ceAjout.onclick = () => {
+    const q = carteDe(S.condEd.cle);
+    const avant = toutes.slice(0, toutes.indexOf(q)).filter(aChoix);
+    brouillon().push([avant[avant.length - 1].id, [], false]);
+    revoir();
+  };
+  const ceAnnuler = z.querySelector("[data-ce-annuler]");
+  if (ceAnnuler) ceAnnuler.onclick = () => { S.condEd = null; revoir(); };
+  const ceOk = z.querySelector("[data-ce-ok]");
+  if (ceOk) ceOk.onclick = () => {
+    const q = carteDe(S.condEd.cle);
+    const regles = brouillon().filter((c) => c[1].length);
+    if (brouillon().length && !regles.length) return toast("Cochez au moins une réponse, ou retirez la règle.", "erreur");
+    q.conditions = regles;
+    q.modifiee = true;
+    redessiner();
+  };
   const ajS = z.querySelector("#aj-section");
   if (ajS) ajS.onclick = () => {
     const noms = new Set(W.sections.map((s) => s.titre));
@@ -1417,7 +1514,7 @@ function editeurSuivi(z) {
   const b = $("#suivi-auto");
   if (b) b.onclick = (ev) => occupe(ev.currentTarget, async () => {
     const r = await api("PUT", `/api/projets/${S.projet.slug}/etapes/suivi/data`, { observations: null, recommandations: null });
-    S.travail = null; S.sale = false;
+    S.travail = null; S.condEd = null; S.sale = false;
     majProjet(r, "Observations et recommandations de nouveau rédigées à partir des données.");
   });
 }
@@ -1737,7 +1834,7 @@ function editeurPretest(z, e) {
     const pb = W.problemes[Number(b.dataset.corrigerPb)];
     try {
       if (S.sale) S.projet = await api("PUT", `/api/projets/${p.slug}/pretest`, W);
-      S.sale = false; S.travail = null; S.focusVar = pb.var;
+      S.sale = false; S.travail = null; S.condEd = null; S.focusVar = pb.var;
       S.onglet = "parametres";
       history.replaceState(null, "", `#/p/${p.slug}/questionnaire/parametres`);
       panneauEtape("questionnaire");

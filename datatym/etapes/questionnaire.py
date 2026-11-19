@@ -77,6 +77,8 @@ def question_indicateur(ind, profils):
         q["consigne"] = "Lire les modalités."
     elif t in ("jugement", "satisfaction", "intention", "evolution", "perspective"):
         q["consigne"] = "Lire les modalités sauf « Ne sait pas »."
+    if ind.get("consigne"):  # consigne du questionnaire d'origine (import)
+        q["consigne"] = (ind["consigne"] + " " + q["consigne"]).strip()
     if q.get("exclut"):
         libs = {m["code"]: m["label"] for m in q["modalites"]}
         q["consigne"] = (q["consigne"] + " " if q["consigne"] else "") + "Fin du questionnaire si : " + " ou ".join(libs.get(c, c) for c in q["exclut"]) + " (hors cible)."
@@ -213,9 +215,12 @@ def duree_estimee(toutes, profils, mode):
                 continue
             if q.get("profils") and pr["code"] not in q["profils"]:
                 continue
-            s += SECONDES.get(q["type"], 15)
+            # ligne de grille (« Question — critère ») : même échelle que la ligne précédente, réponse plus rapide
+            sec = 8 if " — " in (q.get("texte") or "") and q["type"] == "select_one" else SECONDES.get(q["type"], 15)
             if q["type"] == "select_multiple":
-                s += 20  # précision « Autre »
+                sec += 20  # précision « Autre »
+            # question filtrée : seule une partie des répondants la voit (estimation : la moitié)
+            s += sec * (0.5 if q.get("conditions") or q.get("condition_sur") else 1)
         res[pr["code"]] = round(s * (1.3 if mode == "terrain" else 1.0) / 60, 1)
     return res
 

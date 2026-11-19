@@ -288,8 +288,11 @@ def generer(projet, cle):
     if cle == "cadrage":
         if prec:
             # la cible a pu changer dans la fiche : on garde le niveau déjà choisi pour chaque profil
+            # (et son poids dans l'échantillon)
             niveaux = {pr["code"]: pr["niveau"] for pr in prec.get("profils", [])}
-            prec["profils"] = [{**pr, "niveau": niveaux.get(pr["code"], pr["niveau"])} for pr in profils_depuis_cible(projet["fiche"]["cible"])]
+            poids = {pr["code"]: pr["poids"] for pr in prec.get("profils", []) if "poids" in pr}
+            prec["profils"] = [{**pr, "niveau": niveaux.get(pr["code"], pr["niveau"]), **({"poids": poids[pr["code"]]} if pr["code"] in poids else {})}
+                               for pr in profils_depuis_cible(projet["fiche"]["cible"])]
             prec, nouveau_domaine = cadrage.actualiser(projet, prec)
             if nouveau_domaine:
                 store.journaliser(projet, f"Nouveau thème : indicateurs du domaine « {prec['domaine']} » proposés à la place des précédents.")

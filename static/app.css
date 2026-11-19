@@ -270,6 +270,15 @@ select.saisie { padding-right: 28px; }
 .q-pretest span { flex: 1; }
 .carte-q.q-focus { border-color: var(--bleu); box-shadow: 0 0 0 3px var(--bleu-50); }
 .liste-q { display: flex; flex-direction: column; gap: 10px; }
+/* conception du questionnaire : condition « Posée si », insertion sous une question, duplication */
+.carte-q .cond-q > svg { width: 14px; height: 14px; flex: none; }
+.carte-q .cond-q span { flex: 1; min-width: 160px; }
+.q-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.cond-ed { border: 1px dashed var(--bleu); border-radius: 10px; padding: 10px 12px; background: var(--bleu-50); display: flex; flex-direction: column; gap: 8px; }
+.cond-ligne { display: grid; grid-template-columns: minmax(180px, 1.2fr) auto minmax(180px, 2fr) auto; gap: 8px; align-items: start; }
+.cond-vals { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; max-height: 150px; overflow: auto; }
+.cond-pied { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 760px) { .cond-ligne { grid-template-columns: 1fr; } }
 .sec-q > h4 { font-size: 13px; margin: 18px 0 10px; display: flex; gap: 8px; align-items: center; }
 .sec-q > h4 span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--bleu); color: #fff; font-size: 12px; }
 .jauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }

@@ -204,7 +204,7 @@ def analyser_note(blocs):
             prop["contexte"] = [b["texte"] for b in paras if not b["titre"]]
         if "objectif" in t:
             for b in paras:
-                if (m := re.match(r"objectif g[ée]n[ée]ral\s*:\s*(.+)", b["texte"], re.I)):
+                if (m := re.match(r"objectif g[ée]n[ée]ral\s*[:.]\s*(.+)", b["texte"], re.I)):
                     prop["fiche"].setdefault("objectif", m.group(1).rstrip("."))
             debut = False
             for b in paras:
@@ -262,7 +262,7 @@ def analyser_note(blocs):
         prop["fiche"]["secteur"] = ", ".join(_nettoyer_liste(s) for s in dict.fromkeys(secteurs))
     if fonctions and "cible" not in prop["fiche"]:
         prop["fiche"]["cible"] = ", ".join(_nettoyer_liste(f) for f in dict.fromkeys(fonctions))
-    if "taille" not in prop["fiche"] and (m := re.search(r"\b(\d[\d\s]{1,5})\s+(?:dirigeants|répondants|entreprises|questionnaires|personnes|ménages)", texte_tout)):
+    if "taille" not in prop["fiche"] and (m := re.search(r"\b(\d[\d\s]{1,5})\s+(?:dirigeants|répondants|entreprises|questionnaires|personnes|ménages|clients|entretiens)", texte_tout)):
         prop["fiche"]["taille"] = int(m.group(1).replace(" ", ""))
     if "duree" not in prop["fiche"]:
         # seulement une durée rattachée au terrain (« 15 jours de collecte », « terrain de 40 jours »)
@@ -404,8 +404,8 @@ def analyser_questionnaire(blocs):
             if (m := re.search(r"(\d+)\s+r[ée]ponses?\s+au\s+maximum", controle, re.I)):
                 q["max_choix"] = int(m.group(1))
             questions.append(q)
-    if not format_:
-        # pas de tableau de questions : questionnaire rédigé en paragraphes numérotés
+    if not questions:
+        # pas de question dans les tableaux (ou seulement des annexes) : questionnaire rédigé en paragraphes numérotés
         redigees, n_r = _questionnaire_redige(blocs)
         if redigees:
             return redigees, "redige", n_r
@@ -425,8 +425,10 @@ def analyser_questionnaire(blocs):
 
 
 # ------------------------------------------------------------------ questionnaire rédigé (paragraphes numérotés)
-_Q_NUM = re.compile(r"^([A-Z]\d{1,2})\.\s+(.+)$")
+_Q_NUM = re.compile(r"^([A-Z]\d{1,2}[a-z]?)\.\s+(.+)$")
 _TYPE_REDIGE = re.compile(r"^(choix unique|choix multiple|grille|echelle|ouverte)")
+_ETIQUETTES = re.compile(r"\s+(NOUVEAU|MODIFI[ÉE]|[ÀA] VALIDER|SUPPRIM[ÉE])\s*$")
+_REF = r"(?:profil_final|[A-Z]\d{1,2}[a-z]?)"
 
 
 def _bloc_redige(titre):
@@ -438,8 +440,10 @@ def _bloc_redige(titre):
         lettre, nom = m.group(1).upper(), m.group(2).strip()
     else:
         lettre = None
-    if re.search(r"mode d'emploi|correspondance|conventions|annexe|sommaire|lexique", bas):
+    if re.search(r"mode d'emploi|correspondance|conventions|annexe|sommaire|lexique|changements par rapport", bas):
         genre = "ignore"
+    elif re.search(r"donnees de collecte|non lues? au repondant|metadonnees", bas):
+        genre = "collecte"
     elif re.search(r"introduction|consentement|accueil", bas):
         genre = "intro"
     elif re.search(r"\bcloture\b|\bfin de l'entretien\b|remerciements", bas):
@@ -464,6 +468,16 @@ def _decouper_puce(p):
     return [p]
 
 
+def _condition_puce(p):
+    """Puce « Avec mon opérateur (ligne affichée si A7 ≠ Aucun) » : libellé nettoyé et condition propre à la ligne."""
+    cond = None
+    if (m := re.search(r"\s*\((?:ligne affich[ée]e si|affich[ée]e? si|si)\s+([^()]*)\)", p, re.I)):
+        cond, p = m.group(1).strip(), p[:m.start()] + p[m.end():]
+    p = re.sub(r"\s*\((?:masqu[ée]e? si|r[ée]ponse exclusive)[^()]*\)", "", p, flags=re.I)
+    p = re.sub(r"\s*·\s*toujours affich[ée]e?\s*$", "", p, flags=re.I)
+    return p.strip(), cond
+
+
 def _codes(labels, type_):
     """Codes des réponses : 1, 2, 3… en choix unique (« Ne sait pas » = 99), mots en choix multiple."""
     mods, vus = [], set()
@@ -484,12 +498,37 @@ def _codes(labels, type_):
     return mods
 
 
+def _proche(valeur, libelle):
+    """Une valeur citée dans une condition (« Oui », « Aucun », « Conseiller attitré ») désigne-t-elle ce libellé ?"""
+    v, l = _bas(valeur).strip(" .«»\"'"), _bas(libelle)
+    if not v:
+        return 0
+    if v == l:
+        return 3
+    if l.startswith(v) or v.startswith(l):
+        return 2
+    mots_v = {w for w in re.findall(r"[a-z0-9]+", v) if len(w) > 2 or w.isdigit()}
+    mots_l = set(re.findall(r"[a-z0-9]+", l))
+    commun = mots_v & mots_l
+    return 1 if mots_v and len(commun) >= max(1, (len(mots_v) + 1) // 2) else 0
+
+
+def _choisir(valeur, modalites):
+    notes = [(_proche(valeur, m["label"]), k) for k, m in enumerate(modalites)]
+    meilleur = max(notes, default=(0, None))
+    return modalites[meilleur[1]] if meilleur[0] else None
+
+
 def _questionnaire_redige(blocs):
     """Questionnaire rédigé : intertitres de blocs, questions « A1. … », ligne de type (« Choix unique · filtre »),
-    réponses en puces avec renvois (« Oui → A5 », « Non → fin (hors cible) »), consignes."""
+    réponses en puces avec renvois (« Oui → A5 », « Non → fin (hors cible) »), conditions « Posée si : … »,
+    lignes de grille conditionnelles, listes propres à un profil (« Liste pour les entreprises : »), consignes."""
     items, section = [], None
     for b in blocs:
-        if b["type"] != "p":
+        if b["type"] == "t":
+            # grille présentée en tableau (« N° | Critère | Ligne affichée si (B0) »)
+            if items and items[-1]["section"] is section and _bas(items[-1]["type_ligne"]).startswith("grille") and not items[-1].get("table"):
+                items[-1]["table"] = [[_txt(c) for c in l] for l in b["lignes"]]
             continue
         t = b["texte"]
         if b["titre"] == 1:
@@ -498,19 +537,29 @@ def _questionnaire_redige(blocs):
         if section is None or section["genre"] == "ignore":
             continue
         if not b["liste"] and (m := _Q_NUM.match(t)):
-            items.append({"num": m.group(1).upper(), "texte": m.group(2).strip(), "type_ligne": "", "puces": [], "section": section})
+            items.append({"num": m.group(1)[0].upper() + m.group(1)[1:], "texte": _ETIQUETTES.sub("", m.group(2)).strip(),
+                          "type_ligne": "", "puces": [], "groupes": [], "section": section, "consignes": [], "posee_si": [], "sinon": []})
             continue
         if not items or items[-1]["section"] is not section:
             continue
         q = items[-1]
+        bas = _bas(t)
         if b["liste"]:
-            q["puces"].append(t)
-        elif not q["type_ligne"] and _TYPE_REDIGE.match(_bas(t)):
+            (q["groupes"][-1]["puces"] if q["groupes"] else q["puces"]).append(t)
+        elif not q["type_ligne"] and _TYPE_REDIGE.match(bas):
             q["type_ligne"] = t
+        elif (m := re.match(r"^pos[ée]e si\s*:\s*(.+)$", t, re.I)):
+            q["posee_si"].append(m.group(1).strip())
+        elif (m := re.match(r"^sinon\s*:\s*(.+)$", t, re.I)):
+            q["sinon"].append(m.group(1).strip())
+        elif (m := re.match(r"^consigne\s*:\s*(.+)$", t, re.I)):
+            q["consignes"].append(m.group(1).strip())
+        elif (m := re.match(r"^liste pour (?:les )?(.+?)\s*:\s*$", t, re.I)):
+            q["groupes"].append({"tag": m.group(1), "puces": []})
     notes = []
     if len(items) < 3:
         return [], notes
-    ouvertes, a_completer, controles, copies = [], [], [], []
+    ouvertes, a_completer, controles, copies, non_lues, auto = [], [], [], [], [], []
     developpees = []  # questions telles que la plateforme les reprend (une ligne de grille = une question)
     for it in items:
         s, tl = it["section"], _bas(it["type_ligne"])
@@ -520,27 +569,54 @@ def _questionnaire_redige(blocs):
             continue  # texte d'introduction et consentement : pris en charge par le formulaire
         if not tl:
             continue
+        identification = s["genre"] in ("intro", "profil", "collecte")
+        # « A » désigne l'identification dans la plateforme : un « Bloc A » thématique reçoit une clé à part
+        base = {"texte": texte, "section": "A" if identification else f"bloc_{s['lettre'] or s['nom']}",
+                "bloc": "Profil du répondant" if identification else s["nom"], "condition_texte": "",
+                "facultatif": False, "niveau_tag": " / ".join([s["tag"]] + tags).strip(" /"), "base": it["num"],
+                "consigne": " ".join(it["consignes"]), "posee_si": " ; ".join(it["posee_si"])}
+        if it["sinon"]:
+            auto.append(it["num"])
         if tl.startswith("ouverte"):
-            ouvertes.append(it["num"])
+            if s["genre"] == "cloture" or re.search(r"telephone|e-?mail|coordonnees", _bas(texte)):
+                continue  # coordonnées : la clôture de la plateforme les recueille déjà
+            ouvertes.append({**base, "num": it["num"], "type": "ouverte", "facultatif": "facultati" in tl,
+                             "apres": developpees[-1]["num"] if developpees else None})
             continue
         type_ = "multiple" if tl.startswith("choix multiple") else "unique"
         if "[liste pays" in tl or any(p.strip().startswith("[") for p in it["puces"]):
             a_completer.append(it["num"])
-        # « A » désigne l'identification dans la plateforme : un « Bloc A » thématique reçoit une clé à part
-        base = {"texte": texte, "section": "A" if s["genre"] in ("intro", "profil") else f"bloc_{s['lettre'] or s['nom']}",
-                "bloc": "Profil du répondant" if s["genre"] in ("intro", "profil") else s["nom"], "condition_texte": "",
-                "facultatif": False, "niveau_tag": " / ".join([s["tag"]] + tags).strip(" /"), "base": it["num"]}
         if tl.startswith("grille"):
-            rangs, cols, extra = [], [], []
+            rangs, cols, extra = [], [], []  # rangs : (numéro, libellé, condition, réponse propre à la ligne)
+            if it.get("table"):
+                tete = [_bas(c) for c in it["table"][0]]
+                k_lib = next((k for k, c in enumerate(tete) if re.search(r"crit|ligne$|libell|item", c) and "si" not in c.split()), 1)
+                k_cond = next((k for k, c in enumerate(tete) if "si" in c.split() or "affich" in c), None)
+                # en-tête « Ligne affichée si (B0) » : chaque cellule est une réponse de cette question
+                ref_cond = (m.group(1) if k_cond is not None and (m := re.search(r"\(([A-Z]\d{1,2}[a-z]?)\)", it["table"][0][k_cond])) else None)
+                for l in it["table"][1:]:
+                    n, lib = (l[0] if l else ""), (l[k_lib] if k_lib < len(l) else "")
+                    if not lib:
+                        continue
+                    if not re.match(r"^\d+$", n.strip()):
+                        controles.append(it["num"])
+                        continue
+                    propre = None
+                    if (m := re.search(r"\s*·\s*modalit[ée]\s*«\s*([^»]+?)\s*»", lib)):
+                        propre, lib = m.group(1), lib[:m.start()] + lib[m.end():]
+                    cond = l[k_cond].strip() if k_cond is not None and k_cond < len(l) else ""
+                    if ref_cond and cond and not re.match(rf"^{_REF}\b", cond):
+                        cond = f"{ref_cond} = {cond}"
+                    rangs.append((n.strip(), lib.strip(), None if re.match(r"(?i)^(\S+ = )?toujours$|^$", cond) else cond, propre))
             for p in it["puces"]:
                 if (m := re.match(r"^lignes?\s*:\s*(.+)$", p, re.I)):
-                    rangs += _decouper_puce(m.group(1))
+                    rangs += [(None, *_condition_puce(x), None) for x in _decouper_puce(m.group(1))]
                 elif (m := re.match(r"^colonnes?\s*:\s*(.+)$", p, re.I)):
                     cols += _decouper_puce(m.group(1))
                 elif re.match(r"contr[ôo]le d'attention|ligne de contr[ôo]le", _bas(p)):
                     controles.append(it["num"])
                 else:
-                    rangs.append(p)
+                    rangs.append((None, *_condition_puce(p), None))
             if not cols:
                 if (m := re.search(r"(\d+)\s*=\s*([^,·«]+?)\s*,\s*(\d+)\s*=\s*([^,·«]+)", it["type_ligne"])):
                     lo, hi = int(m.group(1)), int(m.group(3))
@@ -550,46 +626,60 @@ def _questionnaire_redige(blocs):
                     cols = ["Oui", "Non"]
             mods = [{"code": c.split(" – ")[0] if re.match(r"^\d+( – |$)", c) else str(k), "label": c} for k, c in enumerate(cols, 1)]
             mods += [{"code": str(98 - k), "label": e} for k, e in enumerate(extra)]
-            for k, r in enumerate(rangs, 1):
-                developpees.append({**base, "num": f"{it['num']}.{k}", "texte": f"{texte.rstrip(' ?:')} — {r}", "type": "unique",
-                                    "modalites": mods, "libelle": f"{r} ({it['num']})", "routes": []})
+            for k, (n, r, cond, propre) in enumerate(rangs, 1):
+                m_r = mods + ([{"code": "97", "label": propre}] if propre else [])
+                developpees.append({**base, "num": f"{it['num']}_{n or k}", "texte": f"{texte.rstrip(' ?:')} — {r}", "type": "unique",
+                                    "modalites": m_r, "libelle": f"{r} ({it['num']})", "routes": [], "posee_si_ligne": cond})
             continue
-        labels, routes = [], []
-        for p in it["puces"]:
-            if p.strip().startswith("["):
-                continue
-            if (m := re.match(r"^exemples?\s*:\s*(.+)$", p, re.I)):
-                labels += _decouper_puce(m.group(1)) if "," in m.group(1) else [m.group(1)]
-                continue
-            cible = None
-            if (m := re.search(r"\s*→\s*(.+)$", p)):
-                p, cible = p[:m.start()].strip(), m.group(1).strip()
-            for l in _decouper_puce(p):
-                labels.append(l)
-                if cible:
-                    routes.append((l, cible))
-        if tl.startswith("echelle") and (m := re.search(r"(\d+)\s*a\s*(\d+)", tl)):
-            lo, hi = int(m.group(1)), int(m.group(2))
-            bornes = dict(re.findall(r"(\d+)\s*=\s*([^·,]+)", " ".join(it["puces"])))
-            labels = [f"{v} – {bornes[str(v)].strip()}" if str(v) in bornes else str(v) for v in range(lo, hi + 1)]
-            mods = [{"code": str(v), "label": l} for v, l in zip(range(lo, hi + 1), labels)]
-        else:
-            mods = _codes(labels, type_)
-        q = {**base, "num": it["num"], "type": type_, "modalites": mods, "routes": routes}
-        if (m := re.search(r"(\d+)\s+r[ée]ponses?\s+maximum", it["type_ligne"], re.I)):
-            q["max_choix"] = int(m.group(1))
-        if (m := re.search(r"(?:parmi les r[ée]ponses [àa]|m[êe]mes modalit[ée]s que)\s+([A-Z]\d+)", it["type_ligne"], re.I)):
-            q["copie_de"] = m.group(1).upper()
-        # la question de cible (« Vous répondez en tant que ») : la première trouvée, « en tant que » avant « vous êtes »
-        cible_q = s["genre"] == "profil" and len(mods) > 1 and not any(x.get("role") == "fonction" for x in developpees)
-        if cible_q and re.search(r"\ben tant que\b", _bas(texte)):
-            q["role"] = "fonction"
-        elif cible_q and re.search(r"\b(vous etes|je suis)\b", _bas(texte)) and not any(
-                re.search(r"\ben tant que\b", _bas(x["texte"])) for x in items if x["section"]["genre"] == "profil"):
-            q["role"] = "fonction"
-        else:
-            q["role"] = _role(texte)
-        developpees.append(q)
+        groupes = [g for g in it["groupes"] if g["puces"]] or [{"tag": "", "puces": it["puces"]}]
+        for g_k, g in enumerate(groupes):
+            labels, routes = [], []
+            for p in (it["puces"] + g["puces"] if g["tag"] else g["puces"]):
+                if p.strip().startswith("["):
+                    continue
+                if (m := re.search(r"\b(?:coch[ée]e?s?|cit[ée]e?s?) en ([A-Z]\d{1,2})\b", p)):
+                    it["copie_de"] = m.group(1)  # « Opérateurs cochés en A7 uniquement »
+                    continue
+                if (m := re.match(r"^exemples?\s*:\s*(.+)$", p, re.I)):
+                    labels += _decouper_puce(m.group(1)) if "," in m.group(1) else [m.group(1)]
+                    continue
+                cible = None
+                if (m := re.search(r"\s*→\s*(.+)$", p)):
+                    p, cible = p[:m.start()].strip(), m.group(1).strip()
+                p, _ = _condition_puce(p)
+                for l in _decouper_puce(p):
+                    labels.append(l)
+                    if cible:
+                        routes.append((l, cible))
+            if tl.startswith("echelle") and (m := re.search(r"(\d+)\s*a\s*(\d+)", tl)):
+                lo, hi = int(m.group(1)), int(m.group(2))
+                bornes = dict(re.findall(r"(\d+)\s*=\s*([^·,]+)", " ".join(it["puces"])))
+                labels = [f"{v} – {bornes[str(v)].strip()}" if str(v) in bornes else str(v) for v in range(lo, hi + 1)]
+                mods = [{"code": str(v), "label": l} for v, l in zip(range(lo, hi + 1), labels)]
+            else:
+                mods = _codes(labels, type_)
+            num = it["num"] if len(groupes) == 1 else f"{it['num']}{'abcdefgh'[g_k]}"
+            q = {**base, "num": num, "type": type_, "modalites": mods, "routes": routes}
+            if g["tag"]:
+                q["niveau_tag"] = g["tag"]
+                court = re.sub(r"\s+", " ", texte).rstrip(" ?:")[:70]
+                q["libelle"] = f"{court} ({g['tag']})"
+            if (m := re.search(r"(\d+)\s+r[ée]ponses?\s+maximum", it["type_ligne"], re.I)):
+                q["max_choix"] = int(m.group(1))
+            if (m := re.search(r"(?:parmi les r[ée]ponses [àa]|m[êe]mes modalit[ée]s que)\s+([A-Z]\d+)", it["type_ligne"], re.I)):
+                q["copie_de"] = m.group(1).upper()
+            elif it.get("copie_de"):
+                q["copie_de"] = it["copie_de"]
+            # la question de cible (« Vous répondez en tant que ») : la première trouvée, « en tant que » avant « vous êtes »
+            cible_q = s["genre"] == "profil" and len(mods) > 1 and not any(x.get("role") == "fonction" for x in developpees)
+            if cible_q and re.search(r"\ben tant que\b", _bas(texte)):
+                q["role"] = "fonction"
+            elif cible_q and re.search(r"\b(vous etes|je suis)\b", _bas(texte)) and not any(
+                    re.search(r"\ben tant que\b", _bas(x["texte"])) for x in items if x["section"]["genre"] == "profil"):
+                q["role"] = "fonction"
+            else:
+                q["role"] = _role(texte)
+            developpees.append(q)
     # réponses reprises d'une autre question (« parmi les réponses à A7 », « mêmes modalités que E3 »)
     par_base = {}
     for q in developpees:
@@ -622,8 +712,8 @@ def _questionnaire_redige(blocs):
             elif (m := re.match(r"^bloc\s+([0-9a-z])\b", bas)):
                 lettre = m.group(1).upper()
                 fin = debut_bloc.get("A" if lettre == "0" else f"bloc_{lettre}", len(developpees))
-            elif (m := re.match(r"^([a-z]\d+)\b", bas)) and m.group(1).upper() in position:
-                fin = position[m.group(1).upper()]
+            elif (m := re.match(r"^([a-z]\d{1,2}[a-z]?)\b", bas)) and (m.group(1)[0].upper() + m.group(1)[1:]) in position:
+                fin = position[m.group(1)[0].upper() + m.group(1)[1:]]
             else:
                 continue
             for j in range(k + 1, fin):
@@ -633,8 +723,8 @@ def _questionnaire_redige(blocs):
             # la question n'est posée que pour les autres réponses (forme positive : réponse absente = question masquée)
             garder = [m["code"] for m in q["modalites"] if m["code"] not in sautes]
             if garder:
-                developpees[j]["clause"] = {"num": q["num"], "valeurs": garder, "sauf": False}  # le renvoi le plus proche l'emporte
-    # mentions [Particuliers], [PME / GE] : questions réservées à certains profils
+                developpees[j]["clauses"] = [{"num": q["num"], "valeurs": garder, "sauf": False}]  # le renvoi le plus proche l'emporte
+    # profils de la cible (question « Vous répondez en tant que ») : mentions [PME / GE] et conditions sur le profil
     fonction = next((q for q in developpees if q.get("role") == "fonction"), None)
     profils = [m["label"] for m in fonction["modalites"] if not _bas(m["label"]).startswith("autre")] if fonction else []
 
@@ -642,31 +732,117 @@ def _questionnaire_redige(blocs):
         mots = [w for w in re.findall(r"[a-z]+", _bas(_hors_parentheses(label))) if len(w) > 2 and w not in ("une", "des", "les", "pour")]
         return "".join(w[0] for w in mots)
 
-    for q in developpees:
-        if not q.get("niveau_tag") or not profils:
-            continue
+    def _singulier(t):
+        return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") else w for w in re.findall(r"[a-z0-9']+", _bas(t)))
+
+    def _profils_cites(texte):
         retenus = set()
-        for jeton in re.split(r"\s*/\s*|\s*,\s*", q["niveau_tag"]):
-            j = _bas(jeton).rstrip("s")
+        for jeton in re.split(r"\s*/\s*|\s*,\s*|\s+ou\s+|\s+et\s+", texte):
+            j = _singulier(re.sub(r"^(les|le|la|l')\s*", "", _bas(jeton))).strip()
             if len(j) < 2:
                 continue
             for lab in profils:
-                if j in _bas(lab) or (len(j) <= 3 and j in _sigle(lab)):
+                if j in _singulier(lab) or (len(j) <= 3 and j in _sigle(lab)):
                     retenus.add(lab)
-        if retenus and len(retenus) < len(profils):
-            q["niveau"] = [slug(_nettoyer_liste(l), maxi=20) for l in profils if l in retenus]
+        return retenus
+
+    def _code_profil(lab):
+        return slug(_nettoyer_liste(lab), maxi=20)
+
     for q in developpees:
+        if q.get("niveau_tag") and profils:
+            retenus = _profils_cites(q["niveau_tag"])
+            if retenus and len(retenus) < len(profils):
+                q["niveau"] = [_code_profil(l) for l in profils if l in retenus]
+    # conditions écrites en clair : « Posée si : A4 = Oui », « D1 = Oui et D3 ≠ Une seule fois », lignes « (si D7 banque = Oui) »
+    par_num = {q["num"]: q for q in developpees}
+
+    def _question(ref, precision):
+        if ref == "profil_final":
+            return fonction
+        if precision:  # ligne d'une grille : « D7 banque », « D7 mobile money »
+            lignes = [q for q in developpees if q["base"] == ref and q["num"] != ref]
+            notes_l = [(_proche(precision, re.sub(r"\s*\([A-Z]\d+\)$", "", q.get("libelle", ""))), q) for q in lignes]
+            meilleur = max(notes_l, key=lambda x: x[0], default=(0, None))
+            return meilleur[1] if meilleur[0] else None
+        return par_num.get(ref)
+
+    def _traduire(texte):
+        """Clauses (reliées par « ou ») et profils concernés ; None si la condition n'est pas lisible."""
+        t = re.sub(r"\.\s.*$", "", texte.strip()).rstrip(" .")  # première phrase seulement
+        clauses, niveau = [], None
+        for ou in re.split(rf"\s+ou\s+(?={_REF}\b)", t):
+            retenue = None
+            for et in re.split(rf"\s+et\s+(?={_REF}\b)", ou):
+                m = re.match(rf"^({_REF})(?:\s+([^=≠!]+?))?\s*(=|≠|!=)\s*(.+)$", et.strip())
+                if not m:
+                    return None
+                q = _question(m.group(1), (m.group(2) or "").strip())
+                if q is None:
+                    return None
+                valeurs = [v.strip() for v in re.split(r"\s+ou\s+", m.group(4)) if v.strip()]
+                sauf = m.group(3) != "="
+                if q is fonction:
+                    cites = set().union(*[_profils_cites(v) for v in valeurs]) if valeurs else set()
+                    if not cites:
+                        return None
+                    gardes = [l for l in profils if (l in cites) != sauf]
+                    niveau = [_code_profil(l) for l in gardes]
+                    continue
+                choisies = [x for x in (_choisir(v, q["modalites"]) for v in valeurs) if x]
+                if len(choisies) != len(valeurs):
+                    return None
+                codes = [x["code"] for x in choisies]
+                garder = [x["code"] for x in q["modalites"] if (x["code"] in codes) != sauf]
+                if garder:
+                    cl = {"num": q["num"], "valeurs": garder, "sauf": False}  # forme positive
+                    # « et » : la clause sur la question la plus tardive suffit (elle n'est posée que si les autres le sont)
+                    if retenue is None or developpees.index(q) > developpees.index(par_num[retenue["num"]]):
+                        retenue = cl
+            if retenue:
+                clauses.append(retenue)
+        return clauses, niveau
+
+    for q in developpees + ouvertes:
+        # la condition propre à une ligne de grille, plus précise, passe avant celle de la grille entière
+        ligne = q.pop("posee_si_ligne", None)
+        res_ligne = _traduire(ligne) if ligne else None
+        textes = [("ligne", ligne, res_ligne)] if res_ligne else []
+        if not res_ligne:
+            textes = [("question", q.pop("posee_si", None), None)] + ([("ligne", ligne, None)] if ligne else [])
+        else:
+            q.pop("posee_si", None)
+        for _, texte, res in textes:
+            if not texte:
+                continue
+            res = res or _traduire(texte)
+            if res is None:
+                if q.get("role") not in ("pays", "fonction", "enqueteur", "restitution"):  # gérées par la plateforme
+                    non_lues.append(q["num"])
+                q["consigne"] = (q.get("consigne", "") + " " if q.get("consigne") else "") + f"Posée si : {texte}"
+                continue
+            clauses, niveau = res
+            if clauses:
+                q["clauses"] = clauses  # la condition écrite prime sur celle déduite des renvois
+            if niveau:
+                q["niveau"] = [c for c in niveau if c in q["niveau"]] if q.get("niveau") else niveau
+    for q in developpees + ouvertes:
         q.pop("routes", None)
         q.pop("niveau_tag", None)
     if ouvertes:
-        notes.append(f"Questions ouvertes non reprises ({', '.join(ouvertes)}) : la plateforme ne traite pas encore les réponses libres.")
+        notes.append(f"Questions ouvertes ({', '.join(o['num'] for o in ouvertes)}) : ajoutées au questionnaire comme questions de texte, "
+                     "à leur place, avec leur condition ; collectées mais non calculées dans le rapport.")
     if a_completer:
         notes.append(f"Listes à établir pays par pays ({', '.join(a_completer)}) : banques, opérateurs… à compléter dans l'étape Questionnaire.")
     if copies:
         notes.append(f"Réponses reprises d'une question précédente ({', '.join(copies)}) : la liste complète est proposée, sans filtrage sur la réponse donnée.")
     if controles:
-        notes.append(f"Ligne de contrôle d'attention ({', '.join(controles)}) non reprise : à traiter à l'apurement.")
-    return developpees, notes
+        notes.append(f"Ligne de contrôle d'attention ({', '.join(sorted(set(controles)))}) non reprise : à traiter à l'apurement.")
+    if non_lues:
+        notes.append(f"Conditions écrites non traduites ({', '.join(non_lues)}) : reportées en consigne, à programmer à la main.")
+    if auto:
+        notes.append(f"Remplissages automatiques (« Sinon : », {', '.join(auto)}) non programmés : à calculer à l'analyse.")
+    return developpees + ouvertes, notes
 
 
 def _condition(texte, par_num):
@@ -700,7 +876,8 @@ def _condition(texte, par_num):
 def _vers_indicateurs(questions, format_):
     """Une question = un indicateur ; les questions d'identification prises en charge par la plateforme sont écartées."""
     par_num = {q["num"]: q for q in questions}
-    retenues = [q for q in questions if q.get("role") not in ("enqueteur", "pays", "secteur", "fonction", "restitution")]
+    retenues = [q for q in questions if q.get("role") not in ("enqueteur", "pays", "secteur", "fonction", "restitution")
+                and q["type"] != "ouverte"]
     ids = {q["num"]: f"I{k:02d}" for k, q in enumerate(retenues, 1)}
     inds = []
     for q in retenues:
@@ -709,20 +886,72 @@ def _vers_indicateurs(questions, format_):
                "type": q["type"], "bloc": bloc, "niveau": q.get("niveau") or "tous",
                "actif": True, "sens": "", "objet": "", "question": q["texte"],
                "options": [{"code": m["code"], "label": m["label"]} if m["code"] else m["label"] for m in q["modalites"]]}
+        if format_ == "redige":
+            ind["code_origine"] = q["num"]  # code du questionnaire d'origine (B2_3…), repris par le plan d'analyse et les scores
+        if q.get("consigne"):
+            ind["consigne"] = q["consigne"]
         if q["section"] == "A":
             ind["identification"] = True
         if q.get("exclut"):
             ind["exclut"] = q["exclut"]
         if q["type"] == "multiple":
             ind["max_choix"] = q.get("max_choix", 0)
-        if q.get("clause") and q["clause"]["num"] in ids:  # renvoi d'un questionnaire rédigé
-            ind["condition"] = [{"si": ids[q["clause"]["num"]], "valeurs": q["clause"]["valeurs"], "sauf": q["clause"]["sauf"]}]
+        clauses = [c for c in q.get("clauses") or [] if c["num"] in ids]  # renvois et conditions d'un questionnaire rédigé
+        if clauses:
+            ind["condition"] = [{"si": ids[c["num"]], "valeurs": c["valeurs"], "sauf": c["sauf"]} for c in clauses]
         if q.get("condition_texte") and format_ == "technique":
             clauses = [c for c in _condition(q["condition_texte"], par_num) if c["num"] in ids]
             if clauses:
                 ind["condition"] = [{"si": ids[c["num"]], "valeurs": c["valeurs"], "sauf": c["sauf"]} for c in clauses]
         inds.append(ind)
     return inds
+
+
+def _ouvertes(questions):
+    """Questions ouvertes d'un questionnaire rédigé : placées après la question qui les précède, avec leur condition."""
+    retenues = [q for q in questions if q.get("role") not in ("enqueteur", "pays", "secteur", "fonction", "restitution")
+                and q["type"] != "ouverte"]
+    ids = {q["num"]: f"I{k:02d}" for k, q in enumerate(retenues, 1)}
+    res = []
+    for q in questions:
+        if q["type"] != "ouverte":
+            continue
+        res.append({"num": q["num"], "texte": q["texte"], "bloc": q["bloc"], "facultatif": q.get("facultatif", False),
+                    "consigne": q.get("consigne", ""), "niveau": q.get("niveau") or "tous", "apres": ids.get(q.get("apres")),
+                    "condition": [{"si": ids[c["num"]], "valeurs": c["valeurs"], "sauf": c["sauf"]}
+                                  for c in q.get("clauses") or [] if c["num"] in ids]})
+    return res
+
+
+def ajouter_ouvertes(projet, ouvertes):
+    """Ajoute au questionnaire généré les questions ouvertes de l'import, chacune sous la question qui la précède."""
+    from . import moteur
+    if not ouvertes:
+        return projet
+    d = projet["etapes"]["questionnaire"]["data"]
+    if not d.get("sections"):  # questionnaire pas encore généré
+        return projet
+    sections = d["sections"]
+    profils = {p["code"] for p in d.get("profils") or []}
+    deja = {q["id"] for s in sections for q in s["ids"]}
+    for o in ouvertes:
+        ident = f"aj_ouv_{slug(o['num'], maxi=8)}"
+        if ident in deja:
+            continue
+        q = {"id": ident, "texte": o["texte"], "type": "text", "modalites": [], "ajoutee": True, "modifiee": True,
+             "dans_rapport": False, "bloc": o["bloc"], "obligatoire": not o["facultatif"], "consigne": o["consigne"],
+             "profils": [c for c in o["niveau"] if c in profils] if isinstance(o["niveau"], list) else None,
+             "conditions": [[f"q_{c['si']}", c["valeurs"], c["sauf"]] for c in o["condition"]], "num": "…", "var": "…"}
+        place = None
+        for si, s in enumerate(sections):
+            for qi, x in enumerate(s["ids"]):
+                if o["apres"] and x.get("indicateur") == o["apres"]:
+                    place = (si, qi + 1)
+        if place is None:  # question précédente absente : en fin de la section du même bloc, sinon avant la clôture
+            si = next((k for k, s in enumerate(sections) if s["titre"] == o["bloc"]), len(sections) - 2)
+            place = (si, len(sections[si]["ids"]))
+        sections[place[0]]["ids"].insert(place[1], q)
+    return moteur.maj_data(projet, "questionnaire", {"sections": sections})
 
 
 # ------------------------------------------------------------------ proposition complète
@@ -752,13 +981,15 @@ def proposer(chemin_note, chemin_questionnaire=None):
             if f.get(cle):
                 notes = [n for n in notes if n != f"La note ne précise pas {lib} de façon reconnaissable : à compléter."]
         inds = _vers_indicateurs(questions, format_)
+        prop["questions_ouvertes"] = _ouvertes(questions)
         if inds and prop["indicateurs"] and format_ == "terrain":
             # la note a son tableau d'indicateurs (types d'échelle, indice) : il prime sur un questionnaire terrain
             notes.append("Indicateurs repris du tableau de la note (types et indice conservés) ; le questionnaire a servi à préciser le champ.")
         elif inds:
             prop["indicateurs"] = inds
             prop["origine_indicateurs"] = "questionnaire"
-        grilles = sorted({q["num"].split(".")[0] for q in questions if "." in q["num"]})
+        grilles = sorted({q["base"] for q in questions if q.get("base") and q["num"] != q["base"] and q.get("libelle", "").endswith(f"({q['base']})")}
+                         | {q["num"].split(".")[0] for q in questions if "." in q["num"]})
         if grilles:
             notes.append(f"Grilles ({', '.join(grilles)}) : chaque ligne devient une question à choix unique.")
     elif prop["indicateurs"]:
@@ -818,4 +1049,5 @@ def creer_etude(prop, fiche, chemin_note, chemin_questionnaire=None, valider=Tru
     if valider:
         moteur.valider(p, "cadrage")
         moteur.generer(p, "questionnaire")
+        p = ajouter_ouvertes(p, prop.get("questions_ouvertes"))
     return p
