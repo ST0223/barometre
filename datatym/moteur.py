@@ -1,14 +1,15 @@
 """Moteur de la chaîne de production : génération, édition, validation, propagation, exports."""
 import logging
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 from . import apurement, budget, equipe, formulaires, formation, paiement, pretest, rappels, store, terrain
-from .banque import nom_court, profils_depuis_cible
+from .banque import decouper, nom_court, profils_depuis_cible, sont_des_pays
 from .charte import rendre_modele
 from .etapes import cadrage, collecte, echantillonnage, methodologie, questionnaire, rapport, suivi
-from .outils import propre
+from .outils import aujourdhui, nombre, propre
 from .store import CLES, ETAPES
 
 MODULES = {"cadrage": cadrage, "questionnaire": questionnaire, "echantillonnage": echantillonnage,
@@ -115,24 +116,41 @@ AUTEUR = "DATATYM"
 EXTERNES = {"note_recrutement", "questionnaire_digital"}
 
 
+def accroche(projet):
+    """Ligne d'accroche de la page de garde : « 5 000 répondants · 10 pays · particulier, PME, grande entreprise »."""
+    f = projet["fiche"]
+    zones = decouper(f.get("zones", ""))
+    profils = [re.sub(r"\s*\(.*$", "", x).strip() for x in decouper(f.get("cible", ""))]
+    profils = [x[:1].lower() + x[1:] if x[:2] != x[:2].upper() else x for x in profils if x]
+    morceaux = [f"{nombre(f.get('taille') or 0, 0)} répondants" if f.get("taille") else "",
+                f"{len(zones)} {'pays' if sont_des_pays(zones) else 'zones'}" if zones else "", ", ".join(profils[:4])]
+    return " · ".join(x for x in morceaux if x)
+
+
 def page_de_garde(projet, docs, cle):
-    """Titre = thème du baromètre, sous-titre = type de document, auteur DATATYM."""
+    """Page de garde au style des notes d'étude : titre = type de document, sous-titre = baromètre, surtitre au nom du
+    commanditaire et de Datatym, accroche (échantillon, pays, cible), ligne de version ; en-tête « Commanditaire ·
+    Baromètre — Document vN » ; pied « Commanditaire · Datatym, groupe Agiltym — Confidentiel »."""
     types = {nom: affiche for nom, (_, affiche) in getattr(MODULES[cle], "DOCS", {}).items()}
+    fiche = projet["fiche"]
+    comm = (fiche.get("commanditaire") or "").strip()
+    v = projet["etapes"][cle].get("version") or 1
     for nom, m in docs.items():
         if m.get("entete_manuel"):
             continue
-        if not (cle == "rapport" and m.get("titre") and m["titre"] != projet["fiche"]["theme"]):
-            m["titre"] = projet["fiche"]["theme"]
-        if not (cle == "rapport" and m.get("sous_titre")):
-            m["sous_titre"] = types.get(nom, m.get("sous_titre", ""))
-        # la mention de confidentialité figure en note de bas de page, pas sur la couverture
-        m["surtitre"] = ""
-        m["pied"] = "Datatym" if nom in EXTERNES else "Document interne — Confidentiel"
-        # pas de rappel d'échantillon ni de cible en page de garde : version, dates et auteur seulement
-        meta = [x for x in m.get("meta", []) if x.startswith(("Version", "Collecte du", "Date limite", "Candidature"))]
-        m["meta"] = meta + [f"Auteur : {AUTEUR}"]
+        rapport_titre = cle == "rapport" and m.get("titre") and m["titre"] != fiche["theme"]
+        if not rapport_titre:
+            m["titre"] = types.get(nom, m.get("titre", ""))
+            m["sous_titre"] = fiche["theme"]
+        m["surtitre"] = f"{comm.upper()}  ·  DATATYM, GROUPE AGILTYM" if comm else "DATATYM, GROUPE AGILTYM"
+        signature = f"{comm.upper()}  ·  Datatym, groupe Agiltym" if comm else "Datatym, groupe Agiltym"
+        m["pied"] = "Datatym, groupe Agiltym" if nom in EXTERNES else f"{signature} — Confidentiel"
+        # accroche, puis version et dates utiles (collecte, candidature) ; l'auteur figure dans les propriétés du fichier
+        dates = [x for x in m.get("meta", []) if x.startswith(("Collecte du", "Date limite", "Candidature"))]
+        m["meta"] = [accroche(projet), f"Version {v} du {aujourdhui()}." + (" Document de référence de l'étude, à valider par le commanditaire." if cle == "cadrage" and comm else "")] + dates
         m["auteur"] = AUTEUR
-        m["en_tete"] = f"{m['titre']} — {m['sous_titre']}"
+        court = re.sub(r"\s+(executive education|consulting|group|groupe)\b.*$", "", comm, flags=re.I).strip() or comm
+        m["en_tete"] = " — ".join(x for x in (" · ".join(x for x in (court, fiche["theme"]) if x), f"{types.get(nom, m.get('titre', ''))} v{v}") if x)
     return docs
 
 
@@ -173,7 +191,7 @@ def exporter(projet, cle):
     for nom, (code, affiche) in getattr(mod, "DOCS", {}).items():
         if nom in e["docs"]:
             f = store.nom_fichier(projet, code, v, "docx")
-            rendre_modele(e["docs"][nom], out / f)
+            rendre_modele(e["docs"][nom], out / f, projet, v)
             ajout(affiche, f, nom)
     # étude lancée à partir de documents importés : ils restent disponibles tels quels, à côté des versions de la plateforme
     sources = (projet["etapes"]["cadrage"].get("data") or {}).get("sources") or {}

@@ -1013,6 +1013,114 @@ def proposer(chemin_note, chemin_questionnaire=None):
     return prop, notes
 
 
+# ------------------------------------------------------------------ sections d'une note fournie (cadrage, méthodologie)
+# section de la plateforme ← intitulés reconnus dans la note fournie
+CLES_SECTIONS = {
+    "cadrage": [("principes", r"principes|methodolog"), ("livrables", r"livrable"), ("gouvernance", r"gouvernance|pilotage"),
+                ("planning", r"planning|calendrier"), ("budget", r"budget|\bcout"), ("ethique", r"ethique|legal|deontolog"),
+                ("risques", r"risque"), ("decisions", r"decision|points? (a valider|a trancher)")],
+    "methodologie": [("population", r"population|unites? d'observation"), ("echantillonnage", r"echantillon"), ("collecte", r"collecte"),
+                     ("precision", r"precision"), ("ponderation", r"ponderation|redressement"), ("indicateurs", r"indicateur|composite|indice"),
+                     ("qualite", r"qualite"), ("traitement", r"intelligence artificielle|traitement|\bia\b"),
+                     ("donnees", r"protection|donnees personnelles|confidentialite"), ("limites", r"limite")],
+}
+
+
+def _texte_gras(paragraphe):
+    """Texte d'un paragraphe Word, le gras rendu par **…** comme dans les modèles de la plateforme."""
+    segments = []  # (texte, gras), les morceaux voisins de même graisse fusionnés
+    for r in paragraphe.runs:
+        if not r.text:
+            continue
+        g = bool(r.bold) and bool(r.text.strip())
+        if segments and segments[-1][1] == g:
+            segments[-1] = (segments[-1][0] + r.text, g)
+        else:
+            segments.append((r.text, g))
+    morceaux = []
+    for texte, g in segments:
+        if not g:
+            morceaux.append(texte)
+            continue
+        # les espaces restent hors du gras : « **Règle :** Datatym » et non « **Règle : **Datatym »
+        avant, coeur, apres = re.match(r"^(\s*)(.*?)(\s*)$", texte, re.S).groups()
+        morceaux.append(f"{avant}**{coeur}**{apres}" if coeur else texte)
+    return " ".join("".join(morceaux).split())
+
+
+def sections_document(chemin):
+    """Sections de premier niveau d'un document Word : [{titre, blocs}] (paragraphes, listes, tableaux, sous-titres)."""
+    d = docx.Document(chemin)
+    sections, cour, puces = [], None, []
+
+    def vider():
+        nonlocal puces
+        if puces and cour is not None:
+            cour["blocs"].append({"type": "liste", "items": puces, "numerotee": False})
+        puces = []
+
+    for el in d.element.body.iterchildren():
+        if el.tag == qn("w:p"):
+            par = Paragraph(el, d)
+            texte = " ".join(par.text.split())
+            if not texte:
+                continue
+            style = (par.style.name if par.style is not None else "") or ""
+            niveau = int(m.group(1)) if (m := re.search(r"(?:Heading|Titre)\s*(\d)", style)) else 0
+            if niveau == 1:
+                vider()
+                cour = {"titre": re.sub(r"^\d+[.)]\s*", "", texte), "blocs": []}
+                sections.append(cour)
+                continue
+            if cour is None:
+                continue  # page de garde
+            if niveau >= 2:
+                vider()
+                cour["blocs"].append({"type": "titre", "texte": re.sub(r"^\d+\.(\d+)\s*", r"{n}.\1 ", texte), "niveau": 2})
+            elif el.find(".//" + qn("w:numPr")) is not None or "List" in style:
+                puces.append(_texte_gras(par))
+            else:
+                vider()
+                t = _texte_gras(par)
+                cour["blocs"].append({"type": "p", "texte": t, "style": "encadre" if re.match(r"^\**\s*[àa] retenir", t, re.I) else "normal"})
+        elif el.tag == qn("w:tbl") and cour is not None:
+            vider()
+            lignes = [[" / ".join(" ".join(p.text.split()) for p in c.paragraphs if p.text.strip()) for c in r.cells] for r in Table(el, d).rows]
+            if lignes:
+                cour["blocs"].append({"type": "tableau", "colonnes": lignes[0], "lignes": lignes[1:], "legende": "", "taille": 9.5})
+    vider()
+    return sections
+
+
+def sections_pour(cle, chemin):
+    """Sections d'une note fournie, rangées sous les clés du plan de la plateforme (« gouvernance », « ponderation »…)."""
+    res = {}
+    for s in sections_document(chemin):
+        bas = _bas(s["titre"])
+        for k, motif in CLES_SECTIONS.get(cle, []):
+            if k not in res and re.search(motif, bas):
+                res[k] = s["blocs"]
+                break
+    return res
+
+
+def importer_sections(projet, cle, chemin, nom_fichier=""):
+    """Reprend dans l'étape les sections d'une note Word (cadrage ou méthodologie) ; renvoie les clés reprises."""
+    import shutil
+    from . import moteur, store
+    res = sections_pour(cle, chemin)
+    if not res:
+        return projet, []
+    e = projet["etapes"][cle]
+    e["data"]["sections_importees"] = res
+    sources = store.dossier(projet["slug"]) / "sources"
+    sources.mkdir(parents=True, exist_ok=True)
+    shutil.copy(chemin, sources / f"{cle}_sections_origine.docx")
+    store.journaliser(projet, f"« {moteur.LIBELLES[cle]} » : sections reprises de {nom_fichier or 'la note fournie'} ({', '.join(res)}).")
+    moteur._apres_maj(projet, cle)
+    return projet, list(res)
+
+
 # ------------------------------------------------------------------ création de l'étude
 def creer_etude(prop, fiche, chemin_note, chemin_questionnaire=None, valider=True):
     """Crée l'étude à partir de la proposition vérifiée : cadrage repris de la note (validé si demandé), documents
@@ -1042,6 +1150,8 @@ def creer_etude(prop, fiche, chemin_note, chemin_questionnaire=None, valider=Tru
         d["objectifs_specifiques"] = prop["objectifs"]
     d["redaction"] = "importee"
     d["sources"] = noms
+    # sections de la note (principes, gouvernance, risques…) reprises telles quelles dans la note de cadrage
+    d["sections_importees"] = sections_pour("cadrage", chemin_note)
     d["theme_ref"] = [p["fiche"]["theme"], p["fiche"]["objectif"]]
     p["etapes"]["cadrage"]["data"] = cadrage.normaliser(d)
     store.journaliser(p, "Note de cadrage importée" + (" avec son questionnaire" if chemin_questionnaire else "") + ".")

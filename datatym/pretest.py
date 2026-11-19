@@ -192,7 +192,7 @@ def docx(chemin, projet):
     modele = {"titre": theme, "sous_titre": "Rapport de pré-test du questionnaire", "surtitre": "",
               "meta": [f"Version du {aujourdhui()}", "Auteur : DATATYM"], "en_tete": f"{theme} — Rapport de pré-test",
               "pied": "Document interne — Confidentiel", "sections": secs}
-    return rendre_modele(modele, chemin)
+    return rendre_modele(modele, chemin, projet)
 
 
 def grille_xlsx(chemin, projet):

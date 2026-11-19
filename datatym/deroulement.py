@@ -236,7 +236,7 @@ def docx(chemin, projet, d=None):
                         "Moments de décision", [1.3, 1.7, 3.2])], source="auto"),
         ],
     }
-    rendre_modele(modele, chemin)
+    rendre_modele(modele, chemin, projet)
     return chemin
 
 

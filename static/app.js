@@ -764,12 +764,14 @@ function rendreModele(m, maj) {
     if (b.type === "tableau") return `${b.legende ? `<div class="leg">Tableau ${++n}. ${esc(b.legende)}</div>` : ""}<table><thead><tr>${b.colonnes.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${b.lignes.map((l) => `<tr>${l.map((c) => `<td>${md(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
     if (b.type === "chiffres") return `<div class="kpis">${b.items.map((i) => `<div><b>${esc(i.valeur)}</b><span>${esc(i.libelle)}</span></div>`).join("")}</div>`;
     if (b.type === "image") return `<figure><img src="/media/${esc(b.chemin.replace(/\\/g, "/"))}?t=${t}" alt="">${b.legende ? `<figcaption>Graphique ${++g}. ${esc(b.legende)}</figcaption>` : ""}</figure>`;
+    if (b.type === "titre") return `<h3 class="sous-titre">${esc(b.texte)}</h3>`;
     return "";
   };
+  const meta = m.meta || [];
   return `<div class="page ${m.paysage ? "paysage" : ""}">
     <div class="pg-entete"><div class="pg-logos"><img src="/static/logo_datatym.png" alt="Datatym"><img src="/static/logo_agiltym.png" alt="Agiltym"></div><span>${esc(m.en_tete)}</span></div>
-    <div class="couv"><div class="st">${esc(m.surtitre)}</div><h1>${esc(m.titre)}</h1><div class="sous">${esc(m.sous_titre)}</div>
-      <div class="meta">${(m.meta || []).map(esc).join("<br>")}</div></div>
+    <div class="couv ${m.sommaire ? "pleine" : "compacte"}"><div class="st">${esc(m.surtitre)}</div><h1>${esc(m.titre)}</h1><div class="sous">${esc(m.sous_titre)}</div>
+      ${meta.length ? `<div class="accroche">${esc(meta[0])}</div>` : ""}<div class="meta">${meta.slice(1).map(esc).join("<br>")}</div></div>
     ${m.sommaire ? `<h2>Sommaire</h2><ul>${m.sections.filter((s) => s.titre && (s.niveau || 1) === 1).map((s) => `<li>${esc(s.titre)}</li>`).join("")}</ul>` : ""}
     ${m.sections.map((s) => `<div class="${s.source === "auto" ? "sec-auto" : ""}">${s.titre ? `<h${(s.niveau || 1) + 1}>${esc(s.titre)}</h${(s.niveau || 1) + 1}>` : ""}${s.blocs.map(blocs).join("")}</div>`).join("")}
   <div class="pg-pied">${esc(m.pied || "Document interne — Confidentiel")}</div>
@@ -791,6 +793,7 @@ function ongletRedaction(z, cle, e) {
       <tbody>${b.lignes.map((l, li) => `<tr>${l.map((c, ci) => `<td><textarea class="saisie petite" rows="1" data-s="${si}" data-b="${bi}" data-l="${li}" data-c="${ci}">${esc(c)}</textarea></td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
     if (b.type === "image") return `<div class="aide">${ico("chart")} Graphique : ${esc(b.legende)}</div>`;
     if (b.type === "chiffres") return `<div class="aide">Chiffres clés : ${b.items.map((i) => esc(i.valeur + " " + i.libelle)).join(" · ")}</div>`;
+    if (b.type === "titre") return `<input class="saisie petite" style="font-weight:700" data-s="${si}" data-b="${bi}" data-k="texte" value="${esc(b.texte)}" title="Sous-titre">`;
     return "";
   };
   z.insertAdjacentHTML("beforeend", `
@@ -798,6 +801,9 @@ function ongletRedaction(z, cle, e) {
     <div class="carte-corps">
       <div class="bandeau info">${ico("info")}<div>Les sections <b>rédigées</b> sont librement modifiables et conservées lors des mises à jour. Les sections <b>calculées</b> sont reconstruites à partir des paramètres : modifiez-les dans l'onglet de paramétrage ou, pour une retouche finale, dans le fichier Word.</div></div>
       ${lectureSeule ? `<div class="bandeau alerte">${ico("lock")}<div>Étape validée : rouvrez-la pour modifier le document.</div></div>` : ""}
+      ${!lectureSeule && ["cadrage", "methodologie"].includes(cle) ? `<div class="reprise-note">
+        <div><b>Reprendre les sections d'une note Word</b><span class="aide">Les parties de même intitulé (${cle === "cadrage" ? "principes, livrables, gouvernance, planning, budget, cadre éthique, risques, décisions" : "population, échantillonnage, collecte, précision, pondération, indicateurs, contrôle qualité, protection des données, limites"}) remplacent le texte par défaut ; les tableaux calculés restent joints.</span></div>
+        <label class="btn btn-petit">${ico("file")} Choisir un document<input type="file" id="reprise-doc" accept=".docx" hidden></label></div>` : ""}
       <div class="grille-2" style="margin-bottom:16px">
         <div class="champ"><label>Titre</label><input class="saisie" data-ent="titre" value="${esc(m.titre)}"></div>
         <div class="champ"><label>Sous-titre</label><input class="saisie" data-ent="sous_titre" value="${esc(m.sous_titre)}"></div>
@@ -824,6 +830,18 @@ function ongletRedaction(z, cle, e) {
     else if (t.dataset.l !== undefined) b.lignes[+t.dataset.l][+t.dataset.c] = t.value;
     else if (t.dataset.k === "items") b.items = t.value.split("\n");
     else b[t.dataset.k] = t.value;
+  };
+  const reprise = z.querySelector("#reprise-doc");
+  if (reprise) reprise.onchange = async () => {
+    const f = reprise.files[0];
+    if (!f) return;
+    const form = new FormData();
+    form.append("document", f);
+    try {
+      const r = await api("POST", `/api/projets/${S.projet.slug}/etapes/${cle}/sections`, undefined, form);
+      S.docTravail = null; S.sale = false;
+      majProjet(r, `Sections reprises de « ${f.name} ».`);
+    } catch (err) { toast(err.message, "erreur"); }
   };
   z.querySelectorAll("[data-ajout-p]").forEach((b) => (b.onclick = () => {
     m.sections[+b.dataset.ajoutP].blocs.push({ type: "p", texte: "", style: "normal" });

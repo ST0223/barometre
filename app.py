@@ -132,6 +132,33 @@ def maj_doc(slug, cle, nom):
     return ok(moteur.maj_doc(_projet(slug), cle, nom, request.get_json(force=True)))
 
 
+@app.post("/api/projets/<slug>/etapes/<cle>/sections")
+def importer_sections(slug, cle):
+    """Reprend les sections d'une note Word (cadrage ou méthodologie) : gouvernance, risques, pondération…"""
+    if cle not in importation.CLES_SECTIONS:
+        abort(404)
+    p = _projet(slug)
+    if p["etapes"][cle]["statut"] == "valide":
+        return jsonify({"erreur": "Étape validée : rouvrez-la pour reprendre les sections d'une note."}), 400
+    if not p["etapes"][cle].get("data"):
+        return jsonify({"erreur": "Générez d'abord cette étape."}), 400
+    f = request.files.get("document")
+    if not f or not f.filename.lower().endswith(".docx"):
+        return jsonify({"erreur": "Choisissez un document Word (.docx)."}), 400
+    d = IMPORTS / uuid.uuid4().hex
+    d.mkdir(parents=True, exist_ok=True)
+    try:
+        f.save(d / "note.docx")
+        p, cles = importation.importer_sections(p, cle, d / "note.docx", f.filename)
+    except Exception as exc:  # document illisible
+        return jsonify({"erreur": f"Lecture impossible du document : {exc}"}), 400
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not cles:
+        return jsonify({"erreur": "Aucune section reconnue dans ce document (intitulés de premier niveau attendus : « Gouvernance », « Pondération »…)."}), 400
+    return ok(p)
+
+
 # ------------------------------------------------------------------ import d'une note de cadrage (et de son questionnaire)
 IMPORTS = PROJETS_DIR / ".imports"
 

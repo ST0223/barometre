@@ -245,7 +245,7 @@ def guide_enqueteur(chemin, projet):
                 b["items"] = [i for i in b["items"] if i]
     modele = {"titre": f["theme"], "sous_titre": "Guide de l'enquêteur", "surtitre": "", "meta": [f"Version du {aujourdhui()}", "Auteur : DATATYM"],
               "en_tete": f"{f['theme']} — Guide de l'enquêteur", "pied": "Datatym", "sections": secs}
-    return rendre_modele(modele, chemin)
+    return rendre_modele(modele, chemin, projet)
 
 
 FICHIERS = [

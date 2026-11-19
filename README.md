@@ -48,6 +48,18 @@ Thème clair ou sombre : Paramètres › Apparence, ou bouton dans le menu (Auto
 | 7. Rapport d'analyse | Indicateurs calculés, graphiques, lecture par profil et par zone, messages clés ; tous les types d'indicateurs, y compris les valeurs numériques (effectif, durée, montant : médiane, moyenne, moitié centrale, écarts entre groupes) |
 | 8. Clôture | Onglet Restitution : présentation PowerPoint des résultats, note de synthèse, infographie (1080 × 1350) et communiqué de presse, tirés du rapport d'analyse (mention « résultats provisoires » tant que la collecte est en cours) ; onglet Archive : bilan des étapes, historique complet ; bouton BOUCLER : une archive ZIP (livrables et supports de restitution, versions validées, base des soumissions, pilotage : déroulement, fiche des rappels et rapport de pré-test, historique) à télécharger |
 
+Style des documents (toutes les études) : page de garde compacte (surtitre « COMMANDITAIRE · DATATYM, GROUPE AGILTYM » en or,
+titre du document, baromètre, accroche échantillon · pays · cible, ligne de version), en-tête « Commanditaire · Baromètre —
+Document vN », pied « … · Datatym, groupe Agiltym — Confidentiel · Page x / y », tableaux à en-tête bleu nuit ; les documents
+longs (avec sommaire) gardent une page de garde pleine. Plans : note de cadrage en 12 parties (contexte, objectifs, périmètre et
+cible, principes méthodologiques, indicateurs et questionnaire, livrables, gouvernance, planning, budget, cadre éthique et légal,
+risques et parades, décisions à prendre) ; note méthodologique en 10 parties (population, plan d'échantillonnage, collecte,
+précision, pondération, indicateurs, contrôle qualité, traitement et usage de l'IA, protection des données, limites).
+**Rédaction › Reprendre les sections d'une note Word** (cadrage, méthodologie) : les parties de même intitulé d'une note
+fournie remplacent le texte par défaut, les tableaux calculés (budget, quotas, indicateurs) restant joints ; à l'import
+d'une note de cadrage, ses sections sont reprises d'office. Une étude importée garde ses indicateurs, son contexte et ses
+objectifs quand la fiche change.
+
 Chaque étape propose : **Aperçu** (rendu fidèle du document), **Paramètres** (indicateurs, questions, quotas…),
 **Rédaction** (édition libre des sections rédigées), téléchargement Word et export PDF (via Microsoft Word).
 

@@ -246,7 +246,7 @@ def note_synthese(chemin, projet, c=None):
                                            "Le détail figure dans le rapport d'analyse et la note méthodologique.", "note")]),
         ],
     }
-    rendre_modele(modele, chemin)
+    rendre_modele(modele, chemin, projet)
     return chemin
 
 
@@ -276,7 +276,7 @@ def communique(chemin, projet, c=None):
             section("contact", "Contact presse", [p("[Nom, téléphone et mail du contact presse à ajouter.]", "note")]),
         ],
     }
-    rendre_modele(modele, chemin)
+    rendre_modele(modele, chemin, projet)
     return chemin
 
 
